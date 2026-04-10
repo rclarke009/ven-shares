@@ -3,7 +3,13 @@ import { notFound, redirect } from "next/navigation";
 
 import { ArenaHeader } from "@/components/idea-arena/arena-header";
 import { ProjectDetailView } from "@/components/idea-arena/project-detail-view";
+import { getArenaTeamDisplay } from "@/lib/arena-team";
 import { getMembershipForCurrentUser } from "@/lib/project-members";
+import {
+  buildIdeaArenaQueryString,
+  effectiveArenaSkillFilter,
+  parseArenaSkillFilterParams,
+} from "@/lib/arena-skill-filter";
 import { getProjectByIdForArena, isProjectUuid } from "@/lib/projects-arena";
 import {
   getProfessionalJobCategoriesFromMetadata,
@@ -11,12 +17,17 @@ import {
   normalizeRequiredJobCategoriesFromDb,
 } from "@/lib/skills-match";
 import { getVenRoleForCurrentUser } from "@/lib/ven-role.server";
+import { getWorkspaceAccessFlags } from "@/lib/workspace-access";
 
 type PageProps = {
   params: Promise<{ projectId: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default async function IdeaArenaProjectPage({ params }: PageProps) {
+export default async function IdeaArenaProjectPage({
+  params,
+  searchParams,
+}: PageProps) {
   const { userId } = await auth();
   if (!userId) {
     redirect("/auth/sign-in");
@@ -32,7 +43,29 @@ export default async function IdeaArenaProjectPage({ params }: PageProps) {
     notFound();
   }
 
+  const requiredForArena = normalizeRequiredJobCategoriesFromDb(
+    project.required_job_categories,
+  );
+  const { members: teamMembers, categoryCoverage } = await getArenaTeamDisplay(
+    projectId,
+    requiredForArena,
+  );
+
   const venRole = await getVenRoleForCurrentUser();
+  const sp = await searchParams;
+  const parsedRaw = parseArenaSkillFilterParams(sp);
+  const parsed = effectiveArenaSkillFilter(
+    parsedRaw,
+    venRole === "professional",
+  );
+  const returnToArenaQuery = buildIdeaArenaQueryString({
+    selected: projectId,
+    skillFilter: parsed.mode,
+    needCategories: parsed.needCategories,
+  });
+
+  const { canAccess: canOpenWorkspace, isOwner: isProjectOwner } =
+    await getWorkspaceAccessFlags(projectId, userId);
   const alreadyJoined =
     venRole === "professional"
       ? await getMembershipForCurrentUser(projectId)
@@ -67,8 +100,13 @@ export default async function IdeaArenaProjectPage({ params }: PageProps) {
         <ProjectDetailView
           project={project}
           venRole={venRole}
-          alreadyJoined={alreadyJoined}
+          canOpenWorkspace={canOpenWorkspace}
+          isProjectOwner={isProjectOwner}
+          canManageCategoryCompletion={canOpenWorkspace}
           joinTeamSkillMessage={joinTeamSkillMessage}
+          teamMembers={teamMembers}
+          categoryCoverage={categoryCoverage}
+          returnToArenaQuery={returnToArenaQuery}
         />
       </main>
       <footer className="border-t border-slate-200 bg-white/80 py-6 px-6">

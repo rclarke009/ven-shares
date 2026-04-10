@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { UserButton } from "@clerk/nextjs";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
+import { VenUserButton } from "@/components/ven-user-button";
 import { updateProfessionalProfileSkills } from "@/app/dashboard/profile/actions";
 import { ProfessionalOnboardingForm } from "@/components/onboarding/professional-onboarding-form";
 import {
@@ -51,7 +51,7 @@ export default async function ProfessionalProfilePage() {
             >
               Idea Arena
             </Link>
-            <UserButton />
+            <VenUserButton />
           </div>
         </div>
       </header>
@@ -65,9 +65,10 @@ export default async function ProfessionalProfilePage() {
         </p>
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <ProfessionalOnboardingForm
-            key={`${hoursBand ?? ""}-${initialCategories.join(",")}`}
+            key={`${hoursBand ?? ""}-${initialCategories.join(",")}-${user.imageUrl ?? ""}`}
             initialCategories={initialCategories}
             initialHours={hoursBand ?? ""}
+            initialProfileImageUrl={user.imageUrl}
             formAction={updateProfessionalProfileSkills}
             submitLabel="Save profile"
             showOnboardingCopy={false}

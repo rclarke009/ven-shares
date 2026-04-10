@@ -4,6 +4,21 @@ import {
   type ProfessionalJobCategory,
 } from "@/lib/professional-onboarding";
 
+/** Overlap between a professional's categories and project needs, in project order (deduped). */
+export function intersectProfessionalWithRequiredCategories(
+  professionalCategories: ProfessionalJobCategory[],
+  requiredCategories: ProfessionalJobCategory[],
+): ProfessionalJobCategory[] {
+  const profSet = new Set(professionalCategories);
+  const out: ProfessionalJobCategory[] = [];
+  for (const r of requiredCategories) {
+    if (profSet.has(r) && !out.includes(r)) {
+      out.push(r);
+    }
+  }
+  return out;
+}
+
 export function normalizeRequiredJobCategoriesFromDb(
   value: unknown,
 ): ProfessionalJobCategory[] {

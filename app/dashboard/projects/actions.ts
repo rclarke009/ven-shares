@@ -12,6 +12,7 @@ import { readRepresentativeImageFromFormData } from "@/lib/representative-image-
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { normalizeProfessionalJobCategories } from "@/lib/professional-onboarding";
 import { isProjectUuid } from "@/lib/projects-arena";
+import { normalizeRequiredJobCategoriesFromDb } from "@/lib/skills-match";
 import { getVenRoleForCurrentUser } from "@/lib/ven-role.server";
 
 import type { RepresentativeImageOk } from "@/lib/representative-image-upload";
@@ -311,7 +312,7 @@ export async function updateProjectWithMediaAndSkills(
   const supabase = createServerSupabaseClient();
   const { data: row, error: fetchError } = await supabase
     .from("projects")
-    .select("id")
+    .select("id, completed_job_categories")
     .eq("id", projectId)
     .eq("clerk_user_id", userId)
     .maybeSingle();
@@ -325,12 +326,21 @@ export async function updateProjectWithMediaAndSkills(
     return { ok: false, error: "Project not found." };
   }
 
+  const prevCompleted = normalizeRequiredJobCategoriesFromDb(
+    (row as Record<string, unknown>).completed_job_categories,
+  );
+  const requiredSet = new Set(required_job_categories);
+  const completed_job_categories = prevCompleted.filter((c) =>
+    requiredSet.has(c),
+  );
+
   const { error: updateErr } = await supabase
     .from("projects")
     .update({
       title,
       description,
       required_job_categories,
+      completed_job_categories,
     })
     .eq("id", projectId)
     .eq("clerk_user_id", userId);

@@ -47,6 +47,7 @@ export default async function ProfessionalOnboardingPage() {
         </p>
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <ProfessionalOnboardingForm
+            initialProfileImageUrl={user.imageUrl}
             formAction={completeProfessionalOnboarding}
             submitLabel="Continue to dashboard"
             showOnboardingCopy

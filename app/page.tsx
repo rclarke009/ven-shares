@@ -1,5 +1,7 @@
 import Link from 'next/link';
-import { UserButton, Show, SignInButton } from '@clerk/nextjs';
+import { Show, SignInButton } from '@clerk/nextjs';
+
+import { VenUserButton } from '@/components/ven-user-button';
 
 export default function LandingPage() {
   return (
@@ -26,7 +28,7 @@ export default function LandingPage() {
                 Idea Arena
               </Link>
               <Link href="/dashboard" className="ven-cta text-sm px-8 py-3">Dashboard</Link>
-              <UserButton />
+              <VenUserButton />
             </Show>
           </div>
         </div>
@@ -35,7 +37,7 @@ export default function LandingPage() {
       {/* Hero Section */}
       <section className="hero-bg h-screen flex items-center justify-center text-center px-6">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-5xl md:text-7xl font-bold leading-tight mb-6">
+          <h1 className="text-5xl md:text-7xl font-bold leading-tight mb-6 text-white">
             If you find a job you love,<br />
             you&apos;ll never work again...
           </h1>

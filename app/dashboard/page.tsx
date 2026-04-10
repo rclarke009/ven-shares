@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { UserButton } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
+import { VenUserButton } from "@/components/ven-user-button";
 import { AddProjectForm } from "@/components/dashboard/add-project-form";
 import { EditProjectForm } from "@/components/dashboard/edit-project-form";
 import { listProjectsForCurrentUser } from "@/app/dashboard/projects/actions";
@@ -44,7 +44,7 @@ export default async function DashboardPage() {
             >
               Idea Arena
             </Link>
-            <UserButton />
+            <VenUserButton />
           </div>
         </div>
       </header>
@@ -103,6 +103,14 @@ export default async function DashboardPage() {
                       ) : null}
                       <p className="mt-2 text-xs text-slate-500">
                         {formatDate(p.created_at)}
+                      </p>
+                      <p className="mt-2">
+                        <Link
+                          href={`/idea-arena/${p.id}/workspace`}
+                          className="text-sm font-semibold text-[#15803d] hover:underline"
+                        >
+                          Open workspace
+                        </Link>
                       </p>
                       {p.required_job_categories?.length ? (
                         <ul className="mt-2 flex flex-wrap gap-1.5">

@@ -6,6 +6,7 @@ import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { isProjectUuid } from "@/lib/projects-arena";
 import {
   getProfessionalJobCategoriesFromMetadata,
+  intersectProfessionalWithRequiredCategories,
   normalizeRequiredJobCategoriesFromDb,
   professionalCanJoinProject,
 } from "@/lib/skills-match";
@@ -108,9 +109,15 @@ export async function joinProjectAsProfessional(
     };
   }
 
+  const covered = intersectProfessionalWithRequiredCategories(
+    profCategories,
+    required,
+  );
+
   const { error: insertError } = await supabase.from("project_members").insert({
     project_id: projectId,
     clerk_user_id: userId,
+    covered_job_categories: covered,
   });
 
   if (insertError) {

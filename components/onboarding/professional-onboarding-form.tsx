@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useActionState, useMemo, useState } from "react";
 
 import type { ProfessionalOnboardingActionState } from "@/app/onboarding/professional/actions";
@@ -15,6 +16,8 @@ const MAX_CATEGORIES = 5;
 export type ProfessionalOnboardingFormProps = {
   initialCategories?: ProfessionalJobCategory[];
   initialHours?: ProfessionalHoursBandValue | "";
+  /** Current Clerk profile image URL (shown as preview when set). */
+  initialProfileImageUrl?: string | null;
   formAction: (
     prev: ProfessionalOnboardingActionState,
     formData: FormData,
@@ -26,6 +29,7 @@ export type ProfessionalOnboardingFormProps = {
 export function ProfessionalOnboardingForm({
   initialCategories = [],
   initialHours = "",
+  initialProfileImageUrl = null,
   formAction,
   submitLabel,
   showOnboardingCopy = true,
@@ -66,6 +70,47 @@ export function ProfessionalOnboardingForm({
           {state.error}
         </p>
       ) : null}
+
+      <div className="rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-4 space-y-3">
+        <p className="text-sm font-semibold text-slate-900">Profile photo</p>
+        <p className="text-xs text-slate-600 leading-relaxed">
+          Optional. Shown next to your name when you join Idea Arena teams (JPEG,
+          PNG, or WebP, up to 5 MB).
+        </p>
+        <div className="flex flex-wrap items-center gap-4">
+          {initialProfileImageUrl ? (
+            <Image
+              src={initialProfileImageUrl}
+              alt=""
+              width={72}
+              height={72}
+              className="rounded-full object-cover border-2 border-white shadow-sm"
+            />
+          ) : (
+            <div
+              className="flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-full border border-dashed border-slate-300 bg-white text-center text-[11px] text-slate-500 px-1 leading-tight"
+              aria-hidden
+            >
+              No photo yet
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <label
+              htmlFor="profile_photo"
+              className="text-xs font-medium text-slate-700 block mb-1"
+            >
+              Upload or replace
+            </label>
+            <input
+              id="profile_photo"
+              name="profile_photo"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="block w-full max-w-xs text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-xs file:font-medium file:text-slate-800 hover:file:bg-slate-200"
+            />
+          </div>
+        </div>
+      </div>
 
       <fieldset className="space-y-3">
         <legend className="text-sm font-semibold text-slate-900 mb-2 block">

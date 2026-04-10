@@ -11,6 +11,7 @@ import {
   isValidProfessionalHoursBand,
   normalizeProfessionalJobCategories,
 } from "@/lib/professional-onboarding";
+import { readProfilePhotoFromFormData } from "@/lib/profile-photo-upload";
 import { getVenRoleFromPublicMetadata } from "@/lib/ven-role";
 
 export async function updateProfessionalProfileSkills(
@@ -43,6 +44,23 @@ export async function updateProfessionalProfileSkills(
     return { error: "Choose at least one job category (up to five)." };
   }
 
+  const photoRead = await readProfilePhotoFromFormData(formData);
+  if (!photoRead.ok) {
+    return { error: photoRead.error };
+  }
+  if (!photoRead.skip) {
+    try {
+      await client.users.updateUserProfileImage(userId, {
+        file: photoRead.file,
+      });
+    } catch {
+      return {
+        error:
+          "Could not upload profile photo. Try a smaller file or a different format.",
+      };
+    }
+  }
+
   await client.users.updateUser(userId, {
     publicMetadata: {
       ...user.publicMetadata,
@@ -53,5 +71,7 @@ export async function updateProfessionalProfileSkills(
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/profile");
+  revalidatePath("/idea-arena");
+  revalidatePath("/onboarding/professional");
   redirect("/dashboard");
 }

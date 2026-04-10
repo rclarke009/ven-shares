@@ -1,6 +1,7 @@
 "use server";
 
 import { auth, clerkClient } from "@clerk/nextjs/server";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import {
@@ -10,6 +11,7 @@ import {
   isValidProfessionalHoursBand,
   normalizeProfessionalJobCategories,
 } from "@/lib/professional-onboarding";
+import { readProfilePhotoFromFormData } from "@/lib/profile-photo-upload";
 import { getVenRoleFromPublicMetadata } from "@/lib/ven-role";
 
 export type ProfessionalOnboardingActionState = {
@@ -46,6 +48,23 @@ export async function completeProfessionalOnboarding(
     return { error: "Choose at least one job category (up to five)." };
   }
 
+  const photoRead = await readProfilePhotoFromFormData(formData);
+  if (!photoRead.ok) {
+    return { error: photoRead.error };
+  }
+  if (!photoRead.skip) {
+    try {
+      await client.users.updateUserProfileImage(userId, {
+        file: photoRead.file,
+      });
+    } catch {
+      return {
+        error:
+          "Could not upload profile photo. Try a smaller file or a different format.",
+      };
+    }
+  }
+
   await client.users.updateUser(userId, {
     publicMetadata: {
       ...user.publicMetadata,
@@ -54,6 +73,10 @@ export async function completeProfessionalOnboarding(
       [PROFESSIONAL_ONBOARDING_COMPLETE_KEY]: true,
     },
   });
+
+  revalidatePath("/dashboard");
+  revalidatePath("/idea-arena");
+  revalidatePath("/onboarding/professional");
 
   redirect("/dashboard");
 }
