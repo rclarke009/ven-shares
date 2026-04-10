@@ -17,6 +17,26 @@ function isArenaProjectUuid(id: string): boolean {
   return ARENA_PROJECT_UUID_RE.test(id);
 }
 
+/** PostgREST / Postgres when `project_members.covered_job_categories` is not in the schema. */
+export function isMissingCoveredJobCategoriesColumn(error: {
+  code?: string;
+  message: string;
+}): boolean {
+  if (!error.message.includes("covered_job_categories")) return false;
+  return error.code === "PGRST204" || error.code === "42703";
+}
+
+type ProjectMemberPreviewRow = {
+  project_id?: unknown;
+  clerk_user_id?: unknown;
+  covered_job_categories?: unknown;
+};
+
+type ProjectMemberDetailRow = {
+  clerk_user_id?: unknown;
+  covered_job_categories?: unknown;
+};
+
 export type ArenaTeamMemberDisplay = {
   clerkUserId: string;
   displayName: string;
@@ -105,10 +125,22 @@ export async function getArenaTeamPreviewForProjects(
   const projectIds = projects.map((p) => p.id);
 
   const supabase = createServerSupabaseClient();
-  const { data: rows, error } = await supabase
+  const previewPrimary = await supabase
     .from("project_members")
     .select("project_id, clerk_user_id, covered_job_categories")
     .in("project_id", projectIds);
+  let rows: ProjectMemberPreviewRow[] | null =
+    previewPrimary.data as ProjectMemberPreviewRow[] | null;
+  let error = previewPrimary.error;
+
+  if (error && isMissingCoveredJobCategoriesColumn(error)) {
+    const retry = await supabase
+      .from("project_members")
+      .select("project_id, clerk_user_id")
+      .in("project_id", projectIds);
+    rows = retry.data as ProjectMemberPreviewRow[] | null;
+    error = retry.error;
+  }
 
   if (error) {
     console.log("MYDEBUG →", error.message);
@@ -135,7 +167,7 @@ export async function getArenaTeamPreviewForProjects(
     }
     list.push({
       clerk_user_id: cid,
-      covered_job_categories: row.covered_job_categories,
+      covered_job_categories: row.covered_job_categories ?? [],
     });
   }
 
@@ -193,10 +225,22 @@ export async function getArenaTeamDisplay(
   }
 
   const supabase = createServerSupabaseClient();
-  const { data: rows, error } = await supabase
+  const detailPrimary = await supabase
     .from("project_members")
     .select("clerk_user_id, covered_job_categories")
     .eq("project_id", projectId);
+  let rows: ProjectMemberDetailRow[] | null =
+    detailPrimary.data as ProjectMemberDetailRow[] | null;
+  let error = detailPrimary.error;
+
+  if (error && isMissingCoveredJobCategoriesColumn(error)) {
+    const retry = await supabase
+      .from("project_members")
+      .select("clerk_user_id")
+      .eq("project_id", projectId);
+    rows = retry.data as ProjectMemberDetailRow[] | null;
+    error = retry.error;
+  }
 
   if (error) {
     console.log("MYDEBUG →", error.message);
@@ -228,7 +272,7 @@ export async function getArenaTeamDisplay(
     members.push(
       buildArenaTeamMemberDisplay(
         clerkUserId,
-        row.covered_job_categories,
+        row.covered_job_categories ?? [],
         user,
         requiredCategories,
       ),

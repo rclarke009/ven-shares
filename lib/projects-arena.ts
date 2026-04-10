@@ -9,6 +9,7 @@ import { createServerSupabaseClient } from "@/lib/supabase-server";
 import type { ProjectRequiredSkill } from "@/lib/project-required-skills";
 import {
   getArenaTeamPreviewForProjects,
+  isMissingCoveredJobCategoriesColumn,
   type ArenaTeamMemberDisplay,
 } from "@/lib/arena-team";
 import {
@@ -73,6 +74,11 @@ function normalizeSkillRows(raw: unknown): ProjectRequiredSkill[] {
   return out.sort((a, b) => a.sort_order - b.sort_order);
 }
 
+type ProjectMemberCoveredUnionRow = {
+  project_id?: unknown;
+  covered_job_categories?: unknown;
+};
+
 async function fetchCoveredUnionByProjectIds(
   projectIds: string[],
 ): Promise<Map<string, Set<ProfessionalJobCategory>>> {
@@ -80,10 +86,22 @@ async function fetchCoveredUnionByProjectIds(
   if (projectIds.length === 0) return map;
 
   const supabase = createServerSupabaseClient();
-  const { data, error } = await supabase
+  const unionPrimary = await supabase
     .from("project_members")
     .select("project_id, covered_job_categories")
     .in("project_id", projectIds);
+  let data: ProjectMemberCoveredUnionRow[] | null =
+    unionPrimary.data as ProjectMemberCoveredUnionRow[] | null;
+  let error = unionPrimary.error;
+
+  if (error && isMissingCoveredJobCategoriesColumn(error)) {
+    const retry = await supabase
+      .from("project_members")
+      .select("project_id")
+      .in("project_id", projectIds);
+    data = retry.data as ProjectMemberCoveredUnionRow[] | null;
+    error = retry.error;
+  }
 
   if (error) {
     console.log("MYDEBUG →", error.message);
@@ -93,7 +111,7 @@ async function fetchCoveredUnionByProjectIds(
   for (const row of data ?? []) {
     const pid = row.project_id as string;
     const cats = normalizeRequiredJobCategoriesFromDb(
-      row.covered_job_categories,
+      row.covered_job_categories ?? [],
     );
     let set = map.get(pid);
     if (!set) {
