@@ -8,29 +8,66 @@ export default function LandingPage() {
     <div className="min-h-screen bg-[#f8fafc]">
       {/* Navigation */}
       <nav className="border-b bg-white/95 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="text-3xl font-bold">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 md:py-5 flex items-center justify-between gap-3 min-w-0">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 shrink">
+            <div className="text-2xl sm:text-3xl font-bold truncate">
               Ven<span className="text-[#22c55e]">Shares</span>
             </div>
-            <div className="text-sm text-slate-500 hidden md:block">Where Ideas Meet Action</div>
+            <div className="text-sm text-slate-500 hidden md:block shrink-0">Where Ideas Meet Action</div>
           </div>
 
-          <div className="flex items-center gap-8 text-sm font-medium">
+          <div className="hidden md:flex items-center gap-6 lg:gap-8 text-sm font-medium shrink-0">
             <Link href="#how-it-works" className="hover:text-[#22c55e] transition-colors">How it Works</Link>
             <Link href="#inventors" className="hover:text-[#22c55e] transition-colors">For Inventors</Link>
             <Link href="#professionals" className="hover:text-[#22c55e] transition-colors">For Professionals</Link>
             <Show when="signed-out">
-              <SignInButton mode="modal"><button type="button" className="ven-cta text-sm px-8 py-3">Login</button></SignInButton>
+              <SignInButton mode="modal"><button type="button" className="ven-cta text-sm px-6 lg:px-8 py-3">Login</button></SignInButton>
             </Show>
             <Show when="signed-in">
               <Link href="/idea-arena" className="text-slate-700 hover:text-[#22c55e] transition-colors">
                 Idea Arena
               </Link>
-              <Link href="/dashboard" className="ven-cta text-sm px-8 py-3">Dashboard</Link>
+              <Link href="/dashboard" className="ven-cta text-sm px-6 lg:px-8 py-3">Dashboard</Link>
               <VenUserButton />
             </Show>
           </div>
+
+          <details className="md:hidden relative shrink-0 text-sm">
+            <summary className="list-none cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-2 font-medium text-slate-800 shadow-sm hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
+              Menu
+            </summary>
+            <div className="absolute right-0 top-full z-50 mt-2 w-[min(18rem,calc(100vw-2rem))] rounded-xl border border-slate-200 bg-white p-3 shadow-lg flex flex-col gap-1">
+              <Link href="#how-it-works" className="rounded-lg px-3 py-2 font-medium text-slate-800 hover:bg-slate-50 hover:text-[#22c55e]">
+                How it Works
+              </Link>
+              <Link href="#inventors" className="rounded-lg px-3 py-2 font-medium text-slate-800 hover:bg-slate-50 hover:text-[#22c55e]">
+                For Inventors
+              </Link>
+              <Link href="#professionals" className="rounded-lg px-3 py-2 font-medium text-slate-800 hover:bg-slate-50 hover:text-[#22c55e]">
+                For Professionals
+              </Link>
+              <div className="mt-2 border-t border-slate-100 pt-2 flex flex-col gap-2">
+                <Show when="signed-out">
+                  <SignInButton mode="modal">
+                    <button type="button" className="ven-cta w-full text-sm px-4 py-2.5 text-center">
+                      Login
+                    </button>
+                  </SignInButton>
+                </Show>
+                <Show when="signed-in">
+                  <Link href="/idea-arena" className="rounded-lg px-3 py-2 font-medium text-slate-700 hover:bg-slate-50 hover:text-[#22c55e]">
+                    Idea Arena
+                  </Link>
+                  <Link href="/dashboard" className="ven-cta block text-center text-sm px-4 py-2.5">
+                    Dashboard
+                  </Link>
+                  <div className="flex justify-center pt-1">
+                    <VenUserButton />
+                  </div>
+                </Show>
+              </div>
+            </div>
+          </details>
         </div>
       </nav>
 

@@ -3,13 +3,19 @@ import "server-only";
 import { clerkClient } from "@clerk/nextjs/server";
 
 import { createServerSupabaseClient } from "@/lib/supabase-server";
-import { isProjectUuid } from "@/lib/projects-arena";
 import type { ProfessionalJobCategory } from "@/lib/professional-onboarding";
 import {
   getProfessionalJobCategoriesFromMetadata,
   intersectProfessionalWithRequiredCategories,
   normalizeRequiredJobCategoriesFromDb,
 } from "@/lib/skills-match";
+
+const ARENA_PROJECT_UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isArenaProjectUuid(id: string): boolean {
+  return ARENA_PROJECT_UUID_RE.test(id);
+}
 
 export type ArenaTeamMemberDisplay = {
   clerkUserId: string;
@@ -40,6 +46,130 @@ function normalizeCoveredFromDb(value: unknown): ProfessionalJobCategory[] {
   return normalizeRequiredJobCategoriesFromDb(value);
 }
 
+type ClerkUserRecord = NonNullable<
+  Awaited<ReturnType<Awaited<ReturnType<typeof clerkClient>>["users"]["getUser"]>>
+>;
+
+function buildArenaTeamMemberDisplay(
+  clerkUserId: string,
+  coveredRaw: unknown,
+  clerkUser: ClerkUserRecord | null,
+  requiredCategories: ProfessionalJobCategory[],
+): ArenaTeamMemberDisplay {
+  const fromDb = normalizeCoveredFromDb(coveredRaw);
+
+  if (clerkUser) {
+    const live = getProfessionalJobCategoriesFromMetadata(
+      clerkUser.publicMetadata as Record<string, unknown>,
+    );
+    const coveredCategories =
+      fromDb.length > 0
+        ? intersectProfessionalWithRequiredCategories(fromDb, requiredCategories)
+        : intersectProfessionalWithRequiredCategories(live, requiredCategories);
+    return {
+      clerkUserId,
+      displayName: displayNameFromClerkUser(clerkUser),
+      imageUrl: clerkUser.imageUrl?.trim() || null,
+      coveredCategories,
+    };
+  }
+
+  const coveredCategories =
+    fromDb.length > 0
+      ? intersectProfessionalWithRequiredCategories(fromDb, requiredCategories)
+      : [];
+
+  return {
+    clerkUserId,
+    displayName: "Team member",
+    imageUrl: null,
+    coveredCategories,
+  };
+}
+
+/**
+ * Batched team roster for Idea Arena list cards. One Supabase query + deduped Clerk lookups.
+ */
+export async function getArenaTeamPreviewForProjects(
+  projects: {
+    id: string;
+    required_job_categories: ProfessionalJobCategory[];
+  }[],
+): Promise<Map<string, ArenaTeamMemberDisplay[]>> {
+  const out = new Map<string, ArenaTeamMemberDisplay[]>();
+  if (projects.length === 0) return out;
+
+  const requiredByProjectId = new Map(
+    projects.map((p) => [p.id, p.required_job_categories] as const),
+  );
+  const projectIds = projects.map((p) => p.id);
+
+  const supabase = createServerSupabaseClient();
+  const { data: rows, error } = await supabase
+    .from("project_members")
+    .select("project_id, clerk_user_id, covered_job_categories")
+    .in("project_id", projectIds);
+
+  if (error) {
+    console.log("MYDEBUG →", error.message);
+    for (const id of projectIds) out.set(id, []);
+    return out;
+  }
+
+  const rowsByProject = new Map<
+    string,
+    { clerk_user_id: string; covered_job_categories: unknown }[]
+  >();
+  const uniqueClerkIds = new Set<string>();
+
+  for (const row of rows ?? []) {
+    const pid = typeof row.project_id === "string" ? row.project_id : "";
+    const cid =
+      typeof row.clerk_user_id === "string" ? row.clerk_user_id : "";
+    if (!pid || !cid) continue;
+    uniqueClerkIds.add(cid);
+    let list = rowsByProject.get(pid);
+    if (!list) {
+      list = [];
+      rowsByProject.set(pid, list);
+    }
+    list.push({
+      clerk_user_id: cid,
+      covered_job_categories: row.covered_job_categories,
+    });
+  }
+
+  const client = await clerkClient();
+  const clerkById = new Map<string, ClerkUserRecord | null>();
+  await Promise.all(
+    [...uniqueClerkIds].map(async (id) => {
+      try {
+        const user = await client.users.getUser(id);
+        clerkById.set(id, user);
+      } catch {
+        console.log("MYDEBUG →", "clerk getUser failed", id);
+        clerkById.set(id, null);
+      }
+    }),
+  );
+
+  for (const projectId of projectIds) {
+    const required = requiredByProjectId.get(projectId) ?? [];
+    const memberRows = rowsByProject.get(projectId) ?? [];
+    const members: ArenaTeamMemberDisplay[] = memberRows.map((r) =>
+      buildArenaTeamMemberDisplay(
+        r.clerk_user_id,
+        r.covered_job_categories,
+        clerkById.get(r.clerk_user_id) ?? null,
+        required,
+      ),
+    );
+    out.set(projectId, members);
+  }
+
+  return out;
+}
+
 /**
  * Loads project team members with Clerk profile fields and per-category coverage
  * for Idea Arena. Legacy rows with empty `covered_job_categories` use live Clerk metadata.
@@ -51,7 +181,7 @@ export async function getArenaTeamDisplay(
   members: ArenaTeamMemberDisplay[];
   categoryCoverage: ArenaCategoryCoverage[];
 }> {
-  if (!isProjectUuid(projectId)) {
+  if (!isArenaProjectUuid(projectId)) {
     return {
       members: [],
       categoryCoverage: requiredCategories.map((category) => ({
@@ -88,31 +218,21 @@ export async function getArenaTeamDisplay(
       typeof row.clerk_user_id === "string" ? row.clerk_user_id : "";
     if (!clerkUserId) continue;
 
-    let user: Awaited<ReturnType<typeof client.users.getUser>> | null = null;
+    let user: ClerkUserRecord | null = null;
     try {
       user = await client.users.getUser(clerkUserId);
     } catch {
       console.log("MYDEBUG →", "clerk getUser failed", clerkUserId);
-      continue;
     }
 
-    const fromDb = normalizeCoveredFromDb(row.covered_job_categories);
-    const live = getProfessionalJobCategoriesFromMetadata(
-      user.publicMetadata as Record<string, unknown>,
+    members.push(
+      buildArenaTeamMemberDisplay(
+        clerkUserId,
+        row.covered_job_categories,
+        user,
+        requiredCategories,
+      ),
     );
-    const coveredCategories =
-      fromDb.length > 0
-        ? intersectProfessionalWithRequiredCategories(fromDb, requiredCategories)
-        : intersectProfessionalWithRequiredCategories(live, requiredCategories);
-
-    const imageUrl = user.imageUrl?.trim() || null;
-
-    members.push({
-      clerkUserId,
-      displayName: displayNameFromClerkUser(user),
-      imageUrl,
-      coveredCategories,
-    });
   }
 
   const categoryCoverage: ArenaCategoryCoverage[] = requiredCategories.map(

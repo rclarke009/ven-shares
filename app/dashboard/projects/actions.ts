@@ -13,6 +13,12 @@ import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { normalizeProfessionalJobCategories } from "@/lib/professional-onboarding";
 import { isProjectUuid } from "@/lib/projects-arena";
 import { normalizeRequiredJobCategoriesFromDb } from "@/lib/skills-match";
+import {
+  completedCategoriesFromChecklist,
+  mergeChecklistWithTemplates,
+  parseWorkspaceProgressChecklist,
+  trimChecklistToRequired,
+} from "@/lib/workspace-progress-checklist";
 import { getVenRoleForCurrentUser } from "@/lib/ven-role.server";
 
 import type { RepresentativeImageOk } from "@/lib/representative-image-upload";
@@ -310,16 +316,45 @@ export async function updateProjectWithMediaAndSkills(
   }
 
   const supabase = createServerSupabaseClient();
-  const { data: row, error: fetchError } = await supabase
+
+  function isMissingWorkspaceProgressColumn(error: {
+    code?: string;
+    message: string;
+  }): boolean {
+    return (
+      error.code === "42703" &&
+      error.message.includes("workspace_progress_checklist")
+    );
+  }
+
+  const primary = await supabase
     .from("projects")
-    .select("id, completed_job_categories")
+    .select("id, completed_job_categories, workspace_progress_checklist")
     .eq("id", projectId)
     .eq("clerk_user_id", userId)
     .maybeSingle();
 
-  if (fetchError) {
-    console.log("MYDEBUG →", fetchError.message);
+  let row: Record<string, unknown> | null = null;
+  let checklistColumnAvailable = true;
+
+  if (primary.error && isMissingWorkspaceProgressColumn(primary.error)) {
+    checklistColumnAvailable = false;
+    const legacy = await supabase
+      .from("projects")
+      .select("id, completed_job_categories")
+      .eq("id", projectId)
+      .eq("clerk_user_id", userId)
+      .maybeSingle();
+    if (legacy.error) {
+      console.log("MYDEBUG →", legacy.error.message);
+      return { ok: false, error: "Could not update project. Try again." };
+    }
+    row = (legacy.data as Record<string, unknown> | null) ?? null;
+  } else if (primary.error) {
+    console.log("MYDEBUG →", primary.error.message);
     return { ok: false, error: "Could not update project. Try again." };
+  } else {
+    row = (primary.data as Record<string, unknown> | null) ?? null;
   }
 
   if (!row) {
@@ -327,21 +362,46 @@ export async function updateProjectWithMediaAndSkills(
   }
 
   const prevCompleted = normalizeRequiredJobCategoriesFromDb(
-    (row as Record<string, unknown>).completed_job_categories,
+    row.completed_job_categories,
   );
   const requiredSet = new Set(required_job_categories);
-  const completed_job_categories = prevCompleted.filter((c) =>
+  const completedIntersect = prevCompleted.filter((c) =>
     requiredSet.has(c),
   );
 
+  let completed_job_categories = completedIntersect;
+  let workspace_progress_checklist: Record<string, unknown> | undefined;
+
+  if (checklistColumnAvailable) {
+    const trimmed = trimChecklistToRequired(
+      parseWorkspaceProgressChecklist(row.workspace_progress_checklist),
+      required_job_categories,
+    );
+    const merged = mergeChecklistWithTemplates(
+      required_job_categories,
+      trimmed,
+      completedIntersect,
+    );
+    completed_job_categories = completedCategoriesFromChecklist(
+      required_job_categories,
+      merged,
+    );
+    workspace_progress_checklist = merged as unknown as Record<string, unknown>;
+  }
+
+  const updatePayload: Record<string, unknown> = {
+    title,
+    description,
+    required_job_categories,
+    completed_job_categories,
+  };
+  if (workspace_progress_checklist !== undefined) {
+    updatePayload.workspace_progress_checklist = workspace_progress_checklist;
+  }
+
   const { error: updateErr } = await supabase
     .from("projects")
-    .update({
-      title,
-      description,
-      required_job_categories,
-      completed_job_categories,
-    })
+    .update(updatePayload)
     .eq("id", projectId)
     .eq("clerk_user_id", userId);
 

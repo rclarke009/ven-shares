@@ -10,7 +10,6 @@ import type { ArenaCategorySlotStatus, ArenaProject } from "@/lib/projects-arena
 import type { VenRole } from "@/lib/ven-role";
 
 import { ArenaUserAvatar } from "./arena-user-avatar";
-import { CategoryCompletionControl } from "./category-completion-control";
 import { arenaProjectImageUrl } from "./utils";
 import { JoinTeamForm } from "./join-team-form";
 
@@ -53,8 +52,6 @@ type ProjectDetailViewProps = {
   venRole: VenRole | undefined;
   canOpenWorkspace: boolean;
   isProjectOwner: boolean;
-  /** Inventor or team member: can mark job categories complete / reopen. */
-  canManageCategoryCompletion: boolean;
   /** When set, professional cannot use Join Team (skill gate). */
   joinTeamSkillMessage?: string;
   teamMembers: ArenaTeamMemberDisplay[];
@@ -68,7 +65,6 @@ export function ProjectDetailView({
   venRole,
   canOpenWorkspace,
   isProjectOwner,
-  canManageCategoryCompletion,
   joinTeamSkillMessage,
   teamMembers,
   categoryCoverage,
@@ -119,68 +115,92 @@ export function ProjectDetailView({
                 </p>
                 {project.category_statuses.length > 0 ? (
                   <ul className="flex flex-col gap-2 max-w-xl">
-                    {project.category_statuses.map(({ category, status }) => {
-                      const cov = coverageByCategory.get(category);
-                      const coverMembers = cov?.members ?? [];
-                      const badge = categoryStatusBadge(status);
-                      return (
-                        <li
-                          key={category}
-                          className={`rounded-xl border px-3 py-2.5 shadow-sm ${categoryRowClass(status)}`}
-                        >
-                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                            <span className="text-xs font-semibold text-slate-900">
-                              {category}
-                            </span>
-                            <span
-                              className={`text-[10px] font-semibold uppercase tracking-wide rounded px-1.5 py-0.5 ${badge.className}`}
-                            >
-                              {badge.label}
-                            </span>
-                            {status === "complete" ? (
-                              <span className="text-[10px] font-medium text-slate-600">
-                                No longer needed
+                    {project.category_statuses.map(
+                      ({
+                        category,
+                        status,
+                        teamCoversCategory,
+                        workspaceChecklistStarted,
+                      }) => {
+                        const cov = coverageByCategory.get(category);
+                        const coverMembers = cov?.members ?? [];
+                        const badge = categoryStatusBadge(status);
+                        const showChecklistProgressNote =
+                          status === "in_progress" &&
+                          coverMembers.length === 0 &&
+                          workspaceChecklistStarted;
+                        const showCoveragePendingNote =
+                          status === "in_progress" &&
+                          coverMembers.length === 0 &&
+                          teamCoversCategory &&
+                          !workspaceChecklistStarted;
+                        return (
+                          <li
+                            key={category}
+                            className={`rounded-xl border px-3 py-2.5 shadow-sm ${categoryRowClass(status)}`}
+                          >
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                              <span className="text-xs font-semibold text-slate-900">
+                                {category}
                               </span>
+                              <span
+                                className={`text-[10px] font-semibold uppercase tracking-wide rounded px-1.5 py-0.5 ${badge.className}`}
+                              >
+                                {badge.label}
+                              </span>
+                              {status === "complete" ? (
+                                <span className="text-[10px] font-medium text-slate-600">
+                                  No longer needed
+                                </span>
+                              ) : null}
+                              {coverMembers.length > 0 ? (
+                                <div className="flex flex-row items-center pl-0.5">
+                                  {coverMembers.map((m, i) => (
+                                    <span
+                                      key={m.clerkUserId}
+                                      className={i > 0 ? "-ml-2" : ""}
+                                    >
+                                      <ArenaUserAvatar
+                                        displayName={m.displayName}
+                                        imageUrl={m.imageUrl}
+                                        size={26}
+                                      />
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : null}
+                            </div>
+                            {status !== "complete" && coverMembers.length > 0 ? (
+                              <p className="text-[11px] text-slate-600 mt-1.5 leading-snug">
+                                Covered by{" "}
+                                {coverMembers
+                                  .map((m) => m.displayName)
+                                  .join(", ")}
+                              </p>
                             ) : null}
-                            {coverMembers.length > 0 ? (
-                              <div className="flex flex-row items-center pl-0.5">
-                                {coverMembers.map((m, i) => (
-                                  <span
-                                    key={m.clerkUserId}
-                                    className={i > 0 ? "-ml-2" : ""}
-                                  >
-                                    <ArenaUserAvatar
-                                      displayName={m.displayName}
-                                      imageUrl={m.imageUrl}
-                                      size={26}
-                                    />
-                                  </span>
-                                ))}
-                              </div>
+                            {status === "complete" && coverMembers.length > 0 ? (
+                              <p className="text-[11px] text-slate-500 mt-1.5 leading-snug">
+                                Previously covered by{" "}
+                                {coverMembers
+                                  .map((m) => m.displayName)
+                                  .join(", ")}
+                              </p>
                             ) : null}
-                          </div>
-                          {status !== "complete" && coverMembers.length > 0 ? (
-                            <p className="text-[11px] text-slate-600 mt-1.5 leading-snug">
-                              Covered by{" "}
-                              {coverMembers.map((m) => m.displayName).join(", ")}
-                            </p>
-                          ) : null}
-                          {status === "complete" && coverMembers.length > 0 ? (
-                            <p className="text-[11px] text-slate-500 mt-1.5 leading-snug">
-                              Previously covered by{" "}
-                              {coverMembers.map((m) => m.displayName).join(", ")}
-                            </p>
-                          ) : null}
-                          {canManageCategoryCompletion ? (
-                            <CategoryCompletionControl
-                              projectId={project.id}
-                              category={category}
-                              isComplete={status === "complete"}
-                            />
-                          ) : null}
-                        </li>
-                      );
-                    })}
+                            {showChecklistProgressNote ? (
+                              <p className="text-[11px] text-slate-600 mt-1.5 leading-snug">
+                                Progress from workspace checklist.
+                              </p>
+                            ) : null}
+                            {showCoveragePendingNote ? (
+                              <p className="text-[11px] text-slate-500 mt-1.5 leading-snug italic">
+                                Coverage data pending — team coverage may not
+                                have loaded yet.
+                              </p>
+                            ) : null}
+                          </li>
+                        );
+                      },
+                    )}
                   </ul>
                 ) : (
                   <div className="flex gap-2 items-center flex-wrap">
@@ -254,9 +274,26 @@ export function ProjectDetailView({
             </p>
             <div className="min-w-0 flex-1">
               {teamMembers.length === 0 ? (
-                <p className="text-xs text-slate-400 text-center leading-snug px-1">
-                  No professionals on this team yet.
-                </p>
+                <div className="text-center px-1 space-y-2.5">
+                  <p className="text-xs text-slate-400 leading-snug">
+                    No professionals on this team yet.
+                  </p>
+                  <p className="text-[10px] text-slate-500 leading-snug">
+                    A skill can still show{" "}
+                    <span className="font-medium text-slate-400">
+                      In progress
+                    </span>{" "}
+                    when work is tracked in the workspace checklist.
+                  </p>
+                  {canOpenWorkspace ? (
+                    <Link
+                      href={`/idea-arena/${project.id}/workspace`}
+                      className="inline-block text-[10px] font-semibold text-sky-300 hover:text-sky-200 hover:underline"
+                    >
+                      Open workspace
+                    </Link>
+                  ) : null}
+                </div>
               ) : (
                 <ul className="flex flex-row lg:flex-col gap-4 lg:gap-5 overflow-x-auto lg:overflow-visible pb-1 lg:pb-0 justify-start lg:items-center">
                   {teamMembers.map((m) => (

@@ -1,15 +1,17 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Check, ChevronDown } from "lucide-react";
+import { Check } from "lucide-react";
 
 import type {
   ArenaCategorySlotStatus,
-  ArenaProject,
-  ArenaProjectViewerRelation,
+  ArenaProjectForViewer,
 } from "@/lib/projects-arena";
 import type { ProfessionalJobCategory } from "@/lib/professional-onboarding";
 
+import { ArenaUserAvatar } from "./arena-user-avatar";
 import { arenaProjectImageUrl } from "./utils";
+
+const TEAM_RAIL_PREVIEW_MAX = 4;
 
 function categoryAbbrev(category: ProfessionalJobCategory): string {
   const bySlash = category
@@ -39,19 +41,8 @@ function slotClasses(status: ArenaCategorySlotStatus): string {
   }
 }
 
-function railDotClasses(status: ArenaCategorySlotStatus): string {
-  switch (status) {
-    case "complete":
-      return "bg-emerald-400";
-    case "in_progress":
-      return "bg-sky-400";
-    default:
-      return "bg-amber-300";
-  }
-}
-
 function summarizeStatuses(
-  slots: ArenaProject["category_statuses"],
+  slots: ArenaProjectForViewer["category_statuses"],
 ): string {
   let needed = 0;
   let inProgress = 0;
@@ -69,9 +60,8 @@ function summarizeStatuses(
 }
 
 type ProjectCardProps = {
-  project: ArenaProject;
+  project: ArenaProjectForViewer;
   selected: boolean;
-  myRelation?: ArenaProjectViewerRelation;
   /** Query string for Idea Arena filters (no leading `?`). */
   detailSearch?: string;
 };
@@ -79,12 +69,13 @@ type ProjectCardProps = {
 export function ProjectCard({
   project,
   selected,
-  myRelation = null,
   detailSearch,
 }: ProjectCardProps) {
   const src = arenaProjectImageUrl(project);
   const slots = project.category_statuses;
   const summary = summarizeStatuses(slots);
+  const myRelation = project.myRelation;
+  const teamPreview = project.teamPreview;
 
   const href =
     detailSearch && detailSearch.length > 0
@@ -105,11 +96,14 @@ export function ProjectCard({
         ? `${project.title} — you're on this team. ${summary}`
         : `${project.title}. ${summary}.`;
 
+  const shownMembers = teamPreview.slice(0, TEAM_RAIL_PREVIEW_MAX);
+  const extraCount = Math.max(0, teamPreview.length - TEAM_RAIL_PREVIEW_MAX);
+
   return (
     <Link
       href={href}
       aria-label={ariaLabel}
-      className={`group flex rounded-2xl bg-[#f0f0f0] shadow-md overflow-hidden w-[min(100%,280px)] shrink-0 snap-start transition-shadow hover:shadow-lg ${membershipBorderClass} ${
+      className={`group flex rounded-2xl bg-[#f0f0f0] shadow-md overflow-hidden w-[min(100%,292px)] shrink-0 snap-start transition-shadow hover:shadow-lg ${membershipBorderClass} ${
         selected ? "ring-2 ring-sky-500 ring-offset-2" : ""
       }`}
     >
@@ -132,7 +126,7 @@ export function ProjectCard({
               <span
                 key={category}
                 title={category}
-                className={`inline-flex h-6 min-w-[1.5rem] px-1 items-center justify-center rounded-md text-[9px] font-bold leading-none ${slotClasses(status)}`}
+                className={`inline-flex h-6 min-w-6 px-1 items-center justify-center rounded-md text-[9px] font-bold leading-none ${slotClasses(status)}`}
               >
                 {status === "complete" ? (
                   <Check className="h-3 w-3" strokeWidth={3} aria-hidden />
@@ -148,32 +142,50 @@ export function ProjectCard({
           </p>
         )}
       </div>
-      <div className="w-[52px] bg-slate-700 flex flex-col items-center gap-2 py-3 px-1">
-        {slots.length > 0 ? (
-          slots.map(({ category, status }) => (
-            <div
-              key={category}
-              className="relative shrink-0 flex flex-col items-center gap-0.5"
-              title={category}
-            >
-              <span
-                className={`h-2.5 w-2.5 rounded-full ${railDotClasses(status)}`}
-              />
-              {status === "complete" ? (
-                <Check
-                  className="h-3 w-3 text-emerald-300"
-                  strokeWidth={2.5}
-                  aria-hidden
-                />
+      <div className="w-[76px] shrink-0 bg-slate-700 flex flex-col items-stretch py-3 px-1.5 border-l border-slate-600/80">
+        <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-400 text-center mb-2">
+          Team
+        </p>
+        <div className="flex-1 min-h-0 max-h-[200px] overflow-y-auto flex flex-col items-center gap-3 px-0.5">
+          {teamPreview.length === 0 ? (
+            <p className="text-[10px] text-slate-400 text-center leading-snug">
+              No team yet
+            </p>
+          ) : (
+            <>
+              {shownMembers.map((m) => {
+                const label =
+                  m.coveredCategories.length > 0
+                    ? m.coveredCategories.join(" · ")
+                    : "On the team";
+                return (
+                  <div
+                    key={m.clerkUserId}
+                    className="flex flex-col items-center gap-1 w-full min-w-0"
+                  >
+                    <ArenaUserAvatar
+                      displayName={m.displayName}
+                      imageUrl={m.imageUrl}
+                      size={32}
+                      className="ring-1 ring-slate-500/80"
+                    />
+                    <span
+                      className="text-[9px] text-slate-200 text-center leading-tight font-medium line-clamp-2 w-full"
+                      title={label}
+                    >
+                      {label}
+                    </span>
+                  </div>
+                );
+              })}
+              {extraCount > 0 ? (
+                <span className="text-[10px] font-semibold text-slate-300">
+                  +{extraCount}
+                </span>
               ) : null}
-            </div>
-          ))
-        ) : (
-          <span className="text-[10px] text-slate-500 text-center px-1 leading-tight">
-            —
-          </span>
-        )}
-        <ChevronDown className="h-4 w-4 text-slate-400 mt-1" aria-hidden />
+            </>
+          )}
+        </div>
       </div>
     </Link>
   );

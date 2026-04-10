@@ -3,8 +3,19 @@
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 
+import type { ProfessionalJobCategory } from "@/lib/professional-onboarding";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { isProjectUuid } from "@/lib/projects-arena";
+import {
+  addCustomMajor,
+  addCustomMinor,
+  mergeChecklistWithTemplates,
+  parseWorkspaceProgressChecklist,
+  setAllLeavesInCategory,
+  setLeafCompleted,
+} from "@/lib/workspace-progress-checklist";
+import { persistWorkspaceProgress } from "@/lib/workspace-progress-sync";
+import { normalizeRequiredJobCategoriesFromDb } from "@/lib/skills-match";
 import { canAccessWorkspace } from "@/lib/workspace-access";
 import {
   WORKSPACE_FILES_BUCKET,
@@ -18,6 +29,183 @@ import {
 
 function workspacePath(projectId: string) {
   return `/idea-arena/${projectId}/workspace`;
+}
+
+function revalidateArenaAndWorkspace(projectId: string) {
+  revalidatePath("/idea-arena");
+  revalidatePath(`/idea-arena/${projectId}`);
+  revalidatePath(workspacePath(projectId));
+}
+
+function isMissingWorkspaceProgressColumn(error: {
+  code?: string;
+  message: string;
+}): boolean {
+  return (
+    error.code === "42703" &&
+    error.message.includes("workspace_progress_checklist")
+  );
+}
+
+async function loadMergedChecklist(projectId: string) {
+  const supabase = createServerSupabaseClient();
+  const primary = await supabase
+    .from("projects")
+    .select(
+      "required_job_categories, completed_job_categories, workspace_progress_checklist",
+    )
+    .eq("id", projectId)
+    .maybeSingle();
+
+  let row: Record<string, unknown> | null = null;
+
+  if (primary.error && isMissingWorkspaceProgressColumn(primary.error)) {
+    const legacy = await supabase
+      .from("projects")
+      .select("required_job_categories, completed_job_categories")
+      .eq("id", projectId)
+      .maybeSingle();
+    if (legacy.error || !legacy.data) {
+      console.log("MYDEBUG →", legacy.error?.message);
+      return null;
+    }
+    row = { ...legacy.data, workspace_progress_checklist: {} } as Record<
+      string,
+      unknown
+    >;
+  } else if (primary.error || !primary.data) {
+    console.log("MYDEBUG →", primary.error?.message);
+    return null;
+  } else {
+    row = primary.data as Record<string, unknown>;
+  }
+
+  const required = normalizeRequiredJobCategoriesFromDb(
+    row.required_job_categories,
+  );
+  const completed = normalizeRequiredJobCategoriesFromDb(
+    row.completed_job_categories,
+  );
+  const merged = mergeChecklistWithTemplates(
+    required,
+    row.workspace_progress_checklist,
+    completed,
+  );
+  return { required, merged };
+}
+
+export async function actionProgressToggleLeaf(
+  projectId: string,
+  category: ProfessionalJobCategory,
+  leafId: string,
+  completed: boolean,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { userId } = await auth();
+  if (!userId || !isProjectUuid(projectId)) {
+    return { ok: false, error: "Unauthorized." };
+  }
+  const allowed = await canAccessWorkspace(projectId, userId);
+  if (!allowed) return { ok: false, error: "Unauthorized." };
+
+  const loaded = await loadMergedChecklist(projectId);
+  if (!loaded) return { ok: false, error: "Could not load project." };
+  if (!loaded.required.includes(category)) {
+    return { ok: false, error: "That category is not part of this project." };
+  }
+
+  const next = setLeafCompleted(loaded.merged, category, leafId, completed);
+  if (!next) return { ok: false, error: "Task not found." };
+
+  const persist = await persistWorkspaceProgress(projectId, next);
+  if (!persist.ok) return persist;
+
+  revalidateArenaAndWorkspace(projectId);
+  return { ok: true };
+}
+
+export async function actionProgressAddCustomMajor(
+  projectId: string,
+  category: ProfessionalJobCategory,
+  title: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { userId } = await auth();
+  if (!userId || !isProjectUuid(projectId)) {
+    return { ok: false, error: "Unauthorized." };
+  }
+  const allowed = await canAccessWorkspace(projectId, userId);
+  if (!allowed) return { ok: false, error: "Unauthorized." };
+
+  const loaded = await loadMergedChecklist(projectId);
+  if (!loaded) return { ok: false, error: "Could not load project." };
+  if (!loaded.required.includes(category)) {
+    return { ok: false, error: "That category is not part of this project." };
+  }
+
+  const next = addCustomMajor(loaded.merged, category, title);
+  if (!next) return { ok: false, error: "Could not add major task." };
+
+  const persist = await persistWorkspaceProgress(projectId, next);
+  if (!persist.ok) return persist;
+
+  revalidateArenaAndWorkspace(projectId);
+  return { ok: true };
+}
+
+export async function actionProgressAddCustomMinor(
+  projectId: string,
+  category: ProfessionalJobCategory,
+  majorId: string,
+  title: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { userId } = await auth();
+  if (!userId || !isProjectUuid(projectId)) {
+    return { ok: false, error: "Unauthorized." };
+  }
+  const allowed = await canAccessWorkspace(projectId, userId);
+  if (!allowed) return { ok: false, error: "Unauthorized." };
+
+  const loaded = await loadMergedChecklist(projectId);
+  if (!loaded) return { ok: false, error: "Could not load project." };
+  if (!loaded.required.includes(category)) {
+    return { ok: false, error: "That category is not part of this project." };
+  }
+
+  const next = addCustomMinor(loaded.merged, category, majorId, title);
+  if (!next) return { ok: false, error: "Could not add task." };
+
+  const persist = await persistWorkspaceProgress(projectId, next);
+  if (!persist.ok) return persist;
+
+  revalidateArenaAndWorkspace(projectId);
+  return { ok: true };
+}
+
+export async function actionProgressSetCategoryLeaves(
+  projectId: string,
+  category: ProfessionalJobCategory,
+  completed: boolean,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { userId } = await auth();
+  if (!userId || !isProjectUuid(projectId)) {
+    return { ok: false, error: "Unauthorized." };
+  }
+  const allowed = await canAccessWorkspace(projectId, userId);
+  if (!allowed) return { ok: false, error: "Unauthorized." };
+
+  const loaded = await loadMergedChecklist(projectId);
+  if (!loaded) return { ok: false, error: "Could not load project." };
+  if (!loaded.required.includes(category)) {
+    return { ok: false, error: "That category is not part of this project." };
+  }
+
+  const next = setAllLeavesInCategory(loaded.merged, category, completed);
+  if (!next) return { ok: false, error: "Could not update tasks." };
+
+  const persist = await persistWorkspaceProgress(projectId, next);
+  if (!persist.ok) return persist;
+
+  revalidateArenaAndWorkspace(projectId);
+  return { ok: true };
 }
 
 function safeStorageFileSegment(name: string): string {

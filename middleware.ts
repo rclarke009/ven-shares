@@ -54,6 +54,12 @@ export default clerkMiddleware(async (auth, req) => {
   const user = await client.users.getUser(userId);
   const meta = user.publicMetadata as Record<string, unknown>;
   const role = getVenRoleFromPublicMetadata(meta);
+  if (!role) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/auth/complete-role";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
   if (
     role === "professional" &&
     !isProfessionalOnboardingComplete(meta)

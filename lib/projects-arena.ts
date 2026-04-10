@@ -7,12 +7,25 @@ import { normalizeRequiredJobCategoriesFromDb } from "@/lib/skills-match";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 
 import type { ProjectRequiredSkill } from "@/lib/project-required-skills";
+import {
+  getArenaTeamPreviewForProjects,
+  type ArenaTeamMemberDisplay,
+} from "@/lib/arena-team";
+import {
+  categoryAllLeavesComplete,
+  categoryHasAnyLeafCompleted,
+  mergeChecklistWithTemplates,
+} from "@/lib/workspace-progress-checklist";
 
 export type ArenaCategorySlotStatus = "needed" | "in_progress" | "complete";
 
 export type ArenaCategorySlot = {
   category: ProfessionalJobCategory;
   status: ArenaCategorySlotStatus;
+  /** True when at least one project member lists this category in covered_job_categories (union). */
+  teamCoversCategory: boolean;
+  /** True when the merged workspace checklist has at least one completed leaf in this category. */
+  workspaceChecklistStarted: boolean;
 };
 
 /** Public fields for Idea Arena UI (no clerk_user_id). */
@@ -32,6 +45,7 @@ export type ArenaProjectViewerRelation = "owner" | "team" | null;
 
 export type ArenaProjectForViewer = ArenaProject & {
   myRelation: ArenaProjectViewerRelation;
+  teamPreview: ArenaTeamMemberDisplay[];
 };
 
 const UUID_RE =
@@ -112,18 +126,32 @@ function mapArenaRow(
   const completed_job_categories =
     normalizeRequiredJobCategoriesFromDb(completedRaw);
 
-  const completedSet = new Set(completed_job_categories);
+  const rawChecklist = row.workspace_progress_checklist;
+  const mergedChecklist = mergeChecklistWithTemplates(
+    required_job_categories,
+    rawChecklist ?? {},
+    completed_job_categories,
+  );
+
   const category_statuses: ArenaCategorySlot[] = required_job_categories.map(
     (category) => {
+      const block = mergedChecklist[category];
+      const teamCoversCategory = coveredUnion.has(category);
+      const workspaceChecklistStarted = categoryHasAnyLeafCompleted(block);
       let status: ArenaCategorySlotStatus;
-      if (completedSet.has(category)) {
+      if (categoryAllLeavesComplete(block)) {
         status = "complete";
-      } else if (coveredUnion.has(category)) {
+      } else if (workspaceChecklistStarted || teamCoversCategory) {
         status = "in_progress";
       } else {
         status = "needed";
       }
-      return { category, status };
+      return {
+        category,
+        status,
+        teamCoversCategory,
+        workspaceChecklistStarted,
+      };
     },
   );
 
@@ -144,6 +172,19 @@ function mapArenaRow(
 }
 
 const ARENA_PROJECT_SELECT = `
+      id,
+      title,
+      description,
+      required_job_categories,
+      completed_job_categories,
+      workspace_progress_checklist,
+      representative_image_path,
+      created_at,
+      project_required_skills ( skill_name, skill_description, sort_order )
+    `;
+
+/** DBs with migration 007 but not 008 omit workspace_progress_checklist. */
+const ARENA_PROJECT_SELECT_WITHOUT_WORKSPACE_CHECKLIST = `
       id,
       title,
       description,
@@ -175,6 +216,16 @@ function isMissingCompletedJobCategoriesColumn(error: {
   );
 }
 
+function isMissingWorkspaceProgressChecklistColumn(error: {
+  code?: string;
+  message: string;
+}): boolean {
+  return (
+    error.code === "42703" &&
+    error.message.includes("workspace_progress_checklist")
+  );
+}
+
 export async function listProjectsForArena(): Promise<ArenaProject[]> {
   const { userId } = await auth();
   if (!userId) return [];
@@ -200,6 +251,19 @@ export async function listProjectsForArena(): Promise<ArenaProject[]> {
       return [];
     }
     rows = (legacy.data ?? []) as Record<string, unknown>[];
+  } else if (
+    primary.error &&
+    isMissingWorkspaceProgressChecklistColumn(primary.error)
+  ) {
+    const fallback = await supabase
+      .from("projects")
+      .select(ARENA_PROJECT_SELECT_WITHOUT_WORKSPACE_CHECKLIST)
+      .order("created_at", { ascending: false });
+    if (fallback.error) {
+      console.log("MYDEBUG →", fallback.error.message);
+      return [];
+    }
+    rows = (fallback.data ?? []) as Record<string, unknown>[];
   } else if (primary.error) {
     console.log("MYDEBUG →", primary.error.message);
     return [];
@@ -260,12 +324,23 @@ export async function listProjectsForArenaForViewer(): Promise<
     (memberRows ?? []).map((m) => m.project_id as string),
   );
 
+  const teamPreviewMap = await getArenaTeamPreviewForProjects(
+    projects.map((p) => ({
+      id: p.id,
+      required_job_categories: p.required_job_categories,
+    })),
+  );
+
   return projects.map((p) => {
     const ownerId = ownerByProjectId.get(p.id);
     let myRelation: ArenaProjectViewerRelation = null;
     if (ownerId === userId) myRelation = "owner";
     else if (teamProjectIds.has(p.id)) myRelation = "team";
-    return { ...p, myRelation };
+    return {
+      ...p,
+      myRelation,
+      teamPreview: teamPreviewMap.get(p.id) ?? [],
+    };
   });
 }
 
@@ -298,6 +373,20 @@ export async function getProjectByIdForArena(
       return null;
     }
     data = (legacy.data as Record<string, unknown> | null) ?? null;
+  } else if (
+    primary.error &&
+    isMissingWorkspaceProgressChecklistColumn(primary.error)
+  ) {
+    const fallback = await supabase
+      .from("projects")
+      .select(ARENA_PROJECT_SELECT_WITHOUT_WORKSPACE_CHECKLIST)
+      .eq("id", id)
+      .maybeSingle();
+    if (fallback.error) {
+      console.log("MYDEBUG →", fallback.error.message);
+      return null;
+    }
+    data = (fallback.data as Record<string, unknown> | null) ?? null;
   } else if (primary.error) {
     console.log("MYDEBUG →", primary.error.message);
     return null;

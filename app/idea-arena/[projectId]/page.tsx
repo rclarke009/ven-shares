@@ -102,7 +102,6 @@ export default async function IdeaArenaProjectPage({
           venRole={venRole}
           canOpenWorkspace={canOpenWorkspace}
           isProjectOwner={isProjectOwner}
-          canManageCategoryCompletion={canOpenWorkspace}
           joinTeamSkillMessage={joinTeamSkillMessage}
           teamMembers={teamMembers}
           categoryCoverage={categoryCoverage}

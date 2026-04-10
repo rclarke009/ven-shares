@@ -114,7 +114,6 @@ export default async function IdeaArenaPage({
               <ProjectCard
                 key={p.id}
                 project={p}
-                myRelation={p.myRelation}
                 selected={p.id === selectedId}
                 detailSearch={
                   buildIdeaArenaQueryString({

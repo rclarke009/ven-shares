@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useClerk } from "@clerk/nextjs";
+
+import { VenUserButton } from "@/components/ven-user-button";
 
 const nav = [
   { label: "INVENT", href: "/#inventors" },
@@ -11,8 +12,6 @@ const nav = [
 ] as const;
 
 export function ArenaHeader() {
-  const { signOut } = useClerk();
-
   return (
     <header className="border-b bg-white/95 backdrop-blur-md sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
@@ -30,13 +29,9 @@ export function ArenaHeader() {
             </Link>
           ))}
         </nav>
-        <button
-          type="button"
-          className="ven-cta text-sm px-6 py-2 shrink-0"
-          onClick={() => void signOut({ redirectUrl: "/" })}
-        >
-          LOGOUT
-        </button>
+        <div className="shrink-0">
+          <VenUserButton />
+        </div>
       </div>
     </header>
   );

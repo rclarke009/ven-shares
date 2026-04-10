@@ -114,6 +114,29 @@ export async function joinProjectAsProfessional(
     required,
   );
 
+  // #region agent log
+  fetch("http://127.0.0.1:7619/ingest/1034fec5-81b2-43ff-b160-1a247567e7d4", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Debug-Session-Id": "1750a1",
+    },
+    body: JSON.stringify({
+      sessionId: "1750a1",
+      location: "lib/project-members.ts:pre-insert",
+      message: "joinProjectAsProfessional before insert",
+      data: {
+        projectIdLen: projectId.length,
+        coveredLen: covered.length,
+        requiredLen: required.length,
+        profCatLen: profCategories.length,
+      },
+      timestamp: Date.now(),
+      hypothesisId: "H4-H5",
+    }),
+  }).catch(() => {});
+  // #endregion
+
   const { error: insertError } = await supabase.from("project_members").insert({
     project_id: projectId,
     clerk_user_id: userId,
@@ -121,12 +144,62 @@ export async function joinProjectAsProfessional(
   });
 
   if (insertError) {
+    // #region agent log
+    fetch("http://127.0.0.1:7619/ingest/1034fec5-81b2-43ff-b160-1a247567e7d4", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "1750a1",
+      },
+      body: JSON.stringify({
+        sessionId: "1750a1",
+        location: "lib/project-members.ts:insert-error",
+        message: "project_members insert failed",
+        data: {
+          code: insertError.code,
+          message: insertError.message,
+          details: insertError.details,
+          hint: insertError.hint,
+        },
+        timestamp: Date.now(),
+        hypothesisId: "H1-H3-H2",
+      }),
+    }).catch(() => {});
+    // #endregion
     if (insertError.code === "23505") {
       return { ok: false, error: "You’re already on this team." };
+    }
+    if (
+      insertError.code === "PGRST204" &&
+      insertError.message.includes("covered_job_categories")
+    ) {
+      return {
+        ok: false,
+        error:
+          "Your Supabase database is missing the project_members.covered_job_categories column. Open the SQL editor and run: alter table public.project_members add column if not exists covered_job_categories text[] not null default '{}';",
+      };
     }
     console.log("MYDEBUG →", insertError.message);
     return { ok: false, error: "Could not join team. Try again." };
   }
+
+  // #region agent log
+  fetch("http://127.0.0.1:7619/ingest/1034fec5-81b2-43ff-b160-1a247567e7d4", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Debug-Session-Id": "1750a1",
+    },
+    body: JSON.stringify({
+      sessionId: "1750a1",
+      location: "lib/project-members.ts:insert-ok",
+      message: "project_members insert succeeded",
+      data: { coveredLen: covered.length },
+      timestamp: Date.now(),
+      hypothesisId: "H1",
+    }),
+  }).catch(() => {});
+  // #endregion
 
   return { ok: true };
 }

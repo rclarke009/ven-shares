@@ -35,6 +35,10 @@ import {
   actionUpsertWorkspacePresence,
   actionWorkspacePresenceHeartbeat,
 } from "@/app/idea-arena/[projectId]/workspace/actions";
+import type { ArenaCategorySlot } from "@/lib/projects-arena";
+import type { WorkspaceProgressChecklist } from "@/lib/workspace-progress-checklist";
+
+import { WorkspaceProgressPanel } from "@/components/workspace/workspace-progress-panel";
 
 const TABS = [
   { id: "activity" as const, label: "Activity", icon: Activity },
@@ -91,6 +95,8 @@ type WorkspaceShellProps = {
   activities: WorkspaceActivityDTO[];
   roster: WorkspaceRosterEntryDTO[];
   nameMap: Record<string, string>;
+  progressChecklist: WorkspaceProgressChecklist;
+  progressCategoryStatuses: ArenaCategorySlot[];
 };
 
 function formatBytes(n: number): string {
@@ -145,6 +151,8 @@ export function WorkspaceShell({
   activities,
   roster,
   nameMap,
+  progressChecklist,
+  progressCategoryStatuses,
 }: WorkspaceShellProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -459,8 +467,8 @@ export function WorkspaceShell({
                         <p className="text-sm text-slate-800 mt-1 whitespace-pre-wrap">
                           {m.body}
                         </p>
-                        <div className="flex flex-wrap items-center gap-2 mt-2">
-                          <p className="text-[11px] text-slate-400 font-mono">
+                        <div className="flex flex-wrap items-center gap-2 mt-2 min-w-0 max-w-full">
+                          <p className="text-[11px] text-slate-400 font-mono min-w-0 max-w-full break-all">
                             id: {m.id}
                           </p>
                           <button
@@ -685,11 +693,11 @@ export function WorkspaceShell({
           ) : null}
 
           {tab === "progress" ? (
-            <div className="max-w-3xl rounded-2xl border border-dashed border-slate-300 bg-white/60 p-12 text-center">
-              <Users className="h-12 w-12 mx-auto text-slate-400 mb-4" />
-              <p className="text-slate-700 font-medium">Progress</p>
-              <p className="text-sm text-slate-500 mt-2">Coming soon.</p>
-            </div>
+            <WorkspaceProgressPanel
+              projectId={projectId}
+              checklist={progressChecklist}
+              categoryStatuses={progressCategoryStatuses}
+            />
           ) : null}
 
           {tab === "meeting" ? (

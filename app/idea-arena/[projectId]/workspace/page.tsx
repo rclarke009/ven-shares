@@ -9,9 +9,10 @@ import {
   type WorkspaceMessageDTO,
   type WorkspaceRosterEntryDTO,
 } from "@/components/workspace/workspace-shell";
+import { getProjectByIdForArena, isProjectUuid } from "@/lib/projects-arena";
 import { assertWorkspaceAccess } from "@/lib/workspace-access";
 import { resolveClerkDisplayNames } from "@/lib/workspace-display-names";
-import { isProjectUuid } from "@/lib/projects-arena";
+import { ensureWorkspaceProgressChecklistSynced } from "@/lib/workspace-progress-sync";
 import {
   getWorkspaceProjectMeta,
   listMemberClerkIdsForProject,
@@ -47,6 +48,12 @@ async function WorkspacePageContent({
 
   const meta = await getWorkspaceProjectMeta(projectId);
   if (!meta) notFound();
+
+  const progressBundle = await ensureWorkspaceProgressChecklistSynced(projectId);
+  if (!progressBundle) notFound();
+
+  const arenaProject = await getProjectByIdForArena(projectId);
+  if (!arenaProject) notFound();
 
   const [files, messages, activities, presence, memberIds] = await Promise.all([
     listWorkspaceFiles(projectId),
@@ -143,6 +150,8 @@ async function WorkspacePageContent({
       activities={activitiesDto}
       roster={roster}
       nameMap={nameMapRecord}
+      progressChecklist={progressBundle.checklist}
+      progressCategoryStatuses={arenaProject.category_statuses}
     />
   );
 }
