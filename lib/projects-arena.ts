@@ -180,31 +180,39 @@ export async function listProjectsForArena(): Promise<ArenaProject[]> {
   if (!userId) return [];
 
   const supabase = createServerSupabaseClient();
-  let { data, error } = await supabase
+  const primary = await supabase
     .from("projects")
     .select(ARENA_PROJECT_SELECT)
     .order("created_at", { ascending: false });
 
-  if (error && isMissingCompletedJobCategoriesColumn(error)) {
-    ({ data, error } = await supabase
+  let rows: Record<string, unknown>[];
+
+  if (
+    primary.error &&
+    isMissingCompletedJobCategoriesColumn(primary.error)
+  ) {
+    const legacy = await supabase
       .from("projects")
       .select(ARENA_PROJECT_SELECT_LEGACY)
-      .order("created_at", { ascending: false }));
-  }
-
-  if (error) {
-    console.log("MYDEBUG →", error.message);
+      .order("created_at", { ascending: false });
+    if (legacy.error) {
+      console.log("MYDEBUG →", legacy.error.message);
+      return [];
+    }
+    rows = (legacy.data ?? []) as Record<string, unknown>[];
+  } else if (primary.error) {
+    console.log("MYDEBUG →", primary.error.message);
     return [];
+  } else {
+    rows = (primary.data ?? []) as Record<string, unknown>[];
   }
 
-  const rows = data ?? [];
-  const ids = rows.map((r) => (r as Record<string, unknown>).id as string);
+  const ids = rows.map((r) => r.id as string);
   const unionMap = await fetchCoveredUnionByProjectIds(ids);
 
   return rows.map((row) => {
-    const r = row as Record<string, unknown>;
-    const id = r.id as string;
-    return mapArenaRow(r, unionMap.get(id) ?? new Set());
+    const id = row.id as string;
+    return mapArenaRow(row, unionMap.get(id) ?? new Set());
   });
 }
 
@@ -268,27 +276,37 @@ export async function getProjectByIdForArena(
   if (!userId || !isProjectUuid(id)) return null;
 
   const supabase = createServerSupabaseClient();
-  let { data, error } = await supabase
+  const primary = await supabase
     .from("projects")
     .select(ARENA_PROJECT_SELECT)
     .eq("id", id)
     .maybeSingle();
 
-  if (error && isMissingCompletedJobCategoriesColumn(error)) {
-    ({ data, error } = await supabase
+  let data: Record<string, unknown> | null;
+
+  if (
+    primary.error &&
+    isMissingCompletedJobCategoriesColumn(primary.error)
+  ) {
+    const legacy = await supabase
       .from("projects")
       .select(ARENA_PROJECT_SELECT_LEGACY)
       .eq("id", id)
-      .maybeSingle());
-  }
-
-  if (error) {
-    console.log("MYDEBUG →", error.message);
+      .maybeSingle();
+    if (legacy.error) {
+      console.log("MYDEBUG →", legacy.error.message);
+      return null;
+    }
+    data = (legacy.data as Record<string, unknown> | null) ?? null;
+  } else if (primary.error) {
+    console.log("MYDEBUG →", primary.error.message);
     return null;
+  } else {
+    data = (primary.data as Record<string, unknown> | null) ?? null;
   }
 
   if (!data) return null;
 
   const unionMap = await fetchCoveredUnionByProjectIds([id]);
-  return mapArenaRow(data as Record<string, unknown>, unionMap.get(id) ?? new Set());
+  return mapArenaRow(data, unionMap.get(id) ?? new Set());
 }

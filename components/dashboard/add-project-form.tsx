@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { startTransition, useActionState, useEffect, useRef, useState } from "react";
 
 import {
   createProject,
@@ -30,9 +30,11 @@ export function AddProjectForm() {
   useEffect(() => {
     if (state.ok && formRef.current) {
       formRef.current.reset();
-      setSelected([]);
-      setImageFileName(null);
-      setSkillRowsKey((k) => k + 1);
+      startTransition(() => {
+        setSelected([]);
+        setImageFileName(null);
+        setSkillRowsKey((k) => k + 1);
+      });
     }
   }, [state.ok]);
 

@@ -1,7 +1,14 @@
 "use client";
 
 import Image from "next/image";
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import {
+  startTransition,
+  useActionState,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import {
   updateProjectWithMediaAndSkills,
@@ -49,8 +56,10 @@ export function EditProjectForm({ project }: EditProjectFormProps) {
 
   useEffect(() => {
     if (!state.ok) return;
-    setImageFileName(null);
     if (imageInputRef.current) imageInputRef.current.value = "";
+    startTransition(() => {
+      setImageFileName(null);
+    });
   }, [state.ok]);
 
   function toggleCategory(value: string) {
