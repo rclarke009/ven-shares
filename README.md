@@ -1,3 +1,12 @@
+# VenShares – Production SaaS Collaboration Platform
+Built with Grok 4.20 in Master Builder Mode.
+Tech: Next.js 15 + Clerk + Supabase (files + realtime).
+Design: 100% faithful to all uploaded PDFs + pitch deck.
+Start: npm run dev → visit /sign-in (Apple login ready).
+
+
+
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started

@@ -32,6 +32,10 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+Untitled
+
+# local reference materials (not for the repo)
+reference_docs/
 
 # vercel
 .vercel
