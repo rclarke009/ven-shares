@@ -2,6 +2,7 @@ import Link from "next/link";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
+import { VenSharesLogo } from "@/components/venshares-logo";
 import { VenUserButton } from "@/components/ven-user-button";
 import { updateProfessionalProfileSkills } from "@/app/dashboard/profile/actions";
 import { ProfessionalOnboardingForm } from "@/components/onboarding/professional-onboarding-form";
@@ -35,9 +36,7 @@ export default async function ProfessionalProfilePage() {
     <div className="min-h-screen bg-[#f8fafc]">
       <header className="border-b bg-white/95 backdrop-blur-md">
         <div className="max-w-3xl mx-auto px-6 py-5 flex items-center justify-between gap-6">
-          <Link href="/" className="text-2xl font-bold">
-            Ven<span className="text-[#22c55e]">Shares</span>
-          </Link>
+          <VenSharesLogo />
           <div className="flex items-center gap-4">
             <Link
               href="/dashboard"

@@ -20,12 +20,20 @@ body {
 }
 
 .hero-bg {
-  background-image: linear-gradient(rgba(15, 23, 42, 0.45), rgba(15, 23, 42, 0.55)), 
-                    url('https://picsum.photos/id/1015/2000/1200'); /* Replace with real underwater asset later */
+  background-image: linear-gradient(rgba(15, 23, 42, 0.45), rgba(15, 23, 42, 0.55)),
+                    url('https://picsum.photos/id/1015/2000/1200');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
   color: white;
+}
+
+.hero-quote {
+  @apply text-xl sm:text-2xl md:text-3xl lg:text-4xl font-normal leading-snug text-white;
+}
+
+.how-it-works-heading {
+  @apply text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-semibold text-slate-900 text-center mb-10 sm:mb-14;
 }
 
 .ven-cta {
@@ -44,8 +52,36 @@ body {
   box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 }
 
-.step-box {
-  @apply bg-[#f0f9ff] border border-[#bae6fd] rounded-3xl p-8 transition-all hover:shadow-xl;
+.how-step-title {
+  @apply text-xl sm:text-2xl font-semibold text-slate-900 text-center md:text-left mb-4 leading-snug;
+}
+
+.how-step-panel {
+  @apply bg-[#E6E9F8] rounded-3xl p-4 sm:p-6 md:p-8 w-full;
+}
+
+.how-step-image {
+  @apply w-full h-auto max-h-[420px] sm:max-h-[480px] object-contain mx-auto md:mx-0 block;
+}
+
+.how-step-caption {
+  @apply text-center md:text-left text-base sm:text-lg font-semibold text-slate-800 mt-2 md:mt-3 px-2 md:px-0;
+}
+
+.how-step-yes {
+  @apply mx-auto my-8 w-fit rounded-full bg-[#22c55e] px-8 py-2 text-lg font-bold text-white shadow-md;
+}
+
+.how-step-placeholder {
+  @apply flex flex-col items-center justify-center gap-3 py-16 sm:py-20 text-slate-500;
+}
+
+.how-step-placeholder-icon {
+  @apply text-5xl sm:text-6xl opacity-60;
+}
+
+.how-step-placeholder-label {
+  @apply text-lg font-semibold text-slate-600;
 }
 
 .section-inventor {

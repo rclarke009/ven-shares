@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
 import { completeProfessionalOnboarding } from "@/app/onboarding/professional/actions";
+import { VenSharesLogo } from "@/components/venshares-logo";
 import { ProfessionalOnboardingForm } from "@/components/onboarding/professional-onboarding-form";
 import { isProfessionalOnboardingComplete } from "@/lib/professional-onboarding";
 import { getVenRoleFromPublicMetadata } from "@/lib/ven-role";
@@ -31,9 +31,7 @@ export default async function ProfessionalOnboardingPage() {
     <div className="min-h-screen bg-[#f8fafc]">
       <header className="border-b bg-white/95 backdrop-blur-md">
         <div className="max-w-3xl mx-auto px-6 py-5">
-          <Link href="/" className="text-2xl font-bold">
-            Ven<span className="text-[#22c55e]">Shares</span>
-          </Link>
+          <VenSharesLogo />
         </div>
       </header>
       <main className="max-w-3xl mx-auto px-6 py-12">
