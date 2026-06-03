@@ -26,10 +26,10 @@ const HOW_IT_WORKS_STEPS: HowItWorksStep[] = [
     imageAlt: 'Inventor with lightbulb submitting an idea to the VenShares dashboard',
   },
   {
-    title: 'Skilled Professionals check IP and viability of the idea.',
+    title: 'Skilled Professionals check IP (intellectual property) and viability of the idea.',
     caption: 'Is it feasible? Can it be protected? does it already exist? etc…',
     image: '/assets/landing-how-step-02.png',
-    imageAlt: 'Skilled professionals reviewing IP and viability of an idea',
+    imageAlt: 'Skilled professionals reviewing IP (intellectual property) and viability of an idea',
     yesAfter: true,
   },
   {

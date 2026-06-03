@@ -1,5 +1,5 @@
 import {
-  PROFESSIONAL_JOB_CATEGORY_OPTIONS,
+  resolveProfessionalJobCategory,
   type ProfessionalJobCategory,
 } from "@/lib/professional-onboarding";
 
@@ -10,10 +10,17 @@ export type WorkspaceProgressSubtask = {
   completed: boolean;
 };
 
+export type WorkspaceProgressLeaf = {
+  id: string;
+  title: string;
+  completed: boolean;
+};
+
 export type WorkspaceProgressTask = {
   id: string;
   title: string;
   standard: boolean;
+  completed: boolean;
   subtasks: WorkspaceProgressSubtask[];
 };
 
@@ -83,11 +90,11 @@ export const WORKSPACE_PROGRESS_STANDARD_TEMPLATE: Record<
   ProfessionalJobCategory,
   TemplateTaskList[]
 > = {
-  "Patent / IP law": [
+  "Patent / IP (intellectual property) law": [
     taskListFromMajor("Discovery & strategy", [
       "Review invention disclosure and prior art snapshot",
       "Confirm freedom-to-operate goals",
-      "Outline IP strategy (patents, trade secrets, timing)",
+      "Outline IP (intellectual property) strategy (patents, trade secrets, timing)",
     ]),
     taskListFromMajor("Filing & prosecution", [
       "Draft and file patent application materials",
@@ -114,7 +121,7 @@ export const WORKSPACE_PROGRESS_STANDARD_TEMPLATE: Record<
       "Support due diligence data room",
     ]),
     taskListFromMajor("Strategy & reporting", [
-      "Define KPIs and reporting cadence for investors",
+      "Define KPIs (key performance indicators) and reporting cadence for investors",
       "Align entity structure with funding plan",
       "Prepare board / investor updates",
     ]),
@@ -122,7 +129,7 @@ export const WORKSPACE_PROGRESS_STANDARD_TEMPLATE: Record<
   Accounting: [
     taskListFromMajor("Bookkeeping & controls", [
       "Set up chart of accounts and bookkeeping cadence",
-      "Reconcile accounts and manage AP/AR",
+      "Reconcile accounts and manage AP/AR (accounts payable / accounts receivable)",
       "Establish internal controls",
     ]),
     taskListFromMajor("Compliance & close", [
@@ -133,9 +140,9 @@ export const WORKSPACE_PROGRESS_STANDARD_TEMPLATE: Record<
   ],
   "Marketing / growth": [
     taskListFromMajor("Positioning & audience", [
-      "Define ICP, messaging, and channel mix",
+      "Define ICP (ideal customer profile), messaging, and channel mix",
       "Create core assets (site, deck, one-pager)",
-      "Set measurement plan and KPIs",
+      "Set measurement plan and KPIs (key performance indicators)",
     ]),
     taskListFromMajor("Launch & iteration", [
       "Run campaigns and experiments",
@@ -147,19 +154,19 @@ export const WORKSPACE_PROGRESS_STANDARD_TEMPLATE: Record<
     taskListFromMajor("Process & systems", [
       "Map critical workflows and owners",
       "Implement tools for inventory / fulfillment / support",
-      "Define SLAs and escalation paths",
+      "Define SLAs (service-level agreements) and escalation paths",
     ]),
     taskListFromMajor("Scale & quality", [
-      "Monitor operational KPIs",
+      "Monitor operational KPIs (key performance indicators)",
       "Run retros and continuous improvements",
       "Document runbooks for handoff",
     ]),
   ],
-  "Design / UX": [
-    taskListFromMajor("Research & IA", [
+  "Design / UX (user experience)": [
+    taskListFromMajor("Research & IA (information architecture)", [
       "Synthesize user research and jobs-to-be-done",
       "Define information architecture and flows",
-      "Establish design system / UI patterns",
+      "Establish design system / UI (user interface) patterns",
     ]),
     taskListFromMajor("Delivery & validation", [
       "Produce high-fidelity mocks and prototypes",
@@ -169,9 +176,9 @@ export const WORKSPACE_PROGRESS_STANDARD_TEMPLATE: Record<
   ],
   "Sales / business development": [
     taskListFromMajor("Pipeline & playbook", [
-      "Define ICP, offer, and pricing narrative",
+      "Define ICP (ideal customer profile), offer, and pricing narrative",
       "Build prospect lists and outreach sequences",
-      "Create CRM stages and forecasting rules",
+      "Create CRM (customer relationship management) stages and forecasting rules",
     ]),
     taskListFromMajor("Close & expand", [
       "Run discovery and demos",
@@ -182,19 +189,19 @@ export const WORKSPACE_PROGRESS_STANDARD_TEMPLATE: Record<
   "Manufacturing / supply chain": [
     taskListFromMajor("Sourcing & planning", [
       "Qualify suppliers and materials",
-      "Build BOM, lead times, and MOQs",
+      "Build BOM (bill of materials), lead times, and MOQs (minimum order quantities)",
       "Plan production schedule and inventory buffers",
     ]),
     taskListFromMajor("Quality & logistics", [
-      "Define QC checkpoints and certifications",
+      "Define QC (quality control) checkpoints and certifications",
       "Coordinate shipping, import/export, and warehousing",
       "Monitor cost and delivery performance",
     ]),
   ],
   "Software development": [
     taskListFromMajor("Foundation", [
-      "Set up repo, CI/CD, and environments",
-      "Implement core services and APIs",
+      "Set up repo, CI/CD (continuous integration / deployment), and environments",
+      "Implement core services and APIs (application programming interfaces)",
       "Add observability, security basics, and backups",
     ]),
     taskListFromMajor("Ship & maintain", [
@@ -210,16 +217,12 @@ export const WORKSPACE_PROGRESS_STANDARD_TEMPLATE: Record<
       "Align labeling, claims, and evidence",
     ]),
     taskListFromMajor("Ongoing compliance", [
-      "Establish QMS / audit trail as needed",
+      "Establish QMS (quality management system) / audit trail as needed",
       "Monitor law and standard updates",
       "Train team on policies and controls",
     ]),
   ],
 };
-
-function isProfessionalJobCategory(s: string): s is ProfessionalJobCategory {
-  return (PROFESSIONAL_JOB_CATEGORY_OPTIONS as readonly string[]).includes(s);
-}
 
 function parseSubtask(raw: unknown): WorkspaceProgressSubtask | null {
   if (!raw || typeof raw !== "object") return null;
@@ -249,7 +252,13 @@ function parseTask(raw: unknown): WorkspaceProgressTask | null {
       if (parsed) subtasks.push(parsed);
     }
   }
-  return { id, title, standard: o.standard === true, subtasks };
+  return {
+    id,
+    title,
+    standard: o.standard === true,
+    completed: o.completed === true,
+    subtasks,
+  };
 }
 
 function parseTaskList(raw: unknown): WorkspaceProgressTaskList | null {
@@ -286,6 +295,7 @@ function legacyMinorToTask(
     id: taskId,
     title: minor.title,
     standard: minor.standard,
+    completed: false,
     subtasks: [
       {
         id: minor.id,
@@ -362,9 +372,10 @@ export function parseWorkspaceProgressChecklist(
   }
   const out: WorkspaceProgressChecklist = {};
   for (const [key, val] of Object.entries(raw as Record<string, unknown>)) {
-    if (!isProfessionalJobCategory(key)) continue;
+    const category = resolveProfessionalJobCategory(key);
+    if (!category) continue;
     const block = parseCategoryBlock(val);
-    if (block) out[key] = block;
+    if (block) out[category] = block;
   }
   return out;
 }
@@ -430,13 +441,21 @@ function findSubtaskInBlock(
 
 export function collectLeavesForCategory(
   block: WorkspaceProgressCategoryBlock | undefined,
-): WorkspaceProgressSubtask[] {
+): WorkspaceProgressLeaf[] {
   if (!block?.taskLists?.length) return [];
-  const out: WorkspaceProgressSubtask[] = [];
+  const out: WorkspaceProgressLeaf[] = [];
   for (const list of block.taskLists) {
     for (const task of list.tasks) {
-      for (const sub of task.subtasks) {
-        out.push(sub);
+      if (task.subtasks.length === 0) {
+        out.push({
+          id: task.id,
+          title: task.title,
+          completed: task.completed,
+        });
+      } else {
+        for (const sub of task.subtasks) {
+          out.push(sub);
+        }
       }
     }
   }
@@ -528,6 +547,7 @@ export function mergeChecklistWithTemplates(
           id: taskId,
           title: tTask.title,
           standard: true,
+          completed: false,
           subtasks: mergedSubtasks,
         });
       }
@@ -539,6 +559,7 @@ export function mergeChecklistWithTemplates(
               id: t.id,
               title: t.title,
               standard: false,
+              completed: t.completed,
               subtasks: t.subtasks.map((s) => ({ ...s })),
             });
           }
@@ -564,6 +585,7 @@ export function mergeChecklistWithTemplates(
               id: t.id,
               title: t.title,
               standard: t.standard,
+              completed: t.completed,
               subtasks: t.subtasks.map((s) => ({ ...s })),
             })),
           });
@@ -620,6 +642,10 @@ export function setLeafCompleted(
   if (!block) return null;
   for (const list of block.taskLists) {
     for (const task of list.tasks) {
+      if (task.subtasks.length === 0 && task.id === leafId) {
+        task.completed = completed;
+        return next;
+      }
       const found = task.subtasks.find((s) => s.id === leafId);
       if (found) {
         found.completed = completed;
@@ -666,6 +692,7 @@ export function addCustomTask(
     id: `cust:${crypto.randomUUID()}`,
     title: trimmed,
     standard: false,
+    completed: false,
     subtasks: [],
   });
   return next;
@@ -685,6 +712,9 @@ export function addCustomSubtask(
   for (const list of block.taskLists) {
     const task = list.tasks.find((t) => t.id === taskId);
     if (!task) continue;
+    if (task.subtasks.length === 0) {
+      task.completed = false;
+    }
     task.subtasks.push({
       id: `cust:${crypto.randomUUID()}`,
       title: trimmed,
@@ -706,8 +736,12 @@ export function setAllLeavesInCategory(
   if (!block) return null;
   for (const list of block.taskLists) {
     for (const task of list.tasks) {
-      for (const sub of task.subtasks) {
-        sub.completed = completed;
+      if (task.subtasks.length === 0) {
+        task.completed = completed;
+      } else {
+        for (const sub of task.subtasks) {
+          sub.completed = completed;
+        }
       }
     }
   }

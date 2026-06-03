@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   Activity,
   BarChart3,
+  ChevronDown,
   Eye,
   FileText,
   MessageCircle,
@@ -30,6 +31,7 @@ import {
 } from "@/lib/workspace-preview";
 
 import {
+  actionDeleteWorkspaceFile,
   actionGetWorkspaceFileDownloadUrl,
   actionPostWorkspaceMessage,
   actionUploadWorkspaceFile,
@@ -87,6 +89,8 @@ export type WorkspaceFileDTO = {
   content_type: string | null;
   byte_size: number;
   created_at: string;
+  deleted_at: string | null;
+  deleted_by_clerk_user_id: string | null;
 };
 
 export type WorkspaceActivityDTO = {
@@ -151,6 +155,11 @@ function activityDescription(
       typeof payload?.filename === "string" ? payload.filename : "a file";
     return `Uploaded ${name}`;
   }
+  if (kind === "file_deleted") {
+    const name =
+      typeof payload?.filename === "string" ? payload.filename : "a file";
+    return `Removed ${name}`;
+  }
   if (kind === "status_updated") {
     const s =
       typeof payload?.status_text === "string" ? payload.status_text : "";
@@ -205,6 +214,7 @@ export function WorkspaceShell({
     string | null
   >(null);
   const workspaceFileInputId = useId();
+  const workspaceFileInputRef = useRef<HTMLInputElement>(null);
   const previewTitleId = useId();
   const previewCloseRef = useRef<HTMLButtonElement>(null);
   const [downloadBusy, setDownloadBusy] = useState<string | null>(null);
@@ -216,6 +226,19 @@ export function WorkspaceShell({
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewText, setPreviewText] = useState<string | null>(null);
   const [previewTextOversized, setPreviewTextOversized] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState<string | null>(null);
+  const [deprecatedExpanded, setDeprecatedExpanded] = useState(false);
+
+  const activeFiles = useMemo(
+    () => files.filter((f) => !f.deleted_at),
+    [files],
+  );
+  const deprecatedFiles = useMemo(
+    () => files.filter((f) => f.deleted_at),
+    [files],
+  );
 
   const messageById = useMemo(() => {
     const m = new Map<string, WorkspaceMessageDTO>();
@@ -270,6 +293,29 @@ export function WorkspaceShell({
     } finally {
       setDownloadBusy(null);
     }
+  }
+
+  async function onConfirmDelete(fileId: string) {
+    setDeleteError(null);
+    setDeleteBusy(fileId);
+    try {
+      const r = await actionDeleteWorkspaceFile(projectId, fileId);
+      if (!r.ok) {
+        setDeleteError(r.error);
+      } else {
+        setPendingDeleteId(null);
+        router.refresh();
+      }
+    } finally {
+      setDeleteBusy(null);
+    }
+  }
+
+  function canRemoveFile(f: WorkspaceFileDTO): boolean {
+    if (f.deleted_at) return false;
+    return (
+      f.uploaded_by_clerk_user_id === currentUserId || isProjectOwner
+    );
   }
 
   const closePreview = useCallback(() => {
@@ -645,7 +691,13 @@ export function WorkspaceShell({
                   setUploadError(null);
                   const r = await actionUploadWorkspaceFile(projectId, formData);
                   if (!r.ok) setUploadError(r.error);
-                  else router.refresh();
+                  else {
+                    setWorkspaceUploadFileName(null);
+                    if (workspaceFileInputRef.current) {
+                      workspaceFileInputRef.current.value = "";
+                    }
+                    router.refresh();
+                  }
                 }}
               >
                 <div>
@@ -655,6 +707,7 @@ export function WorkspaceShell({
                   <div className="flex flex-wrap items-center gap-2">
                     <div className="rounded-lg has-[input:focus-visible]:ring-2 has-[input:focus-visible]:ring-[#22c55e] has-[input:focus-visible]:ring-offset-2">
                       <input
+                        ref={workspaceFileInputRef}
                         id={workspaceFileInputId}
                         name="file"
                         type="file"
@@ -690,61 +743,168 @@ export function WorkspaceShell({
                   Upload file
                 </button>
               </form>
-              {files.length === 0 ? (
-                <p className="text-sm text-slate-600">No files yet.</p>
+              {activeFiles.length === 0 ? (
+                <p className="text-sm text-slate-600">No active files.</p>
               ) : (
                 <ul className="divide-y divide-slate-100 border border-slate-100 rounded-xl overflow-hidden">
-                  {files.map((f) => {
+                  {activeFiles.map((f) => {
                     const previewable = getWorkspacePreviewKind(f) !== null;
+                    const showDeleteConfirm = pendingDeleteId === f.id;
                     return (
                       <li
                         key={f.id}
-                        className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 bg-slate-50/50"
+                        className="px-4 py-3 bg-slate-50/50"
                       >
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-slate-900 truncate">
-                            {f.filename}
-                          </p>
-                          <p className="text-xs text-slate-500">
-                            {nameMap[f.uploaded_by_clerk_user_id] ?? "Someone"} ·{" "}
-                            {formatBytes(f.byte_size)} ·{" "}
-                            {formatTime(f.created_at)}
-                          </p>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2 shrink-0">
-                          {previewable ? (
-                            <button
-                              type="button"
-                              disabled={
-                                previewLoading && previewTarget?.id === f.id
-                              }
-                              onClick={() => void openPreview(f)}
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50"
-                              aria-label={`Preview ${f.filename}`}
-                            >
-                              <Eye className="h-4 w-4" aria-hidden />
-                            </button>
-                          ) : null}
-                          <button
-                            type="button"
-                            disabled={downloadBusy === f.id}
-                            onClick={() => void onDownload(f.id)}
-                            className="text-sm font-medium text-[#15803d] hover:underline disabled:opacity-50"
-                          >
-                            {downloadBusy === f.id ? "…" : "Download"}
-                          </button>
-                        </div>
+                        {showDeleteConfirm ? (
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <p className="text-sm text-slate-700">
+                              Remove this file? It will move to Removed files.
+                            </p>
+                            <div className="flex flex-wrap items-center gap-2 shrink-0">
+                              <button
+                                type="button"
+                                disabled={deleteBusy === f.id}
+                                onClick={() => {
+                                  setPendingDeleteId(null);
+                                  setDeleteError(null);
+                                }}
+                                className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                disabled={deleteBusy === f.id}
+                                onClick={() => void onConfirmDelete(f.id)}
+                                className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
+                              >
+                                {deleteBusy === f.id ? "Removing…" : "Remove"}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-slate-900 truncate">
+                                {f.filename}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                {nameMap[f.uploaded_by_clerk_user_id] ?? "Someone"} ·{" "}
+                                {formatBytes(f.byte_size)} ·{" "}
+                                {formatTime(f.created_at)}
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 shrink-0">
+                              {previewable ? (
+                                <button
+                                  type="button"
+                                  disabled={
+                                    previewLoading && previewTarget?.id === f.id
+                                  }
+                                  onClick={() => void openPreview(f)}
+                                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50"
+                                  aria-label={`Preview ${f.filename}`}
+                                >
+                                  <Eye className="h-4 w-4" aria-hidden />
+                                </button>
+                              ) : null}
+                              <button
+                                type="button"
+                                disabled={downloadBusy === f.id}
+                                onClick={() => void onDownload(f.id)}
+                                className="text-sm font-medium text-[#15803d] hover:underline disabled:opacity-50"
+                              >
+                                {downloadBusy === f.id ? "…" : "Download"}
+                              </button>
+                              {canRemoveFile(f) ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setPendingDeleteId(f.id);
+                                    setDeleteError(null);
+                                  }}
+                                  className="text-sm font-medium text-slate-500 hover:text-red-700 hover:underline"
+                                >
+                                  Remove
+                                </button>
+                              ) : null}
+                            </div>
+                          </div>
+                        )}
                       </li>
                     );
                   })}
                 </ul>
               )}
+              {deleteError ? (
+                <p className="text-sm text-red-600 mt-3">{deleteError}</p>
+              ) : null}
+              {deprecatedFiles.length > 0 ? (
+                <div className="mt-6 border border-slate-200 rounded-xl overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setDeprecatedExpanded((v) => !v)}
+                    className="flex w-full items-center justify-between gap-2 px-4 py-3 bg-slate-100/80 text-left hover:bg-slate-100 transition"
+                    aria-expanded={deprecatedExpanded}
+                  >
+                    <span className="text-sm font-medium text-slate-600">
+                      Removed files ({deprecatedFiles.length})
+                    </span>
+                    <ChevronDown
+                      className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${deprecatedExpanded ? "rotate-180" : ""}`}
+                      aria-hidden
+                    />
+                  </button>
+                  {deprecatedExpanded ? (
+                    <ul className="divide-y divide-slate-100">
+                      {deprecatedFiles.map((f) => (
+                        <li
+                          key={f.id}
+                          className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 bg-slate-50/30"
+                        >
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-sm font-medium text-slate-500 truncate">
+                                {f.filename}
+                              </p>
+                              <span className="rounded-full bg-slate-200/80 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-500">
+                                Removed
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-400 mt-0.5">
+                              Removed by{" "}
+                              {nameMap[f.deleted_by_clerk_user_id ?? ""] ??
+                                "Someone"}{" "}
+                              · {formatTime(f.deleted_at ?? f.created_at)}
+                            </p>
+                            <p className="text-xs text-slate-400">
+                              Uploaded by{" "}
+                              {nameMap[f.uploaded_by_clerk_user_id] ?? "Someone"}{" "}
+                              · {formatBytes(f.byte_size)} ·{" "}
+                              {formatTime(f.created_at)}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={downloadBusy === f.id}
+                            onClick={() => void onDownload(f.id)}
+                            className="text-sm font-medium text-slate-500 hover:text-[#15803d] hover:underline disabled:opacity-50 shrink-0"
+                          >
+                            {downloadBusy === f.id ? "…" : "Download"}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           ) : null}
 
           {tab === "progress" ? (
             <WorkspaceProgressPanel
               projectId={projectId}
+              projectTitle={projectTitle}
               checklist={progressChecklist}
               categoryStatuses={progressCategoryStatuses}
             />

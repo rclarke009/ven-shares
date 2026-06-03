@@ -20,13 +20,15 @@ import type { ArenaCategorySlot } from "@/lib/projects-arena";
 import type { ProfessionalJobCategory } from "@/lib/professional-onboarding";
 import type {
   WorkspaceProgressChecklist,
-  WorkspaceProgressSubtask,
+  WorkspaceProgressLeaf,
   WorkspaceProgressTask,
 } from "@/lib/workspace-progress-checklist";
 import {
   categoryAllLeavesComplete,
   collectLeavesForCategory,
 } from "@/lib/workspace-progress-checklist";
+
+import { SkillRecommendMenu } from "@/components/workspace/skill-recommend-menu";
 
 function slotBadge(status: ArenaCategorySlot["status"]): {
   label: string;
@@ -60,12 +62,14 @@ function isCollapsedSingleSubtaskTask(task: WorkspaceProgressTask): boolean {
 
 type WorkspaceProgressPanelProps = {
   projectId: string;
+  projectTitle: string;
   checklist: WorkspaceProgressChecklist;
   categoryStatuses: ArenaCategorySlot[];
 };
 
 export function WorkspaceProgressPanel({
   projectId,
+  projectTitle,
   checklist,
   categoryStatuses,
 }: WorkspaceProgressPanelProps) {
@@ -143,23 +147,23 @@ export function WorkspaceProgressPanel({
     [refresh],
   );
 
-  const renderSubtaskRow = useCallback(
+  const renderLeafRow = useCallback(
     (
       slot: ArenaCategorySlot,
-      sub: WorkspaceProgressSubtask,
+      leaf: WorkspaceProgressLeaf,
     ) => (
-      <li key={sub.id} className="flex gap-2 items-start">
+      <li key={leaf.id} className="flex gap-2 items-start">
         <input
           type="checkbox"
-          id={`${projectId}-${sub.id}`}
-          checked={sub.completed}
+          id={`${projectId}-${leaf.id}`}
+          checked={leaf.completed}
           disabled={pending}
           onChange={(e) =>
             run(() =>
               actionProgressToggleLeaf(
                 projectId,
                 slot.category as ProfessionalJobCategory,
-                sub.id,
+                leaf.id,
                 e.target.checked,
               ),
             )
@@ -167,10 +171,10 @@ export function WorkspaceProgressPanel({
           className="mt-0.5 h-4 w-4 rounded border-slate-300 text-[#15803d] focus:ring-[#15803d]"
         />
         <label
-          htmlFor={`${projectId}-${sub.id}`}
-          className={`text-sm leading-snug cursor-pointer ${sub.completed ? "text-slate-500 line-through" : "text-slate-800"}`}
+          htmlFor={`${projectId}-${leaf.id}`}
+          className={`text-sm leading-snug cursor-pointer ${leaf.completed ? "text-slate-500 line-through" : "text-slate-800"}`}
         >
-          {sub.title}
+          {leaf.title}
         </label>
       </li>
     ),
@@ -213,40 +217,51 @@ export function WorkspaceProgressPanel({
           const badge = slotBadge(slot.status);
           const skillOpen = expandedSkills.has(slot.category);
           const allDone = categoryAllLeavesComplete(block);
+          const showRecommend =
+            !slot.teamCoversCategory && slot.status !== "complete";
 
           return (
             <li
               key={slot.category}
               className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden"
             >
-              <button
-                type="button"
-                onClick={() => toggleSkill(slot.category)}
-                className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-slate-50/80 transition-colors"
-                aria-expanded={skillOpen}
-              >
-                <ChevronDown
-                  className={`h-5 w-5 shrink-0 text-slate-500 transition-transform ${skillOpen ? "rotate-0" : "-rotate-90"}`}
-                  aria-hidden
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold text-slate-900 text-sm">
-                      {slot.category}
-                    </span>
-                    <span
-                      className={`text-[10px] font-semibold uppercase tracking-wide rounded px-2 py-0.5 ${badge.className}`}
-                    >
-                      {badge.label}
-                    </span>
+              <div className="flex items-center gap-2 px-4 py-3 hover:bg-slate-50/80 transition-colors">
+                <button
+                  type="button"
+                  onClick={() => toggleSkill(slot.category)}
+                  className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                  aria-expanded={skillOpen}
+                >
+                  <ChevronDown
+                    className={`h-5 w-5 shrink-0 text-slate-500 transition-transform ${skillOpen ? "rotate-0" : "-rotate-90"}`}
+                    aria-hidden
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-slate-900 text-sm">
+                        {slot.category}
+                      </span>
+                      <span
+                        className={`text-[10px] font-semibold uppercase tracking-wide rounded px-2 py-0.5 ${badge.className}`}
+                      >
+                        {badge.label}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {counts.total === 0
+                        ? "No subtasks yet"
+                        : `${counts.done} / ${counts.total} subtasks done`}
+                    </p>
                   </div>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    {counts.total === 0
-                      ? "No subtasks yet"
-                      : `${counts.done} / ${counts.total} subtasks done`}
-                  </p>
-                </div>
-              </button>
+                </button>
+                {showRecommend ? (
+                  <SkillRecommendMenu
+                    projectId={projectId}
+                    projectTitle={projectTitle}
+                    skillCategory={slot.category}
+                  />
+                ) : null}
+              </div>
 
               {skillOpen ? (
                 <div className="border-t border-slate-100 px-4 py-3 space-y-3 bg-slate-50/40">
@@ -314,13 +329,24 @@ export function WorkspaceProgressPanel({
                             <div className="border-t border-slate-100 px-3 py-2 space-y-2">
                               <ul className="space-y-2">
                                 {taskList.tasks.map((task) => {
+                                  if (task.subtasks.length === 0) {
+                                    return (
+                                      <ul
+                                        key={task.id}
+                                        className="space-y-1.5 pl-1"
+                                      >
+                                        {renderLeafRow(slot, task)}
+                                      </ul>
+                                    );
+                                  }
+
                                   if (isCollapsedSingleSubtaskTask(task)) {
                                     return (
                                       <ul
                                         key={task.id}
                                         className="space-y-1.5 pl-1"
                                       >
-                                        {renderSubtaskRow(
+                                        {renderLeafRow(
                                           slot,
                                           task.subtasks[0],
                                         )}
@@ -357,7 +383,7 @@ export function WorkspaceProgressPanel({
                                         <div className="border-t border-slate-100 px-2.5 py-2 space-y-2">
                                           <ul className="space-y-1.5">
                                             {task.subtasks.map((sub) =>
-                                              renderSubtaskRow(slot, sub),
+                                              renderLeafRow(slot, sub),
                                             )}
                                           </ul>
                                           <div className="flex gap-2 items-center pt-1">

@@ -16,6 +16,8 @@ export type WorkspaceFileRow = {
   content_type: string | null;
   byte_size: number;
   created_at: string;
+  deleted_at: string | null;
+  deleted_by_clerk_user_id: string | null;
 };
 
 export type WorkspaceMessageRow = {
@@ -335,4 +337,42 @@ export async function getWorkspaceFileById(
     return null;
   }
   return data as WorkspaceFileRow | null;
+}
+
+export async function softDeleteWorkspaceFile(
+  projectId: string,
+  fileId: string,
+  deletedByClerkUserId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const row = await getWorkspaceFileById(projectId, fileId);
+  if (!row) {
+    return { ok: false, error: "File not found." };
+  }
+  if (row.deleted_at) {
+    return { ok: false, error: "File is already removed." };
+  }
+
+  const supabase = createServerSupabaseClient();
+  const { error } = await supabase
+    .from("project_workspace_files")
+    .update({
+      deleted_at: new Date().toISOString(),
+      deleted_by_clerk_user_id: deletedByClerkUserId,
+    })
+    .eq("project_id", projectId)
+    .eq("id", fileId)
+    .is("deleted_at", null);
+
+  if (error) {
+    console.log("MYDEBUG →", error.message);
+    return { ok: false, error: "Could not remove file." };
+  }
+
+  await insertWorkspaceActivity(
+    projectId,
+    deletedByClerkUserId,
+    "file_deleted",
+    { file_id: fileId, filename: row.filename },
+  );
+  return { ok: true };
 }

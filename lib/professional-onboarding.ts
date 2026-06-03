@@ -9,13 +9,13 @@ export const PROFESSIONAL_JOB_CATEGORIES_KEY =
 export const PROFESSIONAL_HOURS_BAND_KEY = "professionalHoursBand" as const;
 
 export const PROFESSIONAL_JOB_CATEGORY_OPTIONS = [
-  "Patent / IP law",
+  "Patent / IP (intellectual property) law",
   "Engineering / product",
   "Finance",
   "Accounting",
   "Marketing / growth",
   "Operations",
-  "Design / UX",
+  "Design / UX (user experience)",
   "Sales / business development",
   "Manufacturing / supply chain",
   "Software development",
@@ -24,6 +24,26 @@ export const PROFESSIONAL_JOB_CATEGORY_OPTIONS = [
 
 export type ProfessionalJobCategory =
   (typeof PROFESSIONAL_JOB_CATEGORY_OPTIONS)[number];
+
+/** Former preset labels kept for DB / Clerk metadata migration. */
+export const LEGACY_JOB_CATEGORY_ALIASES: Record<
+  string,
+  ProfessionalJobCategory
+> = {
+  "Patent / IP law": "Patent / IP (intellectual property) law",
+  "Design / UX": "Design / UX (user experience)",
+};
+
+export function resolveProfessionalJobCategory(
+  value: string,
+): ProfessionalJobCategory | null {
+  const resolved = LEGACY_JOB_CATEGORY_ALIASES[value] ?? value;
+  return (PROFESSIONAL_JOB_CATEGORY_OPTIONS as readonly string[]).includes(
+    resolved,
+  )
+    ? (resolved as ProfessionalJobCategory)
+    : null;
+}
 
 export const PROFESSIONAL_HOURS_BANDS = [
   { value: "1-5", label: "1–5 hours" },
@@ -60,21 +80,15 @@ export function getProfessionalHoursBandFromMetadata(
   return isValidProfessionalHoursBand(raw) ? raw : null;
 }
 
-const PRESET_CATEGORY_ALLOWLIST = new Set<string>(
-  PROFESSIONAL_JOB_CATEGORY_OPTIONS,
-);
-
 function dedupeAllowlistedCategories(
   selected: string[],
   max: number | null,
 ): ProfessionalJobCategory[] {
   const out: ProfessionalJobCategory[] = [];
   for (const s of selected) {
-    if (
-      PRESET_CATEGORY_ALLOWLIST.has(s) &&
-      !out.includes(s as ProfessionalJobCategory)
-    ) {
-      out.push(s as ProfessionalJobCategory);
+    const resolved = resolveProfessionalJobCategory(s);
+    if (resolved && !out.includes(resolved)) {
+      out.push(resolved);
     }
     if (max != null && out.length >= max) break;
   }

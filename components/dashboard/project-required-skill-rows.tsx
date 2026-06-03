@@ -74,7 +74,7 @@ export function ProjectRequiredSkillRows({
                   defaultValue={row.skill_name}
                   maxLength={120}
                   className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900"
-                  placeholder="e.g. PCB layout"
+                  placeholder="e.g. PCB (printed circuit board) layout"
                 />
               </label>
               <button

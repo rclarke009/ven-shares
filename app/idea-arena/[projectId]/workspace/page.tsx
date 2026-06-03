@@ -72,7 +72,10 @@ async function WorkspacePageContent({
   for (const id of memberIds) allIds.add(id);
   for (const m of messages) allIds.add(m.author_clerk_user_id);
   for (const a of activities) allIds.add(a.actor_clerk_user_id);
-  for (const f of files) allIds.add(f.uploaded_by_clerk_user_id);
+  for (const f of files) {
+    allIds.add(f.uploaded_by_clerk_user_id);
+    if (f.deleted_by_clerk_user_id) allIds.add(f.deleted_by_clerk_user_id);
+  }
   for (const p of presence) allIds.add(p.clerk_user_id);
 
   const nameMapRecord = Object.fromEntries(
@@ -124,6 +127,8 @@ async function WorkspacePageContent({
     content_type: f.content_type,
     byte_size: Number(f.byte_size),
     created_at: f.created_at,
+    deleted_at: f.deleted_at ?? null,
+    deleted_by_clerk_user_id: f.deleted_by_clerk_user_id ?? null,
   }));
 
   const activitiesDto: WorkspaceActivityDTO[] = activities.map((a) => ({

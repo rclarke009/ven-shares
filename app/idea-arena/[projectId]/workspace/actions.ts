@@ -22,8 +22,10 @@ import {
   WORKSPACE_FILES_BUCKET,
   MAX_WORKSPACE_FILE_BYTES,
   getWorkspaceFileById,
+  getWorkspaceProjectMeta,
   heartbeatWorkspacePresence,
   postWorkspaceMessage,
+  softDeleteWorkspaceFile,
   uploadWorkspaceFileRecord,
   upsertWorkspacePresence,
 } from "@/lib/workspace";
@@ -364,6 +366,43 @@ export async function actionUploadWorkspaceFile(
     await supabase.storage.from(WORKSPACE_FILES_BUCKET).remove([storagePath]);
     return rec;
   }
+
+  revalidatePath(workspacePath(projectId));
+  return { ok: true };
+}
+
+export async function actionDeleteWorkspaceFile(
+  projectId: string,
+  fileId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { userId } = await auth();
+  if (!userId || !isProjectUuid(projectId)) {
+    return { ok: false, error: "Unauthorized." };
+  }
+  const allowed = await canAccessWorkspace(projectId, userId);
+  if (!allowed) return { ok: false, error: "Unauthorized." };
+
+  const row = await getWorkspaceFileById(projectId, fileId);
+  if (!row) {
+    return { ok: false, error: "File not found." };
+  }
+  if (row.deleted_at) {
+    return { ok: false, error: "File is already removed." };
+  }
+
+  const meta = await getWorkspaceProjectMeta(projectId);
+  if (!meta) {
+    return { ok: false, error: "Project not found." };
+  }
+
+  const isUploader = userId === row.uploaded_by_clerk_user_id;
+  const isOwner = userId === meta.clerk_user_id;
+  if (!isUploader && !isOwner) {
+    return { ok: false, error: "You can’t remove this file." };
+  }
+
+  const result = await softDeleteWorkspaceFile(projectId, fileId, userId);
+  if (!result.ok) return result;
 
   revalidatePath(workspacePath(projectId));
   return { ok: true };
