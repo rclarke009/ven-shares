@@ -1,3 +1,4 @@
+import { currentUser } from "@clerk/nextjs/server";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
@@ -10,7 +11,11 @@ import {
   type WorkspaceRosterEntryDTO,
 } from "@/components/workspace/workspace-shell";
 import { getProjectByIdForArena, isProjectUuid } from "@/lib/projects-arena";
-import { getArenaTeamDisplay } from "@/lib/arena-team";
+import {
+  getArenaTeamDisplay,
+  resolveViewerCoveredCategories,
+} from "@/lib/arena-team";
+import { getProfessionalJobCategoriesFromMetadata } from "@/lib/skills-match";
 import {
   assertWorkspaceAccess,
   getWorkspaceAccessFlags,
@@ -60,9 +65,19 @@ async function WorkspacePageContent({
   const arenaProject = await getProjectByIdForArena(projectId);
   if (!arenaProject) notFound();
 
-  const { categoryCoverage } = await getArenaTeamDisplay(
+  const { members, categoryCoverage } = await getArenaTeamDisplay(
     projectId,
     arenaProject.required_job_categories,
+  );
+
+  const profileSkills = getProfessionalJobCategoriesFromMetadata(
+    (await currentUser())?.publicMetadata as Record<string, unknown>,
+  );
+  const viewerCoveredCategories = resolveViewerCoveredCategories(
+    userId,
+    members,
+    arenaProject.required_job_categories,
+    profileSkills,
   );
 
   const [files, messages, activities, presence, memberIds] = await Promise.all([
@@ -133,6 +148,7 @@ async function WorkspacePageContent({
     content_type: f.content_type,
     byte_size: Number(f.byte_size),
     job_category: f.job_category ?? null,
+    description: f.description ?? null,
     created_at: f.created_at,
     deleted_at: f.deleted_at ?? null,
     deleted_by_clerk_user_id: f.deleted_by_clerk_user_id ?? null,
@@ -169,6 +185,7 @@ async function WorkspacePageContent({
       progressChecklist={progressBundle.checklist}
       progressCategoryStatuses={arenaProject.category_statuses}
       categoryCoverage={categoryCoverage}
+      viewerCoveredCategories={viewerCoveredCategories}
       isProjectOwner={accessFlags.isOwner}
       editableProject={
         accessFlags.isOwner

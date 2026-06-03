@@ -71,6 +71,20 @@ function compareMembersByJoinOrder(
   return a.clerkUserId.localeCompare(b.clerkUserId);
 }
 
+export function resolveViewerCoveredCategories(
+  currentUserId: string,
+  members: ArenaTeamMemberDisplay[],
+  requiredCategories: ProfessionalJobCategory[],
+  profileCategories: ProfessionalJobCategory[] = [],
+): ProfessionalJobCategory[] {
+  const member = members.find((m) => m.clerkUserId === currentUserId);
+  if (member) return member.coveredCategories;
+  return intersectProfessionalWithRequiredCategories(
+    profileCategories,
+    requiredCategories,
+  );
+}
+
 export function buildCategoryCoverage(
   requiredCategories: ProfessionalJobCategory[],
   members: ArenaTeamMemberDisplay[],

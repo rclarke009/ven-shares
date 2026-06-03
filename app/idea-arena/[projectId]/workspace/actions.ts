@@ -25,6 +25,7 @@ import { canAccessWorkspace } from "@/lib/workspace-access";
 import {
   WORKSPACE_FILES_BUCKET,
   MAX_WORKSPACE_FILE_BYTES,
+  MAX_WORKSPACE_FILE_DESCRIPTION_LENGTH,
   getWorkspaceFileById,
   getWorkspaceProjectMeta,
   heartbeatWorkspacePresence,
@@ -453,21 +454,31 @@ export async function actionUploadWorkspaceFile(
   }
 
   const rawCategory = formData.get("job_category");
-  let jobCategory: ProfessionalJobCategory | null = null;
-  if (typeof rawCategory === "string" && rawCategory.trim()) {
-    const resolved = resolveProfessionalJobCategory(rawCategory.trim());
-    if (!resolved) {
-      return { ok: false, error: "Invalid skill category." };
+  if (typeof rawCategory !== "string" || !rawCategory.trim()) {
+    return { ok: false, error: "Choose a skill for this file." };
+  }
+  const resolved = resolveProfessionalJobCategory(rawCategory.trim());
+  if (!resolved) {
+    return { ok: false, error: "Invalid skill category." };
+  }
+  const loaded = await loadMergedChecklist(projectId);
+  if (!loaded) return { ok: false, error: "Could not load project." };
+  if (!loaded.required.includes(resolved)) {
+    return {
+      ok: false,
+      error: "That category is not part of this project.",
+    };
+  }
+  const jobCategory = resolved;
+
+  const rawDescription = formData.get("description");
+  let description: string | null = null;
+  if (typeof rawDescription === "string" && rawDescription.trim()) {
+    const trimmed = rawDescription.trim();
+    if (trimmed.length > MAX_WORKSPACE_FILE_DESCRIPTION_LENGTH) {
+      return { ok: false, error: "Description is too long (max 500 characters)." };
     }
-    const loaded = await loadMergedChecklist(projectId);
-    if (!loaded) return { ok: false, error: "Could not load project." };
-    if (!loaded.required.includes(resolved)) {
-      return {
-        ok: false,
-        error: "That category is not part of this project.",
-      };
-    }
-    jobCategory = resolved;
+    description = trimmed;
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
@@ -495,6 +506,7 @@ export async function actionUploadWorkspaceFile(
     mime,
     file.size,
     jobCategory,
+    description,
   );
 
   if (!rec.ok) {

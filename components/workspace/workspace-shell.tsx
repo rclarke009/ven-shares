@@ -3,11 +3,9 @@
 import Link from "next/link";
 import {
   Activity,
-  BarChart3,
-  FileText,
+  LayoutList,
   MessageCircle,
   Settings,
-  Users,
   Video,
 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -23,25 +21,32 @@ import {
   actionUpsertWorkspacePresence,
   actionWorkspacePresenceHeartbeat,
 } from "@/app/idea-arena/[projectId]/workspace/actions";
+import type { ProfessionalJobCategory } from "@/lib/professional-onboarding";
 import type { ArenaCategorySlot } from "@/lib/projects-arena";
 import type { ArenaCategoryCoverage } from "@/lib/arena-team-display";
 import type { ProjectRequiredSkill } from "@/lib/project-required-skills";
 import type { WorkspaceProgressChecklist } from "@/lib/workspace-progress-checklist";
 
 import { EditProjectForm } from "@/components/dashboard/edit-project-form";
-import {
-  WorkspaceFilesPanel,
-  type WorkspaceFileDTO,
-} from "@/components/workspace/workspace-files-panel";
-import { WorkspaceProgressPanel } from "@/components/workspace/workspace-progress-panel";
+import { WorkspaceOrganizerPanel } from "@/components/workspace/workspace-progress-panel";
 
-export type { WorkspaceFileDTO };
+export type WorkspaceFileDTO = {
+  id: string;
+  uploaded_by_clerk_user_id: string;
+  filename: string;
+  content_type: string | null;
+  byte_size: number;
+  job_category: string | null;
+  description: string | null;
+  created_at: string;
+  deleted_at: string | null;
+  deleted_by_clerk_user_id: string | null;
+};
 
 const TABS = [
   { id: "activity" as const, label: "Activity", icon: Activity },
   { id: "messages" as const, label: "Messages", icon: MessageCircle },
-  { id: "files" as const, label: "Files", icon: FileText },
-  { id: "progress" as const, label: "Progress", icon: BarChart3 },
+  { id: "organizer" as const, label: "Organizer", icon: LayoutList },
   { id: "meeting" as const, label: "Meeting", icon: Video },
 ];
 
@@ -101,6 +106,7 @@ type WorkspaceShellProps = {
   progressChecklist: WorkspaceProgressChecklist;
   progressCategoryStatuses: ArenaCategorySlot[];
   categoryCoverage: ArenaCategoryCoverage[];
+  viewerCoveredCategories: ProfessionalJobCategory[];
   isProjectOwner: boolean;
   editableProject: WorkspaceEditableProject | null;
 };
@@ -126,12 +132,16 @@ function activityDescription(
   if (kind === "file_uploaded") {
     const name =
       typeof payload?.filename === "string" ? payload.filename : "a file";
-    return `Uploaded ${name}`;
+    const category =
+      typeof payload?.job_category === "string" ? payload.job_category : null;
+    return category ? `Uploaded ${name} for ${category}` : `Uploaded ${name}`;
   }
   if (kind === "file_deleted") {
     const name =
       typeof payload?.filename === "string" ? payload.filename : "a file";
-    return `Removed ${name}`;
+    const category =
+      typeof payload?.job_category === "string" ? payload.job_category : null;
+    return category ? `Removed ${name} from ${category}` : `Removed ${name}`;
   }
   if (kind === "status_updated") {
     const s =
@@ -152,6 +162,9 @@ function resolveTabId(
   if (v === "settings") {
     return isProjectOwner ? "settings" : "messages";
   }
+  if (v === "progress" || v === "files") {
+    return "organizer";
+  }
   if (isBaseTabId(v)) return v;
   return "messages";
 }
@@ -170,6 +183,7 @@ export function WorkspaceShell({
   progressChecklist,
   progressCategoryStatuses,
   categoryCoverage,
+  viewerCoveredCategories,
   isProjectOwner,
   editableProject,
 }: WorkspaceShellProps) {
@@ -505,24 +519,18 @@ export function WorkspaceShell({
             </div>
           ) : null}
 
-          {tab === "files" ? (
-            <WorkspaceFilesPanel
-              projectId={projectId}
-              files={files}
-              categoryStatuses={progressCategoryStatuses}
-              nameMap={nameMap}
-              currentUserId={currentUserId}
-              isProjectOwner={isProjectOwner}
-            />
-          ) : null}
-
-          {tab === "progress" ? (
-            <WorkspaceProgressPanel
+          {tab === "organizer" ? (
+            <WorkspaceOrganizerPanel
               projectId={projectId}
               projectTitle={projectTitle}
               checklist={progressChecklist}
               categoryStatuses={progressCategoryStatuses}
               categoryCoverage={categoryCoverage}
+              files={files}
+              nameMap={nameMap}
+              currentUserId={currentUserId}
+              viewerCoveredCategories={viewerCoveredCategories}
+              isProjectOwner={isProjectOwner}
             />
           ) : null}
 

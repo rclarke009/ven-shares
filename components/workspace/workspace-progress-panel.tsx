@@ -20,10 +20,14 @@ import { ChevronDown } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   useCallback,
+  useEffect,
   useMemo,
   useState,
   useTransition,
 } from "react";
+
+import type { ProfessionalJobCategory } from "@/lib/professional-onboarding";
+import { useWorkspaceSkillExpand } from "@/lib/use-workspace-skill-expand";
 
 import {
   actionProgressAddCustomSubtask,
@@ -40,23 +44,44 @@ import {
   subtaskSortableId,
   taskSortableId,
 } from "@/components/workspace/progress-task-row";
+import {
+  OrganizerSkillFiles,
+  OrganizerUncategorizedFiles,
+} from "@/components/workspace/organizer-skill-files";
 import { SkillRecommendMenu } from "@/components/workspace/skill-recommend-menu";
 import { SkillTeamRoster } from "@/components/idea-arena/skill-team-roster";
+import type { WorkspaceFileDTO } from "@/components/workspace/workspace-shell";
 import type { ArenaCategoryCoverage } from "@/lib/arena-team-display";
-import type { ArenaCategorySlot } from "@/lib/projects-arena";
-import type { ProfessionalJobCategory } from "@/lib/professional-onboarding";
+import type {
+  ArenaCategorySlot,
+  ArenaCategorySlotStatus,
+} from "@/lib/projects-arena";
 import type {
   ProgressCustomItemKind,
+  WorkspaceProgressCategoryBlock,
   WorkspaceProgressChecklist,
   WorkspaceProgressTask,
   WorkspaceProgressTaskList,
 } from "@/lib/workspace-progress-checklist";
 import {
   categoryAllLeavesComplete,
+  categoryHasAnyLeafCompleted,
   collectLeavesForCategory,
+  setLeafCompleted,
 } from "@/lib/workspace-progress-checklist";
 
-function slotBadge(status: ArenaCategorySlot["status"]): {
+function deriveSlotStatus(
+  block: WorkspaceProgressCategoryBlock | undefined,
+  teamCoversCategory: boolean,
+): ArenaCategorySlotStatus {
+  if (categoryAllLeavesComplete(block)) return "complete";
+  if (categoryHasAnyLeafCompleted(block) || teamCoversCategory) {
+    return "in_progress";
+  }
+  return "needed";
+}
+
+function slotBadge(status: ArenaCategorySlotStatus): {
   label: string;
   className: string;
 } {
@@ -130,6 +155,7 @@ type SkillProgressBodyProps = {
   onNewTaskTitleChange: (taskListId: string, value: string) => void;
   onNewSubtaskTitleChange: (taskId: string, value: string) => void;
   onRun: (fn: () => Promise<{ ok: boolean; error?: string }>) => void;
+  onToggleLeaf: (leafId: string, completed: boolean) => void;
   onCollapseTask: (taskId: string) => void;
   onCollapseTaskList: (taskListId: string) => void;
 };
@@ -153,6 +179,7 @@ function SkillProgressBody({
   onNewTaskTitleChange,
   onNewSubtaskTitleChange,
   onRun,
+  onToggleLeaf,
   onCollapseTask,
   onCollapseTaskList,
 }: SkillProgressBodyProps) {
@@ -266,15 +293,6 @@ function SkillProgressBody({
       }
     },
     [category, onRun, projectId, taskLists],
-  );
-
-  const handleToggleLeaf = useCallback(
-    (leafId: string, completed: boolean) => {
-      onRun(() =>
-        actionProgressToggleLeaf(projectId, category, leafId, completed),
-      );
-    },
-    [category, onRun, projectId],
   );
 
   const handleAddSubtask = useCallback(
@@ -456,7 +474,7 @@ function SkillProgressBody({
                             pendingDeleteKey={pendingDeleteKey}
                             newSubtaskTitle={newSubtaskTitle[task.id] ?? ""}
                             onToggleTask={onToggleTask}
-                            onToggleLeaf={handleToggleLeaf}
+                            onToggleLeaf={onToggleLeaf}
                             onNewSubtaskTitleChange={onNewSubtaskTitleChange}
                             onAddSubtask={handleAddSubtask}
                             onRequestDelete={handleRequestDelete}
@@ -551,27 +569,47 @@ function SkillProgressBody({
   );
 }
 
-type WorkspaceProgressPanelProps = {
+type WorkspaceOrganizerPanelProps = {
   projectId: string;
   projectTitle: string;
   checklist: WorkspaceProgressChecklist;
   categoryStatuses: ArenaCategorySlot[];
   categoryCoverage: ArenaCategoryCoverage[];
+  files: WorkspaceFileDTO[];
+  nameMap: Record<string, string>;
+  currentUserId: string;
+  viewerCoveredCategories: ProfessionalJobCategory[];
+  isProjectOwner: boolean;
 };
 
-export function WorkspaceProgressPanel({
+export function WorkspaceOrganizerPanel({
   projectId,
   projectTitle,
   checklist,
   categoryStatuses,
   categoryCoverage,
-}: WorkspaceProgressPanelProps) {
+  files,
+  nameMap,
+  currentUserId,
+  viewerCoveredCategories,
+  isProjectOwner,
+}: WorkspaceOrganizerPanelProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [expandedSkills, setExpandedSkills] = useState<Set<string>>(
-    () => new Set(categoryStatuses.map((s) => s.category)),
-  );
+  const [localChecklist, setLocalChecklist] =
+    useState<WorkspaceProgressChecklist>(checklist);
+
+  useEffect(() => {
+    setLocalChecklist(checklist);
+  }, [checklist]);
+
+  const { expandedSkills, toggleSkill } = useWorkspaceSkillExpand({
+    projectId,
+    userId: currentUserId,
+    userSkills: viewerCoveredCategories,
+    allCategories: categoryStatuses.map((s) => s.category),
+  });
   const [expandedTaskLists, setExpandedTaskLists] = useState<Set<string>>(
     () => new Set(),
   );
@@ -591,15 +629,6 @@ export function WorkspaceProgressPanel({
   const refresh = useCallback(() => {
     router.refresh();
   }, [router]);
-
-  const toggleSkill = useCallback((category: string) => {
-    setExpandedSkills((prev) => {
-      const next = new Set(prev);
-      if (next.has(category)) next.delete(category);
-      else next.add(category);
-      return next;
-    });
-  }, []);
 
   const toggleTaskList = useCallback((taskListId: string) => {
     setExpandedTaskLists((prev) => {
@@ -664,16 +693,49 @@ export function WorkspaceProgressPanel({
     [refresh],
   );
 
+  const toggleLeaf = useCallback(
+    async (
+      category: ProfessionalJobCategory,
+      leafId: string,
+      completed: boolean,
+    ) => {
+      setError(null);
+      setLocalChecklist((prev) => {
+        const next = setLeafCompleted(prev, category, leafId, completed);
+        return next ?? prev;
+      });
+
+      const result = await actionProgressToggleLeaf(
+        projectId,
+        category,
+        leafId,
+        completed,
+      );
+      if (!result.ok) {
+        setLocalChecklist((prev) => {
+          const reverted = setLeafCompleted(prev, category, leafId, !completed);
+          return reverted ?? prev;
+        });
+        setError(
+          "error" in result && result.error
+            ? result.error
+            : "Something went wrong.",
+        );
+      }
+    },
+    [projectId],
+  );
+
   const leafCounts = useMemo(() => {
     const map = new Map<string, { done: number; total: number }>();
     for (const slot of categoryStatuses) {
-      const leaves = collectLeavesForCategory(checklist[slot.category]);
+      const leaves = collectLeavesForCategory(localChecklist[slot.category]);
       const total = leaves.length;
       const done = leaves.filter((l) => l.completed).length;
       map.set(slot.category, { done, total });
     }
     return map;
-  }, [checklist, categoryStatuses]);
+  }, [localChecklist, categoryStatuses]);
 
   const coverageByCategory = useMemo(
     () => new Map(categoryCoverage.map((c) => [c.category, c])),
@@ -699,15 +761,17 @@ export function WorkspaceProgressPanel({
 
       <ul className="space-y-3">
         {categoryStatuses.map((slot) => {
-          const block = checklist[slot.category];
+          const block = localChecklist[slot.category];
           const taskLists = block?.taskLists ?? [];
           const counts = leafCounts.get(slot.category) ?? { done: 0, total: 0 };
-          const badge = slotBadge(slot.status);
+          const slotStatus = deriveSlotStatus(block, slot.teamCoversCategory);
+          const badge = slotBadge(slotStatus);
           const skillOpen = expandedSkills.has(slot.category);
           const allDone = categoryAllLeavesComplete(block);
           const showRecommend =
-            !slot.teamCoversCategory && slot.status !== "complete";
+            !slot.teamCoversCategory && slotStatus !== "complete";
           const cov = coverageByCategory.get(slot.category);
+          const category = slot.category as ProfessionalJobCategory;
 
           return (
             <li
@@ -745,7 +809,7 @@ export function WorkspaceProgressPanel({
                       teamLead={cov?.teamLead ?? null}
                       otherMembers={cov?.otherMembers ?? []}
                       variant="compact"
-                      complete={slot.status === "complete"}
+                      complete={slotStatus === "complete"}
                     />
                   </div>
                 </button>
@@ -759,48 +823,72 @@ export function WorkspaceProgressPanel({
               </div>
 
               {skillOpen ? (
-                <SkillProgressBody
-                  projectId={projectId}
-                  slot={slot}
-                  taskLists={taskLists}
-                  counts={counts}
-                  allDone={allDone}
-                  pending={pending}
-                  expandedTaskLists={expandedTaskLists}
-                  expandedTasks={expandedTasks}
-                  newTaskListTitle={newTaskListTitle[slot.category] ?? ""}
-                  newTaskTitle={newTaskTitle}
-                  newSubtaskTitle={newSubtaskTitle}
-                  onToggleTaskList={toggleTaskList}
-                  onToggleTask={toggleTask}
-                  onExpandTask={expandTask}
-                  onNewTaskListTitleChange={(value) =>
-                    setNewTaskListTitle((prev) => ({
-                      ...prev,
-                      [slot.category]: value,
-                    }))
-                  }
-                  onNewTaskTitleChange={(taskListId, value) =>
-                    setNewTaskTitle((prev) => ({
-                      ...prev,
-                      [taskListId]: value,
-                    }))
-                  }
-                  onNewSubtaskTitleChange={(taskId, value) =>
-                    setNewSubtaskTitle((prev) => ({
-                      ...prev,
-                      [taskId]: value,
-                    }))
-                  }
-                  onRun={run}
-                  onCollapseTask={collapseTask}
-                  onCollapseTaskList={collapseTaskList}
-                />
+                <>
+                  <SkillProgressBody
+                    projectId={projectId}
+                    slot={slot}
+                    taskLists={taskLists}
+                    counts={counts}
+                    allDone={allDone}
+                    pending={pending}
+                    expandedTaskLists={expandedTaskLists}
+                    expandedTasks={expandedTasks}
+                    newTaskListTitle={newTaskListTitle[slot.category] ?? ""}
+                    newTaskTitle={newTaskTitle}
+                    newSubtaskTitle={newSubtaskTitle}
+                    onToggleTaskList={toggleTaskList}
+                    onToggleTask={toggleTask}
+                    onExpandTask={expandTask}
+                    onNewTaskListTitleChange={(value) =>
+                      setNewTaskListTitle((prev) => ({
+                        ...prev,
+                        [slot.category]: value,
+                      }))
+                    }
+                    onNewTaskTitleChange={(taskListId, value) =>
+                      setNewTaskTitle((prev) => ({
+                        ...prev,
+                        [taskListId]: value,
+                      }))
+                    }
+                    onNewSubtaskTitleChange={(taskId, value) =>
+                      setNewSubtaskTitle((prev) => ({
+                        ...prev,
+                        [taskId]: value,
+                      }))
+                    }
+                    onRun={run}
+                    onToggleLeaf={(leafId, completed) =>
+                      void toggleLeaf(category, leafId, completed)
+                    }
+                    onCollapseTask={collapseTask}
+                    onCollapseTaskList={collapseTaskList}
+                  />
+                  <OrganizerSkillFiles
+                    projectId={projectId}
+                    category={slot.category as ProfessionalJobCategory}
+                    files={files}
+                    nameMap={nameMap}
+                    currentUserId={currentUserId}
+                    isProjectOwner={isProjectOwner}
+                  />
+                </>
               ) : null}
             </li>
           );
         })}
       </ul>
+
+      <OrganizerUncategorizedFiles
+        projectId={projectId}
+        files={files}
+        nameMap={nameMap}
+        currentUserId={currentUserId}
+        isProjectOwner={isProjectOwner}
+      />
     </div>
   );
 }
+
+/** @deprecated Use WorkspaceOrganizerPanel */
+export const WorkspaceProgressPanel = WorkspaceOrganizerPanel;

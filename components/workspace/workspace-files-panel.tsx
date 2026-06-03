@@ -18,6 +18,7 @@ import {
 } from "@/app/idea-arena/[projectId]/workspace/actions";
 import type { ArenaCategorySlot } from "@/lib/projects-arena";
 import type { ProfessionalJobCategory } from "@/lib/professional-onboarding";
+import { useWorkspaceSkillExpand } from "@/lib/use-workspace-skill-expand";
 import {
   MAX_TEXT_PREVIEW_BYTES,
   getWorkspacePreviewKind,
@@ -341,6 +342,7 @@ type WorkspaceFilesPanelProps = {
   categoryStatuses: ArenaCategorySlot[];
   nameMap: Record<string, string>;
   currentUserId: string;
+  viewerCoveredCategories: ProfessionalJobCategory[];
   isProjectOwner: boolean;
 };
 
@@ -350,6 +352,7 @@ export function WorkspaceFilesPanel({
   categoryStatuses,
   nameMap,
   currentUserId,
+  viewerCoveredCategories,
   isProjectOwner,
 }: WorkspaceFilesPanelProps) {
   const router = useRouter();
@@ -361,7 +364,12 @@ export function WorkspaceFilesPanel({
   const [deleteBusy, setDeleteBusy] = useState<string | null>(null);
   const [downloadBusy, setDownloadBusy] = useState<string | null>(null);
   const [deprecatedExpanded, setDeprecatedExpanded] = useState(false);
-  const [expandedSkills, setExpandedSkills] = useState<Set<string>>(() => new Set());
+  const { expandedSkills, toggleSkill } = useWorkspaceSkillExpand({
+    projectId,
+    userId: currentUserId,
+    userSkills: viewerCoveredCategories,
+    allCategories: categoryStatuses.map((s) => s.category),
+  });
 
   const [previewTarget, setPreviewTarget] = useState<WorkspaceFileDTO | null>(
     null,
@@ -388,15 +396,6 @@ export function WorkspaceFilesPanel({
   const previewKind = previewTarget
     ? getWorkspacePreviewKind(previewTarget)
     : null;
-
-  const toggleSkill = useCallback((category: string) => {
-    setExpandedSkills((prev) => {
-      const next = new Set(prev);
-      if (next.has(category)) next.delete(category);
-      else next.add(category);
-      return next;
-    });
-  }, []);
 
   async function onDownload(fileId: string) {
     setDownloadBusy(fileId);

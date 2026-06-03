@@ -175,7 +175,6 @@ function SortableSubtaskRow({
         type="checkbox"
         id={`${projectId}-${subtask.id}`}
         checked={subtask.completed}
-        disabled={pending}
         onChange={(e) => onToggleLeaf(subtask.id, e.target.checked)}
         className="mt-0.5 h-4 w-4 rounded border-slate-300 text-[#15803d] focus:ring-[#15803d]"
       />
@@ -277,7 +276,6 @@ export function ProgressTaskRow({
               type="checkbox"
               id={`${projectId}-${checkboxLeaf.id}`}
               checked={checkboxLeaf.completed}
-              disabled={pending}
               onChange={(e) =>
                 onToggleLeaf(checkboxLeaf.id, e.target.checked)
               }
