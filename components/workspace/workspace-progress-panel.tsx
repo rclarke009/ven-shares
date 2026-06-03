@@ -67,6 +67,7 @@ import {
   categoryAllLeavesComplete,
   categoryHasAnyLeafCompleted,
   collectLeavesForCategory,
+  setAllLeavesInCategory,
   setLeafCompleted,
 } from "@/lib/workspace-progress-checklist";
 
@@ -156,6 +157,7 @@ type SkillProgressBodyProps = {
   onNewSubtaskTitleChange: (taskId: string, value: string) => void;
   onRun: (fn: () => Promise<{ ok: boolean; error?: string }>) => void;
   onToggleLeaf: (leafId: string, completed: boolean) => void;
+  onSetCategoryLeaves: (completed: boolean) => void;
   onCollapseTask: (taskId: string) => void;
   onCollapseTaskList: (taskListId: string) => void;
 };
@@ -180,6 +182,7 @@ function SkillProgressBody({
   onNewSubtaskTitleChange,
   onRun,
   onToggleLeaf,
+  onSetCategoryLeaves,
   onCollapseTask,
   onCollapseTaskList,
 }: SkillProgressBodyProps) {
@@ -354,24 +357,16 @@ function SkillProgressBody({
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          disabled={pending || counts.total === 0}
-          onClick={() =>
-            onRun(() =>
-              actionProgressSetCategoryLeaves(projectId, category, true),
-            )
-          }
+          disabled={counts.total === 0}
+          onClick={() => onSetCategoryLeaves(true)}
           className="text-xs font-semibold rounded-md px-2.5 py-1 border border-slate-300 bg-white text-slate-800 hover:bg-slate-50 disabled:opacity-50"
         >
           Check all
         </button>
         <button
           type="button"
-          disabled={pending || counts.total === 0}
-          onClick={() =>
-            onRun(() =>
-              actionProgressSetCategoryLeaves(projectId, category, false),
-            )
-          }
+          disabled={counts.total === 0}
+          onClick={() => onSetCategoryLeaves(false)}
           className="text-xs font-semibold rounded-md px-2.5 py-1 border border-slate-300 bg-white text-slate-800 hover:bg-slate-50 disabled:opacity-50"
         >
           Clear all
@@ -726,6 +721,34 @@ export function WorkspaceOrganizerPanel({
     [projectId],
   );
 
+  const setCategoryLeaves = useCallback(
+    async (category: ProfessionalJobCategory, completed: boolean) => {
+      setError(null);
+      setLocalChecklist((prev) => {
+        const next = setAllLeavesInCategory(prev, category, completed);
+        return next ?? prev;
+      });
+
+      const result = await actionProgressSetCategoryLeaves(
+        projectId,
+        category,
+        completed,
+      );
+      if (!result.ok) {
+        setLocalChecklist((prev) => {
+          const reverted = setAllLeavesInCategory(prev, category, !completed);
+          return reverted ?? prev;
+        });
+        setError(
+          "error" in result && result.error
+            ? result.error
+            : "Something went wrong.",
+        );
+      }
+    },
+    [projectId],
+  );
+
   const leafCounts = useMemo(() => {
     const map = new Map<string, { done: number; total: number }>();
     for (const slot of categoryStatuses) {
@@ -860,6 +883,9 @@ export function WorkspaceOrganizerPanel({
                     onRun={run}
                     onToggleLeaf={(leafId, completed) =>
                       void toggleLeaf(category, leafId, completed)
+                    }
+                    onSetCategoryLeaves={(completed) =>
+                      void setCategoryLeaves(category, completed)
                     }
                     onCollapseTask={collapseTask}
                     onCollapseTaskList={collapseTaskList}
