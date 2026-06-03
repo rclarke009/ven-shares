@@ -11,14 +11,11 @@ import {
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   useEffect,
-  useMemo,
   useState,
   useTransition,
 } from "react";
 
 import {
-  actionPostWorkspaceMessage,
-  actionUpsertWorkspacePresence,
   actionWorkspacePresenceHeartbeat,
 } from "@/app/idea-arena/[projectId]/workspace/actions";
 import type { ProfessionalJobCategory } from "@/lib/professional-onboarding";
@@ -26,8 +23,13 @@ import type { ArenaCategorySlot } from "@/lib/projects-arena";
 import type { ArenaCategoryCoverage } from "@/lib/arena-team-display";
 import type { ProjectRequiredSkill } from "@/lib/project-required-skills";
 import type { WorkspaceProgressChecklist } from "@/lib/workspace-progress-checklist";
+import {
+  boardParamFromCategory,
+  messageActivityBoardSuffix,
+} from "@/lib/workspace-message-boards";
 
 import { EditProjectForm } from "@/components/dashboard/edit-project-form";
+import { WorkspaceMessagesPanel } from "@/components/workspace/workspace-messages-panel";
 import { WorkspaceOrganizerPanel } from "@/components/workspace/workspace-progress-panel";
 
 export type WorkspaceFileDTO = {
@@ -73,6 +75,8 @@ export type WorkspaceMessageDTO = {
   author_clerk_user_id: string;
   body: string;
   reply_to_id: string | null;
+  job_category: string | null;
+  is_urgent: boolean;
   created_at: string;
 };
 
@@ -98,7 +102,9 @@ type WorkspaceShellProps = {
   currentUserId: string;
   initialTab: string;
   highlightMessageId: string | null;
+  initialBoardParam: string;
   messages: WorkspaceMessageDTO[];
+  requiredJobCategories: ProfessionalJobCategory[];
   files: WorkspaceFileDTO[];
   activities: WorkspaceActivityDTO[];
   roster: WorkspaceRosterEntryDTO[];
@@ -128,7 +134,20 @@ function activityDescription(
   kind: string,
   payload: Record<string, unknown> | null,
 ): string {
-  if (kind === "message_posted") return "Posted a message";
+  if (kind === "message_posted") {
+    const category =
+      typeof payload?.job_category === "string" ? payload.job_category : null;
+    const suffix = messageActivityBoardSuffix(category);
+    const urgent = payload?.is_urgent === true;
+    return urgent
+      ? `Posted an urgent message${suffix}`
+      : `Posted a message${suffix}`;
+  }
+  if (kind === "message_deleted") {
+    const category =
+      typeof payload?.job_category === "string" ? payload.job_category : null;
+    return `Removed a message${messageActivityBoardSuffix(category)}`;
+  }
   if (kind === "file_uploaded") {
     const name =
       typeof payload?.filename === "string" ? payload.filename : "a file";
@@ -149,6 +168,30 @@ function activityDescription(
     return s ? `Set status: ${s}` : "Updated status";
   }
   return kind.replace(/_/g, " ");
+}
+
+function activityMessagePermalink(
+  payload: Record<string, unknown> | null,
+): string | null {
+  const messageId =
+    typeof payload?.message_id === "string" ? payload.message_id : null;
+  if (!messageId) return null;
+  const category =
+    typeof payload?.job_category === "string" ? payload.job_category : null;
+  const board = boardParamFromCategory(category);
+  const params = new URLSearchParams({
+    tab: "messages",
+    board,
+    m: messageId,
+  });
+  return `?${params.toString()}`;
+}
+
+function isUrgentMessageActivity(
+  kind: string,
+  payload: Record<string, unknown> | null,
+): boolean {
+  return kind === "message_posted" && payload?.is_urgent === true;
 }
 
 function isBaseTabId(v: string): v is BaseTabId {
@@ -175,7 +218,9 @@ export function WorkspaceShell({
   currentUserId,
   initialTab,
   highlightMessageId,
+  initialBoardParam,
   messages,
+  requiredJobCategories,
   files,
   activities,
   roster,
@@ -194,15 +239,6 @@ export function WorkspaceShell({
     resolveTabId(initialTab, isProjectOwner),
   );
   const [, startTransition] = useTransition();
-  const [replyToId, setReplyToId] = useState<string | null>(null);
-  const [msgError, setMsgError] = useState<string | null>(null);
-  const [presenceError, setPresenceError] = useState<string | null>(null);
-
-  const messageById = useMemo(() => {
-    const m = new Map<string, WorkspaceMessageDTO>();
-    for (const x of messages) m.set(x.id, x);
-    return m;
-  }, [messages]);
 
   useEffect(() => {
     const t = searchParams.get("tab");
@@ -214,13 +250,6 @@ export function WorkspaceShell({
       setTabState("messages");
     }
   }, [highlightMessageId]);
-
-  useEffect(() => {
-    if (tab === "messages" && highlightMessageId) {
-      const el = document.getElementById(`msg-${highlightMessageId}`);
-      el?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-  }, [tab, highlightMessageId, messages]);
 
   useEffect(() => {
     void actionWorkspacePresenceHeartbeat(projectId);
@@ -238,8 +267,6 @@ export function WorkspaceShell({
       router.replace(`${pathname}?${params.toString()}`);
     });
   }
-
-  const replyPreview = replyToId ? messageById.get(replyToId) : undefined;
 
   return (
     <div className="flex min-h-[calc(100vh-4rem)] bg-[#e8eef5]">
@@ -328,195 +355,63 @@ export function WorkspaceShell({
                 <p className="text-sm text-slate-600">No activity yet.</p>
               ) : (
                 <ul className="space-y-3">
-                  {activities.map((a) => (
+                  {activities.map((a) => {
+                    const urgent = isUrgentMessageActivity(a.kind, a.payload);
+                    const messageLink = activityMessagePermalink(a.payload);
+                    return (
                     <li
                       key={a.id}
-                      className="text-sm border-b border-slate-100 pb-3 last:border-0"
+                      className={`text-sm border-b border-slate-100 pb-3 last:border-0 ${
+                        urgent
+                          ? "border-l-4 border-l-red-400 pl-3 -ml-3"
+                          : ""
+                      }`}
                     >
                       <span className="font-medium text-slate-900">
                         {nameMap[a.actor_clerk_user_id] ?? "Someone"}
                       </span>
-                      <span className="text-slate-600">
+                      <span
+                        className={
+                          urgent ? "font-semibold text-red-800" : "text-slate-600"
+                        }
+                      >
                         {" "}
                         {activityDescription(a.kind, a.payload)}
                       </span>
+                      {messageLink ? (
+                        <Link
+                          href={messageLink}
+                          className="block text-xs font-medium text-[#15803d] hover:underline mt-1"
+                        >
+                          View message
+                        </Link>
+                      ) : null}
                       <p className="text-xs text-slate-400 mt-1">
                         {formatTime(a.created_at)}
                       </p>
                     </li>
-                  ))}
+                    );
+                  })}
                 </ul>
               )}
             </div>
           ) : null}
 
           {tab === "messages" ? (
-            <div className="max-w-3xl flex flex-col gap-4 h-full min-h-[320px]">
-              <div className="rounded-2xl border border-slate-200 bg-white shadow-sm flex flex-col flex-1 min-h-0">
-                <div className="p-4 border-b border-slate-100">
-                  <h2 className="text-base font-semibold text-slate-900">
-                    Team messages
-                  </h2>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Permalink: add{" "}
-                    <code className="text-slate-700">?m=message-id</code> to
-                    this URL.
-                  </p>
-                </div>
-                <ul className="flex-1 overflow-y-auto p-4 space-y-4 max-h-[50vh]">
-                  {messages.length === 0 ? (
-                    <li className="text-sm text-slate-600">No messages yet.</li>
-                  ) : (
-                    messages.map((m) => (
-                      <li
-                        key={m.id}
-                        id={`msg-${m.id}`}
-                        className={`rounded-xl px-3 py-2 ${
-                          highlightMessageId === m.id
-                            ? "bg-amber-50 ring-1 ring-amber-200"
-                            : "bg-slate-50"
-                        }`}
-                      >
-                        {m.reply_to_id ? (
-                          <p className="text-xs text-slate-500 mb-1">
-                            Replying to{" "}
-                            <Link
-                              href={`?tab=messages&m=${m.reply_to_id}`}
-                              className="text-[#15803d] font-medium hover:underline"
-                            >
-                              earlier message
-                            </Link>
-                          </p>
-                        ) : null}
-                        <div className="flex items-baseline justify-between gap-2">
-                          <span className="text-sm font-semibold text-slate-900">
-                            {nameMap[m.author_clerk_user_id] ?? "Someone"}
-                            {m.author_clerk_user_id === currentUserId
-                              ? " (you)"
-                              : ""}
-                          </span>
-                          <span className="text-xs text-slate-400 shrink-0">
-                            {formatTime(m.created_at)}
-                          </span>
-                        </div>
-                        <p className="text-sm text-slate-800 mt-1 whitespace-pre-wrap">
-                          {m.body}
-                        </p>
-                        <div className="flex flex-wrap items-center gap-2 mt-2 min-w-0 max-w-full">
-                          <p className="text-[11px] text-slate-400 font-mono min-w-0 max-w-full break-all">
-                            id: {m.id}
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setReplyToId(m.id);
-                              setTab("messages");
-                            }}
-                            className="text-[11px] font-medium text-[#15803d] hover:underline"
-                          >
-                            Reply
-                          </button>
-                        </div>
-                      </li>
-                    ))
-                  )}
-                </ul>
-                <form
-                  className="p-4 border-t border-slate-100 space-y-2"
-                  action={async (formData) => {
-                    setMsgError(null);
-                    const body = String(formData.get("body") ?? "");
-                    const r = await actionPostWorkspaceMessage(
-                      projectId,
-                      body,
-                      replyToId,
-                    );
-                    if (!r.ok) setMsgError(r.error);
-                    else {
-                      setReplyToId(null);
-                      router.refresh();
-                    }
-                  }}
-                >
-                  {replyToId ? (
-                    <div className="flex items-start justify-between gap-2 rounded-lg bg-sky-50 border border-sky-100 px-3 py-2 text-xs text-sky-900">
-                      <span className="min-w-0">
-                        Replying to{" "}
-                        <span className="font-mono break-all">{replyToId}</span>
-                        {replyPreview ? (
-                          <span className="block text-sky-800 mt-1 line-clamp-2">
-                            {replyPreview.body}
-                          </span>
-                        ) : null}
-                      </span>
-                      <button
-                        type="button"
-                        className="shrink-0 text-sky-700 font-medium hover:underline"
-                        onClick={() => setReplyToId(null)}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  ) : null}
-                  <label className="sr-only" htmlFor="ws-msg-body">
-                    Message
-                  </label>
-                  <textarea
-                    id="ws-msg-body"
-                    name="body"
-                    rows={3}
-                    required
-                    placeholder="Write a message…"
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400"
-                  />
-                  {msgError ? (
-                    <p className="text-sm text-red-600">{msgError}</p>
-                  ) : null}
-                  <button
-                    type="submit"
-                    className="ven-cta text-sm px-5 py-2 rounded-lg"
-                  >
-                    Send
-                  </button>
-                </form>
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-4">
-                <h3 className="text-sm font-semibold text-slate-900 mb-2">
-                  Your status
-                </h3>
-                <form
-                  className="flex flex-col sm:flex-row gap-2"
-                  action={async (formData) => {
-                    setPresenceError(null);
-                    const statusText = String(formData.get("statusText") ?? "");
-                    const r = await actionUpsertWorkspacePresence(
-                      projectId,
-                      statusText,
-                    );
-                    if (!r.ok) setPresenceError(r.error);
-                    else router.refresh();
-                  }}
-                >
-                  <input
-                    name="statusText"
-                    type="text"
-                    maxLength={200}
-                    placeholder="e.g. Reviewing wireframes"
-                    className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900"
-                  />
-                  <button
-                    type="submit"
-                    className="rounded-lg border border-slate-300 bg-slate-100 px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-200"
-                  >
-                    Save status
-                  </button>
-                </form>
-                {presenceError ? (
-                  <p className="text-sm text-red-600 mt-2">{presenceError}</p>
-                ) : null}
-              </div>
-            </div>
+            <WorkspaceMessagesPanel
+              projectId={projectId}
+              currentUserId={currentUserId}
+              isProjectOwner={isProjectOwner}
+              requiredJobCategories={
+                requiredJobCategories.length > 0
+                  ? requiredJobCategories
+                  : progressCategoryStatuses.map((s) => s.category)
+              }
+              messages={messages}
+              nameMap={nameMap}
+              highlightMessageId={highlightMessageId}
+              initialBoardParam={initialBoardParam}
+            />
           ) : null}
 
           {tab === "organizer" ? (

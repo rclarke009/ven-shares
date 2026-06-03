@@ -29,7 +29,11 @@ export type WorkspaceMessageRow = {
   author_clerk_user_id: string;
   body: string;
   reply_to_id: string | null;
+  job_category: string | null;
+  is_urgent: boolean;
   created_at: string;
+  deleted_at: string | null;
+  deleted_by_clerk_user_id: string | null;
 };
 
 export type WorkspaceActivityRow = {
@@ -120,6 +124,7 @@ export async function listWorkspaceMessages(
     .from("project_workspace_messages")
     .select("*")
     .eq("project_id", projectId)
+    .is("deleted_at", null)
     .order("created_at", { ascending: true })
     .limit(limit);
 
@@ -127,7 +132,41 @@ export async function listWorkspaceMessages(
     console.log("MYDEBUG →", error.message);
     return [];
   }
-  return (data ?? []) as WorkspaceMessageRow[];
+  return (data ?? []).map((row) => ({
+    ...(row as WorkspaceMessageRow),
+    job_category: (row.job_category as string | null) ?? null,
+    is_urgent: Boolean(row.is_urgent),
+    deleted_at: (row.deleted_at as string | null) ?? null,
+    deleted_by_clerk_user_id:
+      (row.deleted_by_clerk_user_id as string | null) ?? null,
+  }));
+}
+
+export async function getWorkspaceMessageById(
+  projectId: string,
+  messageId: string,
+): Promise<WorkspaceMessageRow | null> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("project_workspace_messages")
+    .select("*")
+    .eq("project_id", projectId)
+    .eq("id", messageId)
+    .maybeSingle();
+
+  if (error) {
+    console.log("MYDEBUG →", error.message);
+    return null;
+  }
+  if (!data) return null;
+  return {
+    ...(data as WorkspaceMessageRow),
+    job_category: (data.job_category as string | null) ?? null,
+    is_urgent: Boolean(data.is_urgent),
+    deleted_at: (data.deleted_at as string | null) ?? null,
+    deleted_by_clerk_user_id:
+      (data.deleted_by_clerk_user_id as string | null) ?? null,
+  };
 }
 
 export async function listWorkspaceActivities(
@@ -186,6 +225,9 @@ export async function postWorkspaceMessage(
   authorClerkUserId: string,
   body: string,
   replyToId: string | null,
+  jobCategory: string | null,
+  isUrgent: boolean,
+  allowedJobCategories: readonly string[],
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const trimmed = body.trim();
   if (!trimmed) {
@@ -195,17 +237,21 @@ export async function postWorkspaceMessage(
     return { ok: false, error: "Message is too long." };
   }
 
+  if (jobCategory !== null && !allowedJobCategories.includes(jobCategory)) {
+    return { ok: false, error: "Invalid message board." };
+  }
+
   const supabase = createServerSupabaseClient();
 
   if (replyToId) {
-    const { data: parent } = await supabase
-      .from("project_workspace_messages")
-      .select("id")
-      .eq("project_id", projectId)
-      .eq("id", replyToId)
-      .maybeSingle();
-    if (!parent) {
+    const parent = await getWorkspaceMessageById(projectId, replyToId);
+    if (!parent || parent.deleted_at) {
       return { ok: false, error: "Reply target not found." };
+    }
+    const parentCategory = parent.job_category ?? null;
+    const boardCategory = jobCategory ?? null;
+    if (parentCategory !== boardCategory) {
+      return { ok: false, error: "Reply must stay on the same message board." };
     }
   }
 
@@ -216,6 +262,8 @@ export async function postWorkspaceMessage(
       author_clerk_user_id: authorClerkUserId,
       body: trimmed,
       reply_to_id: replyToId,
+      job_category: jobCategory,
+      is_urgent: isUrgent,
     })
     .select("id")
     .single();
@@ -228,8 +276,51 @@ export async function postWorkspaceMessage(
   const id = data.id as string;
   await insertWorkspaceActivity(projectId, authorClerkUserId, "message_posted", {
     message_id: id,
+    ...(jobCategory ? { job_category: jobCategory } : {}),
+    ...(isUrgent ? { is_urgent: true } : {}),
   });
   return { ok: true, id };
+}
+
+export async function softDeleteWorkspaceMessage(
+  projectId: string,
+  messageId: string,
+  deletedByClerkUserId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const row = await getWorkspaceMessageById(projectId, messageId);
+  if (!row) {
+    return { ok: false, error: "Message not found." };
+  }
+  if (row.deleted_at) {
+    return { ok: false, error: "Message is already removed." };
+  }
+
+  const supabase = createServerSupabaseClient();
+  const { error } = await supabase
+    .from("project_workspace_messages")
+    .update({
+      deleted_at: new Date().toISOString(),
+      deleted_by_clerk_user_id: deletedByClerkUserId,
+    })
+    .eq("project_id", projectId)
+    .eq("id", messageId)
+    .is("deleted_at", null);
+
+  if (error) {
+    console.log("MYDEBUG →", error.message);
+    return { ok: false, error: "Could not remove message." };
+  }
+
+  await insertWorkspaceActivity(
+    projectId,
+    deletedByClerkUserId,
+    "message_deleted",
+    {
+      message_id: messageId,
+      ...(row.job_category ? { job_category: row.job_category } : {}),
+    },
+  );
+  return { ok: true };
 }
 
 export async function heartbeatWorkspacePresence(

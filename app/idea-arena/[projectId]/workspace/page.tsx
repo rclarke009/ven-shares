@@ -17,6 +17,11 @@ import {
 } from "@/lib/arena-team";
 import { getProfessionalJobCategoriesFromMetadata } from "@/lib/skills-match";
 import {
+  boardParamFromCategory,
+  resolveBoardCategory,
+  TEAM_BOARD_PARAM,
+} from "@/lib/workspace-message-boards";
+import {
   assertWorkspaceAccess,
   getWorkspaceAccessFlags,
 } from "@/lib/workspace-access";
@@ -33,7 +38,7 @@ import {
 
 type PageProps = {
   params: Promise<{ projectId: string }>;
-  searchParams: Promise<{ tab?: string; m?: string }>;
+  searchParams: Promise<{ tab?: string; m?: string; board?: string }>;
 };
 
 function WorkspaceFallback() {
@@ -48,10 +53,12 @@ async function WorkspacePageContent({
   projectId,
   tab,
   messageId,
+  boardParam,
 }: {
   projectId: string;
   tab: string | undefined;
   messageId: string | undefined;
+  boardParam: string | undefined;
 }) {
   const userId = await assertWorkspaceAccess(projectId);
   const accessFlags = await getWorkspaceAccessFlags(projectId, userId);
@@ -138,6 +145,8 @@ async function WorkspacePageContent({
     author_clerk_user_id: m.author_clerk_user_id,
     body: m.body,
     reply_to_id: m.reply_to_id,
+    job_category: m.job_category ?? null,
+    is_urgent: m.is_urgent,
     created_at: m.created_at,
   }));
 
@@ -170,6 +179,20 @@ async function WorkspacePageContent({
   const highlightMessageId =
     messageId && messages.some((m) => m.id === messageId) ? messageId : null;
 
+  const highlightMessage = highlightMessageId
+    ? messages.find((m) => m.id === highlightMessageId)
+    : undefined;
+
+  const rawBoardParam =
+    boardParam ??
+    (highlightMessage
+      ? boardParamFromCategory(highlightMessage.job_category ?? null)
+      : TEAM_BOARD_PARAM);
+
+  const initialBoardParam = boardParamFromCategory(
+    resolveBoardCategory(rawBoardParam, arenaProject.required_job_categories),
+  );
+
   return (
     <WorkspaceShell
       projectId={projectId}
@@ -177,7 +200,9 @@ async function WorkspacePageContent({
       currentUserId={userId}
       initialTab={tab ?? "messages"}
       highlightMessageId={highlightMessageId}
+      initialBoardParam={initialBoardParam}
       messages={messagesDto}
+      requiredJobCategories={arenaProject.required_job_categories}
       files={filesDto}
       activities={activitiesDto}
       roster={roster}
@@ -219,6 +244,7 @@ export default async function WorkspacePage({ params, searchParams }: PageProps)
           projectId={projectId}
           tab={sp.tab}
           messageId={sp.m}
+          boardParam={sp.board}
         />
       </Suspense>
       <footer className="border-t border-slate-200 bg-white/80 py-6 px-6">

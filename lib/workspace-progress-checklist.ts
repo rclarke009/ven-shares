@@ -439,27 +439,68 @@ function findSubtaskInBlock(
   return undefined;
 }
 
+export type ProgressItemStatus = "not_started" | "in_progress" | "completed";
+
+export function collectLeavesForTask(
+  task: WorkspaceProgressTask,
+): WorkspaceProgressLeaf[] {
+  if (task.subtasks.length === 0) {
+    return [
+      {
+        id: task.id,
+        title: task.title,
+        completed: task.completed,
+      },
+    ];
+  }
+  return task.subtasks.map((sub) => ({
+    id: sub.id,
+    title: sub.title,
+    completed: sub.completed,
+  }));
+}
+
+export function collectLeavesForTaskList(
+  taskList: WorkspaceProgressTaskList,
+): WorkspaceProgressLeaf[] {
+  return taskList.tasks.flatMap((task) => collectLeavesForTask(task));
+}
+
+export function deriveProgressItemStatus(
+  leaves: WorkspaceProgressLeaf[],
+): ProgressItemStatus {
+  if (leaves.length === 0) return "not_started";
+  if (leaves.every((leaf) => leaf.completed)) return "completed";
+  if (leaves.some((leaf) => leaf.completed)) return "in_progress";
+  return "not_started";
+}
+
+export function deriveTaskListStatus(
+  taskList: WorkspaceProgressTaskList,
+): ProgressItemStatus {
+  return deriveProgressItemStatus(collectLeavesForTaskList(taskList));
+}
+
+export function deriveTaskStatus(task: WorkspaceProgressTask): ProgressItemStatus {
+  return deriveProgressItemStatus(collectLeavesForTask(task));
+}
+
+export function progressItemStatusLabel(status: ProgressItemStatus): string {
+  switch (status) {
+    case "completed":
+      return "Completed";
+    case "in_progress":
+      return "In progress";
+    default:
+      return "Not started";
+  }
+}
+
 export function collectLeavesForCategory(
   block: WorkspaceProgressCategoryBlock | undefined,
 ): WorkspaceProgressLeaf[] {
   if (!block?.taskLists?.length) return [];
-  const out: WorkspaceProgressLeaf[] = [];
-  for (const list of block.taskLists) {
-    for (const task of list.tasks) {
-      if (task.subtasks.length === 0) {
-        out.push({
-          id: task.id,
-          title: task.title,
-          completed: task.completed,
-        });
-      } else {
-        for (const sub of task.subtasks) {
-          out.push(sub);
-        }
-      }
-    }
-  }
-  return out;
+  return block.taskLists.flatMap((list) => collectLeavesForTaskList(list));
 }
 
 export function categoryAllLeavesComplete(

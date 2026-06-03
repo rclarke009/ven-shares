@@ -5,11 +5,16 @@ import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities";
 import { ChevronDown, GripVertical } from "lucide-react";
 
+import { ProgressStatusIcon } from "@/components/workspace/progress-status-icon";
 import type {
   ProgressCustomItemKind,
   WorkspaceProgressLeaf,
   WorkspaceProgressSubtask,
   WorkspaceProgressTask,
+} from "@/lib/workspace-progress-checklist";
+import {
+  deriveTaskStatus,
+  progressItemStatusLabel,
 } from "@/lib/workspace-progress-checklist";
 
 export function taskSortableId(taskId: string): string {
@@ -238,6 +243,8 @@ export function ProgressTaskRow({
 
   const checkboxLeaf = headerCheckboxLeaf(task);
   const showSubtaskList = taskOpen && task.subtasks.length > 1;
+  const showTaskStatusIcon = task.subtasks.length > 1;
+  const taskStatus = deriveTaskStatus(task);
   const taskConfirmKey = deleteKey("task", task.id);
   const showTaskConfirm = pendingDeleteKey === taskConfirmKey;
 
@@ -291,7 +298,15 @@ export function ProgressTaskRow({
             onClick={() => onToggleTask(task.id)}
             className="flex min-w-0 flex-1 items-center gap-2 text-left text-sm font-medium text-slate-800 hover:bg-slate-50/80 rounded-md px-1 py-0.5"
             aria-expanded={taskOpen}
+            aria-label={
+              showTaskStatusIcon
+                ? `${task.title}, ${progressItemStatusLabel(taskStatus)}`
+                : undefined
+            }
           >
+            {showTaskStatusIcon ? (
+              <ProgressStatusIcon status={taskStatus} />
+            ) : null}
             <ChevronDown
               className={`h-3.5 w-3.5 shrink-0 text-slate-500 transition-transform ${taskOpen ? "rotate-0" : "-rotate-90"}`}
               aria-hidden

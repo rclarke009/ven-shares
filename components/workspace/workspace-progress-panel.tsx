@@ -44,6 +44,7 @@ import {
   subtaskSortableId,
   taskSortableId,
 } from "@/components/workspace/progress-task-row";
+import { ProgressStatusIcon } from "@/components/workspace/progress-status-icon";
 import {
   OrganizerSkillFiles,
   OrganizerUncategorizedFiles,
@@ -67,6 +68,8 @@ import {
   categoryAllLeavesComplete,
   categoryHasAnyLeafCompleted,
   collectLeavesForCategory,
+  deriveTaskListStatus,
+  progressItemStatusLabel,
   setAllLeavesInCategory,
   setLeafCompleted,
 } from "@/lib/workspace-progress-checklist";
@@ -388,6 +391,7 @@ function SkillProgressBody({
               const taskListConfirmKey = `taskList:${taskList.id}`;
               const showTaskListConfirm =
                 pendingDeleteKey === taskListConfirmKey;
+              const taskListStatus = deriveTaskListStatus(taskList);
 
               return (
                 <li
@@ -429,7 +433,9 @@ function SkillProgressBody({
                         onClick={() => onToggleTaskList(taskList.id)}
                         className="flex min-w-0 flex-1 items-center gap-2 text-left text-sm font-medium text-slate-800 hover:bg-slate-50/80 rounded-xl py-0.5"
                         aria-expanded={taskListOpen}
+                        aria-label={`${taskList.title}, ${progressItemStatusLabel(taskListStatus)}`}
                       >
+                        <ProgressStatusIcon status={taskListStatus} />
                         <ChevronDown
                           className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${taskListOpen ? "rotate-0" : "-rotate-90"}`}
                           aria-hidden

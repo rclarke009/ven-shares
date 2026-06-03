@@ -27,10 +27,12 @@ import {
   MAX_WORKSPACE_FILE_BYTES,
   MAX_WORKSPACE_FILE_DESCRIPTION_LENGTH,
   getWorkspaceFileById,
+  getWorkspaceMessageById,
   getWorkspaceProjectMeta,
   heartbeatWorkspacePresence,
   postWorkspaceMessage,
   softDeleteWorkspaceFile,
+  softDeleteWorkspaceMessage,
   uploadWorkspaceFileRecord,
   upsertWorkspacePresence,
 } from "@/lib/workspace";
@@ -387,6 +389,8 @@ export async function actionPostWorkspaceMessage(
   projectId: string,
   body: string,
   replyToId: string | null,
+  jobCategory: string | null,
+  isUrgent: boolean,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const { userId } = await auth();
   if (!userId || !isProjectUuid(projectId)) {
@@ -395,11 +399,86 @@ export async function actionPostWorkspaceMessage(
   const allowed = await canAccessWorkspace(projectId, userId);
   if (!allowed) return { ok: false, error: "Unauthorized." };
 
-  const result = await postWorkspaceMessage(projectId, userId, body, replyToId);
+  const supabase = createServerSupabaseClient();
+  const { data: projectRow, error: projectErr } = await supabase
+    .from("projects")
+    .select("required_job_categories")
+    .eq("id", projectId)
+    .maybeSingle();
+
+  if (projectErr || !projectRow) {
+    return { ok: false, error: "Project not found." };
+  }
+
+  const requiredCategories = normalizeRequiredJobCategoriesFromDb(
+    projectRow.required_job_categories,
+  );
+
+  const normalizedCategory =
+    jobCategory === null || jobCategory === ""
+      ? null
+      : resolveProfessionalJobCategory(jobCategory);
+
+  if (
+    jobCategory !== null &&
+    jobCategory !== "" &&
+    normalizedCategory === null
+  ) {
+    return { ok: false, error: "Invalid message board." };
+  }
+
+  const boardCategory = normalizedCategory;
+
+  const result = await postWorkspaceMessage(
+    projectId,
+    userId,
+    body,
+    replyToId,
+    boardCategory,
+    isUrgent,
+    requiredCategories,
+  );
   if (result.ok) {
     revalidatePath(workspacePath(projectId));
   }
   return result;
+}
+
+export async function actionDeleteWorkspaceMessage(
+  projectId: string,
+  messageId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { userId } = await auth();
+  if (!userId || !isProjectUuid(projectId)) {
+    return { ok: false, error: "Unauthorized." };
+  }
+  const allowed = await canAccessWorkspace(projectId, userId);
+  if (!allowed) return { ok: false, error: "Unauthorized." };
+
+  const row = await getWorkspaceMessageById(projectId, messageId);
+  if (!row) {
+    return { ok: false, error: "Message not found." };
+  }
+  if (row.deleted_at) {
+    return { ok: false, error: "Message is already removed." };
+  }
+
+  const meta = await getWorkspaceProjectMeta(projectId);
+  if (!meta) {
+    return { ok: false, error: "Project not found." };
+  }
+
+  const isAuthor = userId === row.author_clerk_user_id;
+  const isOwner = userId === meta.clerk_user_id;
+  if (!isAuthor && !isOwner) {
+    return { ok: false, error: "You can’t remove this message." };
+  }
+
+  const result = await softDeleteWorkspaceMessage(projectId, messageId, userId);
+  if (!result.ok) return result;
+
+  revalidatePath(workspacePath(projectId));
+  return { ok: true };
 }
 
 export async function actionUpsertWorkspacePresence(
