@@ -10,15 +10,23 @@ import {
 } from "react";
 
 import {
-  actionProgressAddCustomMajor,
-  actionProgressAddCustomMinor,
+  actionProgressAddCustomSubtask,
+  actionProgressAddCustomTask,
+  actionProgressAddCustomTaskList,
   actionProgressSetCategoryLeaves,
   actionProgressToggleLeaf,
 } from "@/app/idea-arena/[projectId]/workspace/actions";
 import type { ArenaCategorySlot } from "@/lib/projects-arena";
 import type { ProfessionalJobCategory } from "@/lib/professional-onboarding";
-import type { WorkspaceProgressChecklist } from "@/lib/workspace-progress-checklist";
-import { categoryAllLeavesComplete, collectLeavesForCategory } from "@/lib/workspace-progress-checklist";
+import type {
+  WorkspaceProgressChecklist,
+  WorkspaceProgressSubtask,
+  WorkspaceProgressTask,
+} from "@/lib/workspace-progress-checklist";
+import {
+  categoryAllLeavesComplete,
+  collectLeavesForCategory,
+} from "@/lib/workspace-progress-checklist";
 
 function slotBadge(status: ArenaCategorySlot["status"]): {
   label: string;
@@ -43,6 +51,13 @@ function slotBadge(status: ArenaCategorySlot["status"]): {
   }
 }
 
+function isCollapsedSingleSubtaskTask(task: WorkspaceProgressTask): boolean {
+  return (
+    task.subtasks.length === 1 &&
+    task.subtasks[0].title.trim() === task.title.trim()
+  );
+}
+
 type WorkspaceProgressPanelProps = {
   projectId: string;
   checklist: WorkspaceProgressChecklist;
@@ -60,15 +75,21 @@ export function WorkspaceProgressPanel({
   const [expandedSkills, setExpandedSkills] = useState<Set<string>>(
     () => new Set(categoryStatuses.map((s) => s.category)),
   );
-  const [expandedMajors, setExpandedMajors] = useState<Set<string>>(
+  const [expandedTaskLists, setExpandedTaskLists] = useState<Set<string>>(
     () => new Set(),
   );
-  const [newMajorTitle, setNewMajorTitle] = useState<Record<string, string>>(
+  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [newTaskListTitle, setNewTaskListTitle] = useState<
+    Record<string, string>
+  >({});
+  const [newTaskTitle, setNewTaskTitle] = useState<Record<string, string>>(
     {},
   );
-  const [newMinorTitle, setNewMinorTitle] = useState<Record<string, string>>(
-    {},
-  );
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState<
+    Record<string, string>
+  >({});
 
   const refresh = useCallback(() => {
     router.refresh();
@@ -83,11 +104,20 @@ export function WorkspaceProgressPanel({
     });
   }, []);
 
-  const toggleMajor = useCallback((majorId: string) => {
-    setExpandedMajors((prev) => {
+  const toggleTaskList = useCallback((taskListId: string) => {
+    setExpandedTaskLists((prev) => {
       const next = new Set(prev);
-      if (next.has(majorId)) next.delete(majorId);
-      else next.add(majorId);
+      if (next.has(taskListId)) next.delete(taskListId);
+      else next.add(taskListId);
+      return next;
+    });
+  }, []);
+
+  const toggleTask = useCallback((taskId: string) => {
+    setExpandedTasks((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
       return next;
     });
   }, []);
@@ -99,7 +129,11 @@ export function WorkspaceProgressPanel({
         void (async () => {
           const result = await fn();
           if (!result.ok) {
-            setError("error" in result && result.error ? result.error : "Something went wrong.");
+            setError(
+              "error" in result && result.error
+                ? result.error
+                : "Something went wrong.",
+            );
             return;
           }
           refresh();
@@ -107,6 +141,40 @@ export function WorkspaceProgressPanel({
       });
     },
     [refresh],
+  );
+
+  const renderSubtaskRow = useCallback(
+    (
+      slot: ArenaCategorySlot,
+      sub: WorkspaceProgressSubtask,
+    ) => (
+      <li key={sub.id} className="flex gap-2 items-start">
+        <input
+          type="checkbox"
+          id={`${projectId}-${sub.id}`}
+          checked={sub.completed}
+          disabled={pending}
+          onChange={(e) =>
+            run(() =>
+              actionProgressToggleLeaf(
+                projectId,
+                slot.category as ProfessionalJobCategory,
+                sub.id,
+                e.target.checked,
+              ),
+            )
+          }
+          className="mt-0.5 h-4 w-4 rounded border-slate-300 text-[#15803d] focus:ring-[#15803d]"
+        />
+        <label
+          htmlFor={`${projectId}-${sub.id}`}
+          className={`text-sm leading-snug cursor-pointer ${sub.completed ? "text-slate-500 line-through" : "text-slate-800"}`}
+        >
+          {sub.title}
+        </label>
+      </li>
+    ),
+    [pending, projectId, run],
   );
 
   const leafCounts = useMemo(() => {
@@ -140,7 +208,7 @@ export function WorkspaceProgressPanel({
       <ul className="space-y-3">
         {categoryStatuses.map((slot) => {
           const block = checklist[slot.category];
-          const majors = block?.majors ?? [];
+          const taskLists = block?.taskLists ?? [];
           const counts = leafCounts.get(slot.category) ?? { done: 0, total: 0 };
           const badge = slotBadge(slot.status);
           const skillOpen = expandedSkills.has(slot.category);
@@ -155,7 +223,7 @@ export function WorkspaceProgressPanel({
                 type="button"
                 onClick={() => toggleSkill(slot.category)}
                 className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-slate-50/80 transition-colors"
- aria-expanded={skillOpen}
+                aria-expanded={skillOpen}
               >
                 <ChevronDown
                   className={`h-5 w-5 shrink-0 text-slate-500 transition-transform ${skillOpen ? "rotate-0" : "-rotate-90"}`}
@@ -174,8 +242,8 @@ export function WorkspaceProgressPanel({
                   </div>
                   <p className="text-xs text-slate-500 mt-0.5">
                     {counts.total === 0
-                      ? "No tasks yet"
-                      : `${counts.done} / ${counts.total} tasks done`}
+                      ? "No subtasks yet"
+                      : `${counts.done} / ${counts.total} subtasks done`}
                   </p>
                 </div>
               </button>
@@ -218,91 +286,166 @@ export function WorkspaceProgressPanel({
                   </div>
 
                   <ul className="space-y-2">
-                    {majors.map((major) => {
-                      const majorOpen = expandedMajors.has(major.id);
+                    {taskLists.map((taskList) => {
+                      const taskListOpen = expandedTaskLists.has(taskList.id);
                       return (
                         <li
-                          key={major.id}
+                          key={taskList.id}
                           className="rounded-xl border border-slate-200 bg-white"
                         >
                           <button
                             type="button"
-                            onClick={() => toggleMajor(major.id)}
+                            onClick={() => toggleTaskList(taskList.id)}
                             className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-slate-800 hover:bg-slate-50/80 rounded-xl"
-                            aria-expanded={majorOpen}
+                            aria-expanded={taskListOpen}
                           >
                             <ChevronDown
-                              className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${majorOpen ? "rotate-0" : "-rotate-90"}`}
+                              className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${taskListOpen ? "rotate-0" : "-rotate-90"}`}
                               aria-hidden
                             />
-                            <span className="min-w-0">{major.title}</span>
-                            {!major.standard ? (
+                            <span className="min-w-0">{taskList.title}</span>
+                            {!taskList.standard ? (
                               <span className="text-[10px] font-semibold text-slate-500 uppercase">
                                 Custom
                               </span>
                             ) : null}
                           </button>
-                          {majorOpen ? (
+                          {taskListOpen ? (
                             <div className="border-t border-slate-100 px-3 py-2 space-y-2">
-                              <ul className="space-y-1.5">
-                                {major.minors.map((min) => (
-                                  <li key={min.id} className="flex gap-2 items-start">
-                                    <input
-                                      type="checkbox"
-                                      id={`${projectId}-${min.id}`}
-                                      checked={min.completed}
-                                      disabled={pending}
-                                      onChange={(e) =>
-                                        run(() =>
-                                          actionProgressToggleLeaf(
-                                            projectId,
-                                            slot.category as ProfessionalJobCategory,
-                                            min.id,
-                                            e.target.checked,
-                                          ),
-                                        )
-                                      }
-                                      className="mt-0.5 h-4 w-4 rounded border-slate-300 text-[#15803d] focus:ring-[#15803d]"
-                                    />
-                                    <label
-                                      htmlFor={`${projectId}-${min.id}`}
-                                      className={`text-sm leading-snug cursor-pointer ${min.completed ? "text-slate-500 line-through" : "text-slate-800"}`}
+                              <ul className="space-y-2">
+                                {taskList.tasks.map((task) => {
+                                  if (isCollapsedSingleSubtaskTask(task)) {
+                                    return (
+                                      <ul
+                                        key={task.id}
+                                        className="space-y-1.5 pl-1"
+                                      >
+                                        {renderSubtaskRow(
+                                          slot,
+                                          task.subtasks[0],
+                                        )}
+                                      </ul>
+                                    );
+                                  }
+
+                                  const taskOpen = expandedTasks.has(task.id);
+                                  return (
+                                    <li
+                                      key={task.id}
+                                      className="rounded-lg border border-slate-100 bg-slate-50/50"
                                     >
-                                      {min.title}
-                                    </label>
-                                  </li>
-                                ))}
+                                      <button
+                                        type="button"
+                                        onClick={() => toggleTask(task.id)}
+                                        className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-sm font-medium text-slate-800 hover:bg-slate-50/80 rounded-lg"
+                                        aria-expanded={taskOpen}
+                                      >
+                                        <ChevronDown
+                                          className={`h-3.5 w-3.5 shrink-0 text-slate-500 transition-transform ${taskOpen ? "rotate-0" : "-rotate-90"}`}
+                                          aria-hidden
+                                        />
+                                        <span className="min-w-0">
+                                          {task.title}
+                                        </span>
+                                        {!task.standard ? (
+                                          <span className="text-[10px] font-semibold text-slate-500 uppercase">
+                                            Custom
+                                          </span>
+                                        ) : null}
+                                      </button>
+                                      {taskOpen ? (
+                                        <div className="border-t border-slate-100 px-2.5 py-2 space-y-2">
+                                          <ul className="space-y-1.5">
+                                            {task.subtasks.map((sub) =>
+                                              renderSubtaskRow(slot, sub),
+                                            )}
+                                          </ul>
+                                          <div className="flex gap-2 items-center pt-1">
+                                            <input
+                                              type="text"
+                                              value={
+                                                newSubtaskTitle[task.id] ?? ""
+                                              }
+                                              onChange={(e) =>
+                                                setNewSubtaskTitle((prev) => ({
+                                                  ...prev,
+                                                  [task.id]: e.target.value,
+                                                }))
+                                              }
+                                              placeholder="New subtask…"
+                                              className="flex-1 min-w-0 rounded-lg border border-slate-200 px-2 py-1.5 text-xs text-slate-800"
+                                            />
+                                            <button
+                                              type="button"
+                                              disabled={pending}
+                                              onClick={() => {
+                                                const t = (
+                                                  newSubtaskTitle[task.id] ?? ""
+                                                ).trim();
+                                                if (!t) return;
+                                                run(async () => {
+                                                  const r =
+                                                    await actionProgressAddCustomSubtask(
+                                                      projectId,
+                                                      slot.category as ProfessionalJobCategory,
+                                                      task.id,
+                                                      t,
+                                                    );
+                                                  if (r.ok) {
+                                                    setNewSubtaskTitle(
+                                                      (prev) => ({
+                                                        ...prev,
+                                                        [task.id]: "",
+                                                      }),
+                                                    );
+                                                  }
+                                                  return r;
+                                                });
+                                              }}
+                                              className="text-xs font-semibold text-[#15803d] hover:underline disabled:opacity-50 shrink-0"
+                                            >
+                                              Add subtask
+                                            </button>
+                                          </div>
+                                        </div>
+                                      ) : null}
+                                    </li>
+                                  );
+                                })}
                               </ul>
-                              <div className="flex gap-2 items-center pt-1">
+                              <div className="flex gap-2 items-center pt-1 border-t border-slate-100">
                                 <input
                                   type="text"
-                                  value={newMinorTitle[major.id] ?? ""}
+                                  value={newTaskTitle[taskList.id] ?? ""}
                                   onChange={(e) =>
-                                    setNewMinorTitle((prev) => ({
+                                    setNewTaskTitle((prev) => ({
                                       ...prev,
-                                      [major.id]: e.target.value,
+                                      [taskList.id]: e.target.value,
                                     }))
                                   }
-                                  placeholder="Add a task…"
+                                  placeholder="New task…"
                                   className="flex-1 min-w-0 rounded-lg border border-slate-200 px-2 py-1.5 text-xs text-slate-800"
                                 />
                                 <button
                                   type="button"
                                   disabled={pending}
                                   onClick={() => {
-                                    const t = (newMinorTitle[major.id] ?? "").trim();
+                                    const t = (
+                                      newTaskTitle[taskList.id] ?? ""
+                                    ).trim();
                                     if (!t) return;
                                     run(async () => {
-                                      const r = await actionProgressAddCustomMinor(
-                                        projectId,
-                                        slot.category as ProfessionalJobCategory,
-                                        major.id,
-                                        t,
-                                      );
+                                      const r =
+                                        await actionProgressAddCustomTask(
+                                          projectId,
+                                          slot.category as ProfessionalJobCategory,
+                                          taskList.id,
+                                          t,
+                                        );
                                       if (r.ok) {
-                                        setNewMinorTitle((prev) => ({
+                                        setNewTaskTitle((prev) => ({
                                           ...prev,
-                                          [major.id]: "",
+                                          [taskList.id]: "",
                                         }));
                                       }
                                       return r;
@@ -310,7 +453,7 @@ export function WorkspaceProgressPanel({
                                   }}
                                   className="text-xs font-semibold text-[#15803d] hover:underline disabled:opacity-50 shrink-0"
                                 >
-                                  Add
+                                  Add task
                                 </button>
                               </div>
                             </div>
@@ -323,30 +466,30 @@ export function WorkspaceProgressPanel({
                   <div className="flex flex-wrap gap-2 items-center pt-1 border-t border-slate-200/80">
                     <input
                       type="text"
-                      value={newMajorTitle[slot.category] ?? ""}
+                      value={newTaskListTitle[slot.category] ?? ""}
                       onChange={(e) =>
-                        setNewMajorTitle((prev) => ({
+                        setNewTaskListTitle((prev) => ({
                           ...prev,
                           [slot.category]: e.target.value,
                         }))
                       }
-                      placeholder="New major workstream…"
+                      placeholder="New task list…"
                       className="flex-1 min-w-48 rounded-lg border border-slate-200 px-2 py-1.5 text-xs text-slate-800"
                     />
                     <button
                       type="button"
                       disabled={pending}
                       onClick={() => {
-                        const t = (newMajorTitle[slot.category] ?? "").trim();
+                        const t = (newTaskListTitle[slot.category] ?? "").trim();
                         if (!t) return;
                         run(async () => {
-                          const r = await actionProgressAddCustomMajor(
+                          const r = await actionProgressAddCustomTaskList(
                             projectId,
                             slot.category as ProfessionalJobCategory,
                             t,
                           );
                           if (r.ok) {
-                            setNewMajorTitle((prev) => ({
+                            setNewTaskListTitle((prev) => ({
                               ...prev,
                               [slot.category]: "",
                             }));
@@ -356,14 +499,14 @@ export function WorkspaceProgressPanel({
                       }}
                       className="text-xs font-semibold rounded-md px-2.5 py-1.5 bg-[#15803d] text-white hover:bg-[#166534] disabled:opacity-50"
                     >
-                      Add major
+                      Add task list
                     </button>
                   </div>
 
                   {allDone && counts.total > 0 ? (
                     <p className="text-xs text-emerald-800 font-medium">
-                      All tasks for this skill are done — the Idea Arena card
-                      shows this slot as complete.
+                      All subtasks for this skill are done — the Idea Arena
+                      card shows this slot as complete.
                     </p>
                   ) : null}
                 </div>

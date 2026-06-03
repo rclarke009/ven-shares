@@ -3,22 +3,29 @@ import {
   type ProfessionalJobCategory,
 } from "@/lib/professional-onboarding";
 
-export type WorkspaceProgressMinor = {
+export type WorkspaceProgressSubtask = {
   id: string;
   title: string;
   standard: boolean;
   completed: boolean;
 };
 
-export type WorkspaceProgressMajor = {
+export type WorkspaceProgressTask = {
   id: string;
   title: string;
   standard: boolean;
-  minors: WorkspaceProgressMinor[];
+  subtasks: WorkspaceProgressSubtask[];
+};
+
+export type WorkspaceProgressTaskList = {
+  id: string;
+  title: string;
+  standard: boolean;
+  tasks: WorkspaceProgressTask[];
 };
 
 export type WorkspaceProgressCategoryBlock = {
-  majors: WorkspaceProgressMajor[];
+  taskLists: WorkspaceProgressTaskList[];
 };
 
 /** Keyed by exact `ProfessionalJobCategory` string. */
@@ -27,234 +34,324 @@ export type WorkspaceProgressChecklist = Record<
   WorkspaceProgressCategoryBlock
 >;
 
-type TemplateMajor = { title: string; minors: { title: string }[] };
+type TemplateSubtask = { title: string };
+type TemplateTask = { title: string; subtasks: TemplateSubtask[] };
+type TemplateTaskList = { title: string; tasks: TemplateTask[] };
 
 function categorySlug(category: ProfessionalJobCategory): string {
   return category.replace(/[^a-zA-Z0-9]+/g, "_");
 }
 
-export function stdMajorId(
+export function stdTaskListId(
   category: ProfessionalJobCategory,
-  majorIndex: number,
+  listIndex: number,
 ): string {
-  return `std:${categorySlug(category)}:M${majorIndex}`;
+  return `std:${categorySlug(category)}:M${listIndex}`;
 }
 
-export function stdMinorId(
+export function stdTaskId(
   category: ProfessionalJobCategory,
-  majorIndex: number,
-  minorIndex: number,
+  listIndex: number,
+  taskIndex: number,
 ): string {
-  return `std:${categorySlug(category)}:M${majorIndex}:m${minorIndex}`;
+  return `std:${categorySlug(category)}:M${listIndex}:T${taskIndex}`;
 }
 
-/** Default majors/minors per job category (stable ids derived from indices). */
+/** Legacy-compatible subtask id for standard template rows (matches former minor ids). */
+export function stdSubtaskId(
+  category: ProfessionalJobCategory,
+  listIndex: number,
+  taskIndex: number,
+  subIndex: number,
+): string {
+  if (subIndex === 0) {
+    return `std:${categorySlug(category)}:M${listIndex}:m${taskIndex}`;
+  }
+  return `std:${categorySlug(category)}:M${listIndex}:T${taskIndex}:s${subIndex}`;
+}
+
+function taskFromMinorTitle(title: string): TemplateTask {
+  return { title, subtasks: [{ title }] };
+}
+
+function taskListFromMajor(title: string, minorTitles: string[]): TemplateTaskList {
+  return { title, tasks: minorTitles.map(taskFromMinorTitle) };
+}
+
+/** Default task lists / tasks / subtasks per job category (stable ids derived from indices). */
 export const WORKSPACE_PROGRESS_STANDARD_TEMPLATE: Record<
   ProfessionalJobCategory,
-  TemplateMajor[]
+  TemplateTaskList[]
 > = {
   "Patent / IP law": [
-    {
-      title: "Discovery & strategy",
-      minors: [
-        { title: "Review invention disclosure and prior art snapshot" },
-        { title: "Confirm freedom-to-operate goals" },
-        { title: "Outline IP strategy (patents, trade secrets, timing)" },
-      ],
-    },
-    {
-      title: "Filing & prosecution",
-      minors: [
-        { title: "Draft and file patent application materials" },
-        { title: "Respond to office actions / examiner updates" },
-        { title: "Finalize claims aligned with product roadmap" },
-      ],
-    },
+    taskListFromMajor("Discovery & strategy", [
+      "Review invention disclosure and prior art snapshot",
+      "Confirm freedom-to-operate goals",
+      "Outline IP strategy (patents, trade secrets, timing)",
+    ]),
+    taskListFromMajor("Filing & prosecution", [
+      "Draft and file patent application materials",
+      "Respond to office actions / examiner updates",
+      "Finalize claims aligned with product roadmap",
+    ]),
   ],
   "Engineering / product": [
-    {
-      title: "Requirements & architecture",
-      minors: [
-        { title: "Capture requirements and success metrics" },
-        { title: "Define system architecture and interfaces" },
-        { title: "Identify technical risks and mitigations" },
-      ],
-    },
-    {
-      title: "Build & validation",
-      minors: [
-        { title: "Implement core functionality and integrations" },
-        { title: "Test and document performance / reliability" },
-        { title: "Hand off artifacts for manufacturing or launch" },
-      ],
-    },
+    taskListFromMajor("Requirements & architecture", [
+      "Capture requirements and success metrics",
+      "Define system architecture and interfaces",
+      "Identify technical risks and mitigations",
+    ]),
+    taskListFromMajor("Build & validation", [
+      "Implement core functionality and integrations",
+      "Test and document performance / reliability",
+      "Hand off artifacts for manufacturing or launch",
+    ]),
   ],
   Finance: [
-    {
-      title: "Modeling & runway",
-      minors: [
-        { title: "Build financial model and key assumptions" },
-        { title: "Review cash runway and funding needs" },
-        { title: "Support due diligence data room" },
-      ],
-    },
-    {
-      title: "Strategy & reporting",
-      minors: [
-        { title: "Define KPIs and reporting cadence for investors" },
-        { title: "Align entity structure with funding plan" },
-        { title: "Prepare board / investor updates" },
-      ],
-    },
+    taskListFromMajor("Modeling & runway", [
+      "Build financial model and key assumptions",
+      "Review cash runway and funding needs",
+      "Support due diligence data room",
+    ]),
+    taskListFromMajor("Strategy & reporting", [
+      "Define KPIs and reporting cadence for investors",
+      "Align entity structure with funding plan",
+      "Prepare board / investor updates",
+    ]),
   ],
   Accounting: [
-    {
-      title: "Bookkeeping & controls",
-      minors: [
-        { title: "Set up chart of accounts and bookkeeping cadence" },
-        { title: "Reconcile accounts and manage AP/AR" },
-        { title: "Establish internal controls" },
-      ],
-    },
-    {
-      title: "Compliance & close",
-      minors: [
-        { title: "Align tax filings and entity compliance" },
-        { title: "Close monthly / quarterly books" },
-        { title: "Support audit and data-room requests" },
-      ],
-    },
+    taskListFromMajor("Bookkeeping & controls", [
+      "Set up chart of accounts and bookkeeping cadence",
+      "Reconcile accounts and manage AP/AR",
+      "Establish internal controls",
+    ]),
+    taskListFromMajor("Compliance & close", [
+      "Align tax filings and entity compliance",
+      "Close monthly / quarterly books",
+      "Support audit and data-room requests",
+    ]),
   ],
   "Marketing / growth": [
-    {
-      title: "Positioning & audience",
-      minors: [
-        { title: "Define ICP, messaging, and channel mix" },
-        { title: "Create core assets (site, deck, one-pager)" },
-        { title: "Set measurement plan and KPIs" },
-      ],
-    },
-    {
-      title: "Launch & iteration",
-      minors: [
-        { title: "Run campaigns and experiments" },
-        { title: "Optimize funnel and creative" },
-        { title: "Report learnings to the team" },
-      ],
-    },
+    taskListFromMajor("Positioning & audience", [
+      "Define ICP, messaging, and channel mix",
+      "Create core assets (site, deck, one-pager)",
+      "Set measurement plan and KPIs",
+    ]),
+    taskListFromMajor("Launch & iteration", [
+      "Run campaigns and experiments",
+      "Optimize funnel and creative",
+      "Report learnings to the team",
+    ]),
   ],
   Operations: [
-    {
-      title: "Process & systems",
-      minors: [
-        { title: "Map critical workflows and owners" },
-        { title: "Implement tools for inventory / fulfillment / support" },
-        { title: "Define SLAs and escalation paths" },
-      ],
-    },
-    {
-      title: "Scale & quality",
-      minors: [
-        { title: "Monitor operational KPIs" },
-        { title: "Run retros and continuous improvements" },
-        { title: "Document runbooks for handoff" },
-      ],
-    },
+    taskListFromMajor("Process & systems", [
+      "Map critical workflows and owners",
+      "Implement tools for inventory / fulfillment / support",
+      "Define SLAs and escalation paths",
+    ]),
+    taskListFromMajor("Scale & quality", [
+      "Monitor operational KPIs",
+      "Run retros and continuous improvements",
+      "Document runbooks for handoff",
+    ]),
   ],
   "Design / UX": [
-    {
-      title: "Research & IA",
-      minors: [
-        { title: "Synthesize user research and jobs-to-be-done" },
-        { title: "Define information architecture and flows" },
-        { title: "Establish design system / UI patterns" },
-      ],
-    },
-    {
-      title: "Delivery & validation",
-      minors: [
-        { title: "Produce high-fidelity mocks and prototypes" },
-        { title: "Usability test and iterate" },
-        { title: "Prepare assets for engineering handoff" },
-      ],
-    },
+    taskListFromMajor("Research & IA", [
+      "Synthesize user research and jobs-to-be-done",
+      "Define information architecture and flows",
+      "Establish design system / UI patterns",
+    ]),
+    taskListFromMajor("Delivery & validation", [
+      "Produce high-fidelity mocks and prototypes",
+      "Usability test and iterate",
+      "Prepare assets for engineering handoff",
+    ]),
   ],
   "Sales / business development": [
-    {
-      title: "Pipeline & playbook",
-      minors: [
-        { title: "Define ICP, offer, and pricing narrative" },
-        { title: "Build prospect lists and outreach sequences" },
-        { title: "Create CRM stages and forecasting rules" },
-      ],
-    },
-    {
-      title: "Close & expand",
-      minors: [
-        { title: "Run discovery and demos" },
-        { title: "Negotiate terms and contracts" },
-        { title: "Onboard customers and expansion plan" },
-      ],
-    },
+    taskListFromMajor("Pipeline & playbook", [
+      "Define ICP, offer, and pricing narrative",
+      "Build prospect lists and outreach sequences",
+      "Create CRM stages and forecasting rules",
+    ]),
+    taskListFromMajor("Close & expand", [
+      "Run discovery and demos",
+      "Negotiate terms and contracts",
+      "Onboard customers and expansion plan",
+    ]),
   ],
   "Manufacturing / supply chain": [
-    {
-      title: "Sourcing & planning",
-      minors: [
-        { title: "Qualify suppliers and materials" },
-        { title: "Build BOM, lead times, and MOQs" },
-        { title: "Plan production schedule and inventory buffers" },
-      ],
-    },
-    {
-      title: "Quality & logistics",
-      minors: [
-        { title: "Define QC checkpoints and certifications" },
-        { title: "Coordinate shipping, import/export, and warehousing" },
-        { title: "Monitor cost and delivery performance" },
-      ],
-    },
+    taskListFromMajor("Sourcing & planning", [
+      "Qualify suppliers and materials",
+      "Build BOM, lead times, and MOQs",
+      "Plan production schedule and inventory buffers",
+    ]),
+    taskListFromMajor("Quality & logistics", [
+      "Define QC checkpoints and certifications",
+      "Coordinate shipping, import/export, and warehousing",
+      "Monitor cost and delivery performance",
+    ]),
   ],
   "Software development": [
-    {
-      title: "Foundation",
-      minors: [
-        { title: "Set up repo, CI/CD, and environments" },
-        { title: "Implement core services and APIs" },
-        { title: "Add observability, security basics, and backups" },
-      ],
-    },
-    {
-      title: "Ship & maintain",
-      minors: [
-        { title: "Complete features behind flags or releases" },
-        { title: "Test, fix bugs, and document" },
-        { title: "Operate releases and incident response" },
-      ],
-    },
+    taskListFromMajor("Foundation", [
+      "Set up repo, CI/CD, and environments",
+      "Implement core services and APIs",
+      "Add observability, security basics, and backups",
+    ]),
+    taskListFromMajor("Ship & maintain", [
+      "Complete features behind flags or releases",
+      "Test, fix bugs, and document",
+      "Operate releases and incident response",
+    ]),
   ],
   "Regulatory / compliance": [
-    {
-      title: "Scope & filings",
-      minors: [
-        { title: "Map applicable regulations and markets" },
-        { title: "Prepare submissions / registrations" },
-        { title: "Align labeling, claims, and evidence" },
-      ],
-    },
-    {
-      title: "Ongoing compliance",
-      minors: [
-        { title: "Establish QMS / audit trail as needed" },
-        { title: "Monitor law and standard updates" },
-        { title: "Train team on policies and controls" },
-      ],
-    },
+    taskListFromMajor("Scope & filings", [
+      "Map applicable regulations and markets",
+      "Prepare submissions / registrations",
+      "Align labeling, claims, and evidence",
+    ]),
+    taskListFromMajor("Ongoing compliance", [
+      "Establish QMS / audit trail as needed",
+      "Monitor law and standard updates",
+      "Train team on policies and controls",
+    ]),
   ],
 };
 
 function isProfessionalJobCategory(s: string): s is ProfessionalJobCategory {
   return (PROFESSIONAL_JOB_CATEGORY_OPTIONS as readonly string[]).includes(s);
+}
+
+function parseSubtask(raw: unknown): WorkspaceProgressSubtask | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const id = typeof o.id === "string" ? o.id : "";
+  const title = typeof o.title === "string" ? o.title : "";
+  if (!id || !title) return null;
+  return {
+    id,
+    title,
+    standard: o.standard === true,
+    completed: o.completed === true,
+  };
+}
+
+function parseTask(raw: unknown): WorkspaceProgressTask | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const id = typeof o.id === "string" ? o.id : "";
+  const title = typeof o.title === "string" ? o.title : "";
+  if (!id || !title) return null;
+  const subtasksRaw = o.subtasks;
+  const subtasks: WorkspaceProgressSubtask[] = [];
+  if (Array.isArray(subtasksRaw)) {
+    for (const s of subtasksRaw) {
+      const parsed = parseSubtask(s);
+      if (parsed) subtasks.push(parsed);
+    }
+  }
+  return { id, title, standard: o.standard === true, subtasks };
+}
+
+function parseTaskList(raw: unknown): WorkspaceProgressTaskList | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const id = typeof o.id === "string" ? o.id : "";
+  const title = typeof o.title === "string" ? o.title : "";
+  if (!id || !title) return null;
+  const tasksRaw = o.tasks;
+  const tasks: WorkspaceProgressTask[] = [];
+  if (Array.isArray(tasksRaw)) {
+    for (const t of tasksRaw) {
+      const parsed = parseTask(t);
+      if (parsed) tasks.push(parsed);
+    }
+  }
+  return { id, title, standard: o.standard === true, tasks };
+}
+
+function legacyMinorToTask(
+  minor: {
+    id: string;
+    title: string;
+    standard: boolean;
+    completed: boolean;
+  },
+  minorIndex: number,
+  listId: string,
+): WorkspaceProgressTask {
+  const taskId = minor.id.startsWith("std:")
+    ? `${listId}:T${minorIndex}`
+    : `cust:task:${minor.id}`;
+  return {
+    id: taskId,
+    title: minor.title,
+    standard: minor.standard,
+    subtasks: [
+      {
+        id: minor.id,
+        title: minor.title,
+        standard: minor.standard,
+        completed: minor.completed,
+      },
+    ],
+  };
+}
+
+function parseLegacyMajorsBlock(
+  majorsRaw: unknown[],
+): WorkspaceProgressTaskList[] {
+  const taskLists: WorkspaceProgressTaskList[] = [];
+  for (const m of majorsRaw) {
+    if (!m || typeof m !== "object") continue;
+    const mo = m as Record<string, unknown>;
+    const id = typeof mo.id === "string" ? mo.id : "";
+    const title = typeof mo.title === "string" ? mo.title : "";
+    const standard = mo.standard === true;
+    if (!id || !title) continue;
+
+    const minorsRaw = mo.minors;
+    const tasks: WorkspaceProgressTask[] = [];
+    if (Array.isArray(minorsRaw)) {
+      let minorIndex = 0;
+      for (const n of minorsRaw) {
+        if (!n || typeof n !== "object") continue;
+        const no = n as Record<string, unknown>;
+        const minor = {
+          id: typeof no.id === "string" ? no.id : crypto.randomUUID(),
+          title: typeof no.title === "string" ? no.title : "",
+          standard: no.standard === true,
+          completed: no.completed === true,
+        };
+        if (!minor.title) continue;
+        tasks.push(legacyMinorToTask(minor, minorIndex, id));
+        minorIndex++;
+      }
+    }
+    taskLists.push({ id, title, standard, tasks });
+  }
+  return taskLists;
+}
+
+function parseCategoryBlock(val: unknown): WorkspaceProgressCategoryBlock | null {
+  if (!val || typeof val !== "object" || Array.isArray(val)) return null;
+  const block = val as Record<string, unknown>;
+
+  const taskListsRaw = block.taskLists;
+  if (Array.isArray(taskListsRaw)) {
+    const taskLists: WorkspaceProgressTaskList[] = [];
+    for (const tl of taskListsRaw) {
+      const parsed = parseTaskList(tl);
+      if (parsed) taskLists.push(parsed);
+    }
+    return { taskLists };
+  }
+
+  const majorsRaw = block.majors;
+  if (Array.isArray(majorsRaw)) {
+    return { taskLists: parseLegacyMajorsBlock(majorsRaw) };
+  }
+
+  return null;
 }
 
 export function parseWorkspaceProgressChecklist(
@@ -266,35 +363,8 @@ export function parseWorkspaceProgressChecklist(
   const out: WorkspaceProgressChecklist = {};
   for (const [key, val] of Object.entries(raw as Record<string, unknown>)) {
     if (!isProfessionalJobCategory(key)) continue;
-    if (!val || typeof val !== "object" || Array.isArray(val)) continue;
-    const majorsRaw = (val as Record<string, unknown>).majors;
-    if (!Array.isArray(majorsRaw)) continue;
-    const majors: WorkspaceProgressMajor[] = [];
-    for (const m of majorsRaw) {
-      if (!m || typeof m !== "object") continue;
-      const mo = m as Record<string, unknown>;
-      const id = typeof mo.id === "string" ? mo.id : "";
-      const title = typeof mo.title === "string" ? mo.title : "";
-      const standard = mo.standard === true;
-      const minorsRaw = mo.minors;
-      const minors: WorkspaceProgressMinor[] = [];
-      if (Array.isArray(minorsRaw)) {
-        for (const n of minorsRaw) {
-          if (!n || typeof n !== "object") continue;
-          const no = n as Record<string, unknown>;
-          minors.push({
-            id: typeof no.id === "string" ? no.id : crypto.randomUUID(),
-            title: typeof no.title === "string" ? no.title : "",
-            standard: no.standard === true,
-            completed: no.completed === true,
-          });
-        }
-      }
-      if (id && title) {
-        majors.push({ id, title, standard, minors });
-      }
-    }
-    out[key] = { majors };
+    const block = parseCategoryBlock(val);
+    if (block) out[key] = block;
   }
   return out;
 }
@@ -306,32 +376,68 @@ function categoryHadPersistedData(
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return false;
   const block = (raw as Record<string, unknown>)[category];
   if (!block || typeof block !== "object" || Array.isArray(block)) return false;
-  const majors = (block as Record<string, unknown>).majors;
+  const b = block as Record<string, unknown>;
+  const taskLists = b.taskLists;
+  if (Array.isArray(taskLists) && taskLists.length > 0) return true;
+  const majors = b.majors;
   return Array.isArray(majors) && majors.length > 0;
 }
 
-function collectTemplateMinorIds(
+function collectTemplateSubtaskIds(
   category: ProfessionalJobCategory,
 ): Set<string> {
   const set = new Set<string>();
   const tmpl = WORKSPACE_PROGRESS_STANDARD_TEMPLATE[category];
-  for (let mi = 0; mi < tmpl.length; mi++) {
-    const majors = tmpl[mi];
-    for (let mj = 0; mj < majors.minors.length; mj++) {
-      set.add(stdMinorId(category, mi, mj));
+  for (let li = 0; li < tmpl.length; li++) {
+    const list = tmpl[li];
+    for (let ti = 0; ti < list.tasks.length; ti++) {
+      const task = list.tasks[ti];
+      for (let si = 0; si < task.subtasks.length; si++) {
+        set.add(stdSubtaskId(category, li, ti, si));
+      }
     }
   }
   return set;
 }
 
+function collectTemplateTaskIds(
+  category: ProfessionalJobCategory,
+): Set<string> {
+  const set = new Set<string>();
+  const tmpl = WORKSPACE_PROGRESS_STANDARD_TEMPLATE[category];
+  for (let li = 0; li < tmpl.length; li++) {
+    const list = tmpl[li];
+    for (let ti = 0; ti < list.tasks.length; ti++) {
+      set.add(stdTaskId(category, li, ti));
+    }
+  }
+  return set;
+}
+
+function findSubtaskInBlock(
+  block: WorkspaceProgressCategoryBlock | undefined,
+  subtaskId: string,
+): WorkspaceProgressSubtask | undefined {
+  if (!block) return undefined;
+  for (const list of block.taskLists) {
+    for (const task of list.tasks) {
+      const found = task.subtasks.find((s) => s.id === subtaskId);
+      if (found) return found;
+    }
+  }
+  return undefined;
+}
+
 export function collectLeavesForCategory(
   block: WorkspaceProgressCategoryBlock | undefined,
-): WorkspaceProgressMinor[] {
-  if (!block?.majors?.length) return [];
-  const out: WorkspaceProgressMinor[] = [];
-  for (const maj of block.majors) {
-    for (const min of maj.minors) {
-      out.push(min);
+): WorkspaceProgressSubtask[] {
+  if (!block?.taskLists?.length) return [];
+  const out: WorkspaceProgressSubtask[] = [];
+  for (const list of block.taskLists) {
+    for (const task of list.tasks) {
+      for (const sub of task.subtasks) {
+        out.push(sub);
+      }
     }
   }
   return out;
@@ -375,61 +481,97 @@ export function mergeChecklistWithTemplates(
   for (const category of required) {
     const existing = parsed[category];
     const persisted = categoryHadPersistedData(rawFromDb, category);
-    const templateMinorIds = collectTemplateMinorIds(category);
+    const templateSubtaskIds = collectTemplateSubtaskIds(category);
+    const templateTaskIds = collectTemplateTaskIds(category);
     const template = WORKSPACE_PROGRESS_STANDARD_TEMPLATE[category];
 
-    const mergedMajors: WorkspaceProgressMajor[] = [];
+    const mergedTaskLists: WorkspaceProgressTaskList[] = [];
 
-    for (let mi = 0; mi < template.length; mi++) {
-      const tMaj = template[mi];
-      const majorId = stdMajorId(category, mi);
-      const oldMajor = existing?.majors.find((m) => m.id === majorId);
+    for (let li = 0; li < template.length; li++) {
+      const tList = template[li];
+      const taskListId = stdTaskListId(category, li);
+      const oldTaskList = existing?.taskLists.find((l) => l.id === taskListId);
 
-      const mergedMinors: WorkspaceProgressMinor[] = [];
+      const mergedTasks: WorkspaceProgressTask[] = [];
 
-      for (let mj = 0; mj < tMaj.minors.length; mj++) {
-        const minorId = stdMinorId(category, mi, mj);
-        const oldMin = oldMajor?.minors.find((n) => n.id === minorId);
-        const defaultCompleted =
-          !persisted && completedSet.has(category);
-        mergedMinors.push({
-          id: minorId,
-          title: tMaj.minors[mj].title,
+      for (let ti = 0; ti < tList.tasks.length; ti++) {
+        const tTask = tList.tasks[ti];
+        const taskId = stdTaskId(category, li, ti);
+        const oldTask = oldTaskList?.tasks.find((t) => t.id === taskId);
+
+        const mergedSubtasks: WorkspaceProgressSubtask[] = [];
+
+        for (let si = 0; si < tTask.subtasks.length; si++) {
+          const subtaskId = stdSubtaskId(category, li, ti, si);
+          const oldSub =
+            findSubtaskInBlock(existing, subtaskId) ??
+            oldTask?.subtasks.find((s) => s.id === subtaskId);
+          const defaultCompleted =
+            !persisted && completedSet.has(category);
+          mergedSubtasks.push({
+            id: subtaskId,
+            title: tTask.subtasks[si].title,
+            standard: true,
+            completed: oldSub ? oldSub.completed : defaultCompleted,
+          });
+        }
+
+        if (oldTask) {
+          for (const s of oldTask.subtasks) {
+            if (!templateSubtaskIds.has(s.id)) {
+              mergedSubtasks.push({ ...s });
+            }
+          }
+        }
+
+        mergedTasks.push({
+          id: taskId,
+          title: tTask.title,
           standard: true,
-          completed: oldMin ? oldMin.completed : defaultCompleted,
+          subtasks: mergedSubtasks,
         });
       }
 
-      if (oldMajor) {
-        for (const n of oldMajor.minors) {
-          if (!templateMinorIds.has(n.id)) {
-            mergedMinors.push({ ...n });
+      if (oldTaskList) {
+        for (const t of oldTaskList.tasks) {
+          if (!templateTaskIds.has(t.id) && t.id.startsWith("cust:")) {
+            mergedTasks.push({
+              id: t.id,
+              title: t.title,
+              standard: false,
+              subtasks: t.subtasks.map((s) => ({ ...s })),
+            });
           }
         }
       }
 
-      mergedMajors.push({
-        id: majorId,
-        title: tMaj.title,
+      mergedTaskLists.push({
+        id: taskListId,
+        title: tList.title,
         standard: true,
-        minors: mergedMinors,
+        tasks: mergedTasks,
       });
     }
 
-    if (existing?.majors?.length) {
-      for (const maj of existing.majors) {
-        if (maj.id.startsWith("cust:")) {
-          mergedMajors.push({
-            id: maj.id,
-            title: maj.title,
+    if (existing?.taskLists?.length) {
+      for (const list of existing.taskLists) {
+        if (list.id.startsWith("cust:")) {
+          mergedTaskLists.push({
+            id: list.id,
+            title: list.title,
             standard: false,
-            minors: maj.minors.map((n) => ({ ...n })),
+            tasks: list.tasks.map((t) => ({
+              id: t.id,
+              title: t.title,
+              standard: t.standard,
+              subtasks: t.subtasks.map((s) => ({ ...s })),
+            })),
           });
         }
       }
     }
 
-    next[category] = { majors: mergedMajors };
+    next[category] = { taskLists: mergedTaskLists };
   }
 
   return next;
@@ -476,17 +618,19 @@ export function setLeafCompleted(
   const next = cloneChecklist(checklist);
   const block = next[category];
   if (!block) return null;
-  for (const maj of block.majors) {
-    const found = maj.minors.find((m) => m.id === leafId);
-    if (found) {
-      found.completed = completed;
-      return next;
+  for (const list of block.taskLists) {
+    for (const task of list.tasks) {
+      const found = task.subtasks.find((s) => s.id === leafId);
+      if (found) {
+        found.completed = completed;
+        return next;
+      }
     }
   }
   return null;
 }
 
-export function addCustomMajor(
+export function addCustomTaskList(
   checklist: WorkspaceProgressChecklist,
   category: ProfessionalJobCategory,
   title: string,
@@ -496,19 +640,19 @@ export function addCustomMajor(
   const next = cloneChecklist(checklist);
   const block = next[category];
   if (!block) return null;
-  block.majors.push({
+  block.taskLists.push({
     id: `cust:${crypto.randomUUID()}`,
     title: trimmed,
     standard: false,
-    minors: [],
+    tasks: [],
   });
   return next;
 }
 
-export function addCustomMinor(
+export function addCustomTask(
   checklist: WorkspaceProgressChecklist,
   category: ProfessionalJobCategory,
-  majorId: string,
+  taskListId: string,
   title: string,
 ): WorkspaceProgressChecklist | null {
   const trimmed = title.trim();
@@ -516,15 +660,40 @@ export function addCustomMinor(
   const next = cloneChecklist(checklist);
   const block = next[category];
   if (!block) return null;
-  const major = block.majors.find((m) => m.id === majorId);
-  if (!major) return null;
-  major.minors.push({
+  const taskList = block.taskLists.find((l) => l.id === taskListId);
+  if (!taskList) return null;
+  taskList.tasks.push({
     id: `cust:${crypto.randomUUID()}`,
     title: trimmed,
     standard: false,
-    completed: false,
+    subtasks: [],
   });
   return next;
+}
+
+export function addCustomSubtask(
+  checklist: WorkspaceProgressChecklist,
+  category: ProfessionalJobCategory,
+  taskId: string,
+  title: string,
+): WorkspaceProgressChecklist | null {
+  const trimmed = title.trim();
+  if (!trimmed) return null;
+  const next = cloneChecklist(checklist);
+  const block = next[category];
+  if (!block) return null;
+  for (const list of block.taskLists) {
+    const task = list.tasks.find((t) => t.id === taskId);
+    if (!task) continue;
+    task.subtasks.push({
+      id: `cust:${crypto.randomUUID()}`,
+      title: trimmed,
+      standard: false,
+      completed: false,
+    });
+    return next;
+  }
+  return null;
 }
 
 export function setAllLeavesInCategory(
@@ -535,9 +704,11 @@ export function setAllLeavesInCategory(
   const next = cloneChecklist(checklist);
   const block = next[category];
   if (!block) return null;
-  for (const maj of block.majors) {
-    for (const min of maj.minors) {
-      min.completed = completed;
+  for (const list of block.taskLists) {
+    for (const task of list.tasks) {
+      for (const sub of task.subtasks) {
+        sub.completed = completed;
+      }
     }
   }
   return next;

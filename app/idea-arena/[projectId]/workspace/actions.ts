@@ -7,8 +7,9 @@ import type { ProfessionalJobCategory } from "@/lib/professional-onboarding";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { isProjectUuid } from "@/lib/projects-arena";
 import {
-  addCustomMajor,
-  addCustomMinor,
+  addCustomSubtask,
+  addCustomTask,
+  addCustomTaskList,
   mergeChecklistWithTemplates,
   parseWorkspaceProgressChecklist,
   setAllLeavesInCategory,
@@ -123,7 +124,7 @@ export async function actionProgressToggleLeaf(
   return { ok: true };
 }
 
-export async function actionProgressAddCustomMajor(
+export async function actionProgressAddCustomTaskList(
   projectId: string,
   category: ProfessionalJobCategory,
   title: string,
@@ -141,8 +142,8 @@ export async function actionProgressAddCustomMajor(
     return { ok: false, error: "That category is not part of this project." };
   }
 
-  const next = addCustomMajor(loaded.merged, category, title);
-  if (!next) return { ok: false, error: "Could not add major task." };
+  const next = addCustomTaskList(loaded.merged, category, title);
+  if (!next) return { ok: false, error: "Could not add task list." };
 
   const persist = await persistWorkspaceProgress(projectId, next);
   if (!persist.ok) return persist;
@@ -151,10 +152,10 @@ export async function actionProgressAddCustomMajor(
   return { ok: true };
 }
 
-export async function actionProgressAddCustomMinor(
+export async function actionProgressAddCustomTask(
   projectId: string,
   category: ProfessionalJobCategory,
-  majorId: string,
+  taskListId: string,
   title: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const { userId } = await auth();
@@ -170,8 +171,37 @@ export async function actionProgressAddCustomMinor(
     return { ok: false, error: "That category is not part of this project." };
   }
 
-  const next = addCustomMinor(loaded.merged, category, majorId, title);
+  const next = addCustomTask(loaded.merged, category, taskListId, title);
   if (!next) return { ok: false, error: "Could not add task." };
+
+  const persist = await persistWorkspaceProgress(projectId, next);
+  if (!persist.ok) return persist;
+
+  revalidateArenaAndWorkspace(projectId);
+  return { ok: true };
+}
+
+export async function actionProgressAddCustomSubtask(
+  projectId: string,
+  category: ProfessionalJobCategory,
+  taskId: string,
+  title: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { userId } = await auth();
+  if (!userId || !isProjectUuid(projectId)) {
+    return { ok: false, error: "Unauthorized." };
+  }
+  const allowed = await canAccessWorkspace(projectId, userId);
+  if (!allowed) return { ok: false, error: "Unauthorized." };
+
+  const loaded = await loadMergedChecklist(projectId);
+  if (!loaded) return { ok: false, error: "Could not load project." };
+  if (!loaded.required.includes(category)) {
+    return { ok: false, error: "That category is not part of this project." };
+  }
+
+  const next = addCustomSubtask(loaded.merged, category, taskId, title);
+  if (!next) return { ok: false, error: "Could not add subtask." };
 
   const persist = await persistWorkspaceProgress(projectId, next);
   if (!persist.ok) return persist;
