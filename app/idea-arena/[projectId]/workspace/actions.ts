@@ -4,17 +4,20 @@ import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 
 import type { ProfessionalJobCategory } from "@/lib/professional-onboarding";
+import { resolveProfessionalJobCategory } from "@/lib/professional-onboarding";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { isProjectUuid } from "@/lib/projects-arena";
 import {
   addCustomSubtask,
   addCustomTask,
   addCustomTaskList,
+  deleteCustomProgressItem,
   mergeChecklistWithTemplates,
   moveTaskInCategory,
   reorderSubtasksInTask,
   setAllLeavesInCategory,
   setLeafCompleted,
+  type ProgressCustomItemKind,
 } from "@/lib/workspace-progress-checklist";
 import { persistWorkspaceProgress } from "@/lib/workspace-progress-sync";
 import { normalizeRequiredJobCategoriesFromDb } from "@/lib/skills-match";
@@ -319,6 +322,40 @@ export async function actionProgressReorderSubtasks(
   return { ok: true };
 }
 
+export async function actionProgressDeleteCustomItem(
+  projectId: string,
+  category: ProfessionalJobCategory,
+  kind: ProgressCustomItemKind,
+  itemId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { userId } = await auth();
+  if (!userId || !isProjectUuid(projectId)) {
+    return { ok: false, error: "Unauthorized." };
+  }
+  const allowed = await canAccessWorkspace(projectId, userId);
+  if (!allowed) return { ok: false, error: "Unauthorized." };
+
+  const loaded = await loadMergedChecklist(projectId);
+  if (!loaded) return { ok: false, error: "Could not load project." };
+  if (!loaded.required.includes(category)) {
+    return { ok: false, error: "That category is not part of this project." };
+  }
+
+  const next = deleteCustomProgressItem(
+    loaded.merged,
+    category,
+    kind,
+    itemId,
+  );
+  if (!next) return { ok: false, error: "That item cannot be removed." };
+
+  const persist = await persistWorkspaceProgress(projectId, next);
+  if (!persist.ok) return persist;
+
+  revalidateArenaAndWorkspace(projectId);
+  return { ok: true };
+}
+
 function safeStorageFileSegment(name: string): string {
   const base = name.replace(/[^a-zA-Z0-9._-]+/g, "_").slice(0, 120);
   return base || "file";
@@ -415,6 +452,24 @@ export async function actionUploadWorkspaceFile(
     return { ok: false, error: "This file type isn’t allowed." };
   }
 
+  const rawCategory = formData.get("job_category");
+  let jobCategory: ProfessionalJobCategory | null = null;
+  if (typeof rawCategory === "string" && rawCategory.trim()) {
+    const resolved = resolveProfessionalJobCategory(rawCategory.trim());
+    if (!resolved) {
+      return { ok: false, error: "Invalid skill category." };
+    }
+    const loaded = await loadMergedChecklist(projectId);
+    if (!loaded) return { ok: false, error: "Could not load project." };
+    if (!loaded.required.includes(resolved)) {
+      return {
+        ok: false,
+        error: "That category is not part of this project.",
+      };
+    }
+    jobCategory = resolved;
+  }
+
   const buffer = Buffer.from(await file.arrayBuffer());
   const fileId = crypto.randomUUID();
   const storagePath = `${projectId}/${fileId}-${safeStorageFileSegment(file.name)}`;
@@ -439,6 +494,7 @@ export async function actionUploadWorkspaceFile(
     file.name.slice(0, 500),
     mime,
     file.size,
+    jobCategory,
   );
 
   if (!rec.ok) {

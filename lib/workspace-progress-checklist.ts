@@ -941,3 +941,46 @@ export function reorderSubtasksInTask(
   }
   return null;
 }
+
+export type ProgressCustomItemKind = "taskList" | "task" | "subtask";
+
+export function deleteCustomProgressItem(
+  checklist: WorkspaceProgressChecklist,
+  category: ProfessionalJobCategory,
+  kind: ProgressCustomItemKind,
+  itemId: string,
+): WorkspaceProgressChecklist | null {
+  const next = cloneChecklist(checklist);
+  const block = next[category];
+  if (!block) return null;
+
+  if (kind === "taskList") {
+    const listIndex = block.taskLists.findIndex((l) => l.id === itemId);
+    if (listIndex === -1) return null;
+    if (block.taskLists[listIndex].standard) return null;
+    block.taskLists.splice(listIndex, 1);
+    return next;
+  }
+
+  if (kind === "task") {
+    for (const list of block.taskLists) {
+      const taskIndex = list.tasks.findIndex((t) => t.id === itemId);
+      if (taskIndex === -1) continue;
+      if (list.tasks[taskIndex].standard) return null;
+      list.tasks.splice(taskIndex, 1);
+      return next;
+    }
+    return null;
+  }
+
+  for (const list of block.taskLists) {
+    for (const task of list.tasks) {
+      const subIndex = task.subtasks.findIndex((s) => s.id === itemId);
+      if (subIndex === -1) continue;
+      if (task.subtasks[subIndex].standard) return null;
+      task.subtasks.splice(subIndex, 1);
+      return next;
+    }
+  }
+  return null;
+}

@@ -10,6 +10,7 @@ import {
   type WorkspaceRosterEntryDTO,
 } from "@/components/workspace/workspace-shell";
 import { getProjectByIdForArena, isProjectUuid } from "@/lib/projects-arena";
+import { getArenaTeamDisplay } from "@/lib/arena-team";
 import {
   assertWorkspaceAccess,
   getWorkspaceAccessFlags,
@@ -58,6 +59,11 @@ async function WorkspacePageContent({
 
   const arenaProject = await getProjectByIdForArena(projectId);
   if (!arenaProject) notFound();
+
+  const { categoryCoverage } = await getArenaTeamDisplay(
+    projectId,
+    arenaProject.required_job_categories,
+  );
 
   const [files, messages, activities, presence, memberIds] = await Promise.all([
     listWorkspaceFiles(projectId),
@@ -126,6 +132,7 @@ async function WorkspacePageContent({
     filename: f.filename,
     content_type: f.content_type,
     byte_size: Number(f.byte_size),
+    job_category: f.job_category ?? null,
     created_at: f.created_at,
     deleted_at: f.deleted_at ?? null,
     deleted_by_clerk_user_id: f.deleted_by_clerk_user_id ?? null,
@@ -161,6 +168,7 @@ async function WorkspacePageContent({
       nameMap={nameMapRecord}
       progressChecklist={progressBundle.checklist}
       progressCategoryStatuses={arenaProject.category_statuses}
+      categoryCoverage={categoryCoverage}
       isProjectOwner={accessFlags.isOwner}
       editableProject={
         accessFlags.isOwner

@@ -4,6 +4,10 @@ import { clerkClient } from "@clerk/nextjs/server";
 
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import type { ProfessionalJobCategory } from "@/lib/professional-onboarding";
+import type {
+  ArenaCategoryCoverage,
+  ArenaTeamMemberDisplay,
+} from "@/lib/arena-team-display";
 import {
   getProfessionalJobCategoriesFromMetadata,
   intersectProfessionalWithRequiredCategories,
@@ -30,26 +34,62 @@ type ProjectMemberPreviewRow = {
   project_id?: unknown;
   clerk_user_id?: unknown;
   covered_job_categories?: unknown;
+  created_at?: unknown;
 };
 
 type ProjectMemberDetailRow = {
   clerk_user_id?: unknown;
   covered_job_categories?: unknown;
+  created_at?: unknown;
 };
 
-export type ArenaTeamMemberDisplay = {
-  clerkUserId: string;
-  displayName: string;
-  imageUrl: string | null;
-  /** Categories this member contributes toward this project (persisted or live fallback). */
-  coveredCategories: ProfessionalJobCategory[];
-};
+export type { ArenaCategoryCoverage, ArenaTeamMemberDisplay } from "@/lib/arena-team-display";
 
-export type ArenaCategoryCoverage = {
-  category: ProfessionalJobCategory;
-  covered: boolean;
-  members: ArenaTeamMemberDisplay[];
-};
+function emptyCategoryCoverage(
+  category: ProfessionalJobCategory,
+): ArenaCategoryCoverage {
+  return {
+    category,
+    covered: false,
+    teamLead: null,
+    otherMembers: [],
+    members: [],
+  };
+}
+
+function parseJoinedAt(value: unknown): string {
+  if (typeof value === "string" && value.trim()) return value;
+  return new Date(0).toISOString();
+}
+
+function compareMembersByJoinOrder(
+  a: ArenaTeamMemberDisplay,
+  b: ArenaTeamMemberDisplay,
+): number {
+  const byTime = a.joinedAt.localeCompare(b.joinedAt);
+  if (byTime !== 0) return byTime;
+  return a.clerkUserId.localeCompare(b.clerkUserId);
+}
+
+export function buildCategoryCoverage(
+  requiredCategories: ProfessionalJobCategory[],
+  members: ArenaTeamMemberDisplay[],
+): ArenaCategoryCoverage[] {
+  return requiredCategories.map((category) => {
+    const forCat = members
+      .filter((m) => m.coveredCategories.includes(category))
+      .sort(compareMembersByJoinOrder);
+    const teamLead = forCat[0] ?? null;
+    const otherMembers = forCat.slice(1);
+    return {
+      category,
+      covered: forCat.length > 0,
+      teamLead,
+      otherMembers,
+      members: forCat,
+    };
+  });
+}
 
 function displayNameFromClerkUser(user: {
   firstName: string | null;
@@ -75,6 +115,7 @@ function buildArenaTeamMemberDisplay(
   coveredRaw: unknown,
   clerkUser: ClerkUserRecord | null,
   requiredCategories: ProfessionalJobCategory[],
+  joinedAt: string,
 ): ArenaTeamMemberDisplay {
   const fromDb = normalizeCoveredFromDb(coveredRaw);
 
@@ -91,6 +132,7 @@ function buildArenaTeamMemberDisplay(
       displayName: displayNameFromClerkUser(clerkUser),
       imageUrl: clerkUser.imageUrl?.trim() || null,
       coveredCategories,
+      joinedAt,
     };
   }
 
@@ -104,6 +146,7 @@ function buildArenaTeamMemberDisplay(
     displayName: "Team member",
     imageUrl: null,
     coveredCategories,
+    joinedAt,
   };
 }
 
@@ -127,7 +170,7 @@ export async function getArenaTeamPreviewForProjects(
   const supabase = createServerSupabaseClient();
   const previewPrimary = await supabase
     .from("project_members")
-    .select("project_id, clerk_user_id, covered_job_categories")
+    .select("project_id, clerk_user_id, covered_job_categories, created_at")
     .in("project_id", projectIds);
   let rows: ProjectMemberPreviewRow[] | null =
     previewPrimary.data as ProjectMemberPreviewRow[] | null;
@@ -136,7 +179,7 @@ export async function getArenaTeamPreviewForProjects(
   if (error && isMissingCoveredJobCategoriesColumn(error)) {
     const retry = await supabase
       .from("project_members")
-      .select("project_id, clerk_user_id")
+      .select("project_id, clerk_user_id, created_at")
       .in("project_id", projectIds);
     rows = retry.data as ProjectMemberPreviewRow[] | null;
     error = retry.error;
@@ -150,7 +193,7 @@ export async function getArenaTeamPreviewForProjects(
 
   const rowsByProject = new Map<
     string,
-    { clerk_user_id: string; covered_job_categories: unknown }[]
+    { clerk_user_id: string; covered_job_categories: unknown; joinedAt: string }[]
   >();
   const uniqueClerkIds = new Set<string>();
 
@@ -168,6 +211,7 @@ export async function getArenaTeamPreviewForProjects(
     list.push({
       clerk_user_id: cid,
       covered_job_categories: row.covered_job_categories ?? [],
+      joinedAt: parseJoinedAt(row.created_at),
     });
   }
 
@@ -194,6 +238,7 @@ export async function getArenaTeamPreviewForProjects(
         r.covered_job_categories,
         clerkById.get(r.clerk_user_id) ?? null,
         required,
+        r.joinedAt,
       ),
     );
     out.set(projectId, members);
@@ -216,18 +261,14 @@ export async function getArenaTeamDisplay(
   if (!isArenaProjectUuid(projectId)) {
     return {
       members: [],
-      categoryCoverage: requiredCategories.map((category) => ({
-        category,
-        covered: false,
-        members: [],
-      })),
+      categoryCoverage: requiredCategories.map(emptyCategoryCoverage),
     };
   }
 
   const supabase = createServerSupabaseClient();
   const detailPrimary = await supabase
     .from("project_members")
-    .select("clerk_user_id, covered_job_categories")
+    .select("clerk_user_id, covered_job_categories, created_at")
     .eq("project_id", projectId);
   let rows: ProjectMemberDetailRow[] | null =
     detailPrimary.data as ProjectMemberDetailRow[] | null;
@@ -236,7 +277,7 @@ export async function getArenaTeamDisplay(
   if (error && isMissingCoveredJobCategoriesColumn(error)) {
     const retry = await supabase
       .from("project_members")
-      .select("clerk_user_id")
+      .select("clerk_user_id, created_at")
       .eq("project_id", projectId);
     rows = retry.data as ProjectMemberDetailRow[] | null;
     error = retry.error;
@@ -246,11 +287,7 @@ export async function getArenaTeamDisplay(
     console.log("MYDEBUG →", error.message);
     return {
       members: [],
-      categoryCoverage: requiredCategories.map((category) => ({
-        category,
-        covered: false,
-        members: [],
-      })),
+      categoryCoverage: requiredCategories.map(emptyCategoryCoverage),
     };
   }
 
@@ -275,20 +312,12 @@ export async function getArenaTeamDisplay(
         row.covered_job_categories ?? [],
         user,
         requiredCategories,
+        parseJoinedAt(row.created_at),
       ),
     );
   }
 
-  const categoryCoverage: ArenaCategoryCoverage[] = requiredCategories.map(
-    (category) => {
-      const forCat = members.filter((m) => m.coveredCategories.includes(category));
-      return {
-        category,
-        covered: forCat.length > 0,
-        members: forCat,
-      };
-    },
-  );
+  const categoryCoverage = buildCategoryCoverage(requiredCategories, members);
 
   return { members, categoryCoverage };
 }

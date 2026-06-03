@@ -29,6 +29,7 @@ import {
   actionProgressAddCustomSubtask,
   actionProgressAddCustomTask,
   actionProgressAddCustomTaskList,
+  actionProgressDeleteCustomItem,
   actionProgressMoveTask,
   actionProgressReorderSubtasks,
   actionProgressSetCategoryLeaves,
@@ -40,9 +41,12 @@ import {
   taskSortableId,
 } from "@/components/workspace/progress-task-row";
 import { SkillRecommendMenu } from "@/components/workspace/skill-recommend-menu";
+import { SkillTeamRoster } from "@/components/idea-arena/skill-team-roster";
+import type { ArenaCategoryCoverage } from "@/lib/arena-team-display";
 import type { ArenaCategorySlot } from "@/lib/projects-arena";
 import type { ProfessionalJobCategory } from "@/lib/professional-onboarding";
 import type {
+  ProgressCustomItemKind,
   WorkspaceProgressChecklist,
   WorkspaceProgressTask,
   WorkspaceProgressTaskList,
@@ -126,6 +130,8 @@ type SkillProgressBodyProps = {
   onNewTaskTitleChange: (taskListId: string, value: string) => void;
   onNewSubtaskTitleChange: (taskId: string, value: string) => void;
   onRun: (fn: () => Promise<{ ok: boolean; error?: string }>) => void;
+  onCollapseTask: (taskId: string) => void;
+  onCollapseTaskList: (taskListId: string) => void;
 };
 
 function SkillProgressBody({
@@ -147,8 +153,11 @@ function SkillProgressBody({
   onNewTaskTitleChange,
   onNewSubtaskTitleChange,
   onRun,
+  onCollapseTask,
+  onCollapseTaskList,
 }: SkillProgressBodyProps) {
   const category = slot.category as ProfessionalJobCategory;
+  const [pendingDeleteKey, setPendingDeleteKey] = useState<string | null>(null);
 
   const allTaskSortableIds = useMemo(
     () =>
@@ -288,6 +297,40 @@ function SkillProgressBody({
     [category, onExpandTask, onNewSubtaskTitleChange, onRun, projectId],
   );
 
+  const handleRequestDelete = useCallback(
+    (kind: ProgressCustomItemKind, itemId: string) => {
+      setPendingDeleteKey(`${kind}:${itemId}`);
+    },
+    [],
+  );
+
+  const handleCancelDelete = useCallback(() => {
+    setPendingDeleteKey(null);
+  }, []);
+
+  const handleConfirmDelete = useCallback(
+    (kind: ProgressCustomItemKind, itemId: string) => {
+      onRun(async () => {
+        const r = await actionProgressDeleteCustomItem(
+          projectId,
+          category,
+          kind,
+          itemId,
+        );
+        if (r.ok) {
+          setPendingDeleteKey(null);
+          if (kind === "task") {
+            onCollapseTask(itemId);
+          } else if (kind === "taskList") {
+            onCollapseTaskList(itemId);
+          }
+        }
+        return r;
+      });
+    },
+    [category, onCollapseTask, onCollapseTaskList, onRun, projectId],
+  );
+
   return (
     <div className="border-t border-slate-100 px-4 py-3 space-y-3 bg-slate-50/40">
       <div className="flex flex-wrap gap-2">
@@ -329,30 +372,77 @@ function SkillProgressBody({
           <ul className="space-y-2">
             {taskLists.map((taskList) => {
               const taskListOpen = expandedTaskLists.has(taskList.id);
+              const taskListConfirmKey = `taskList:${taskList.id}`;
+              const showTaskListConfirm =
+                pendingDeleteKey === taskListConfirmKey;
 
               return (
                 <li
                   key={taskList.id}
                   className="rounded-xl border border-slate-200 bg-white"
                 >
-                  <button
-                    type="button"
-                    onClick={() => onToggleTaskList(taskList.id)}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-slate-800 hover:bg-slate-50/80 rounded-xl"
-                    aria-expanded={taskListOpen}
-                  >
-                    <ChevronDown
-                      className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${taskListOpen ? "rotate-0" : "-rotate-90"}`}
-                      aria-hidden
-                    />
-                    <span className="min-w-0">{taskList.title}</span>
-                    {!taskList.standard ? (
-                      <span className="text-[10px] font-semibold text-slate-500 uppercase">
-                        Custom
-                      </span>
-                    ) : null}
-                  </button>
-                  {taskListOpen ? (
+                  {showTaskListConfirm ? (
+                    <div className="px-3 py-2">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="text-xs text-slate-700">
+                          Remove this task list?
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            disabled={pending}
+                            onClick={handleCancelDelete}
+                            className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            disabled={pending}
+                            onClick={() =>
+                              handleConfirmDelete("taskList", taskList.id)
+                            }
+                            className="rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
+                          >
+                            {pending ? "Removing…" : "Remove"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 px-3 py-2">
+                      <button
+                        type="button"
+                        onClick={() => onToggleTaskList(taskList.id)}
+                        className="flex min-w-0 flex-1 items-center gap-2 text-left text-sm font-medium text-slate-800 hover:bg-slate-50/80 rounded-xl py-0.5"
+                        aria-expanded={taskListOpen}
+                      >
+                        <ChevronDown
+                          className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${taskListOpen ? "rotate-0" : "-rotate-90"}`}
+                          aria-hidden
+                        />
+                        <span className="min-w-0">{taskList.title}</span>
+                        {!taskList.standard ? (
+                          <span className="text-[10px] font-semibold text-slate-500 uppercase">
+                            Custom
+                          </span>
+                        ) : null}
+                      </button>
+                      {!taskList.standard ? (
+                        <button
+                          type="button"
+                          disabled={pending}
+                          onClick={() =>
+                            handleRequestDelete("taskList", taskList.id)
+                          }
+                          className="text-xs font-medium text-slate-500 hover:text-red-700 hover:underline disabled:opacity-50 shrink-0"
+                        >
+                          Remove
+                        </button>
+                      ) : null}
+                    </div>
+                  )}
+                  {taskListOpen && !showTaskListConfirm ? (
                     <div className="border-t border-slate-100 px-3 py-2 space-y-2">
                       <TaskListDropZone taskListId={taskList.id}>
                         {taskList.tasks.map((task) => (
@@ -363,11 +453,15 @@ function SkillProgressBody({
                             taskListId={taskList.id}
                             taskOpen={expandedTasks.has(task.id)}
                             pending={pending}
+                            pendingDeleteKey={pendingDeleteKey}
                             newSubtaskTitle={newSubtaskTitle[task.id] ?? ""}
                             onToggleTask={onToggleTask}
                             onToggleLeaf={handleToggleLeaf}
                             onNewSubtaskTitleChange={onNewSubtaskTitleChange}
                             onAddSubtask={handleAddSubtask}
+                            onRequestDelete={handleRequestDelete}
+                            onCancelDelete={handleCancelDelete}
+                            onConfirmDelete={handleConfirmDelete}
                           />
                         ))}
                       </TaskListDropZone>
@@ -462,6 +556,7 @@ type WorkspaceProgressPanelProps = {
   projectTitle: string;
   checklist: WorkspaceProgressChecklist;
   categoryStatuses: ArenaCategorySlot[];
+  categoryCoverage: ArenaCategoryCoverage[];
 };
 
 export function WorkspaceProgressPanel({
@@ -469,6 +564,7 @@ export function WorkspaceProgressPanel({
   projectTitle,
   checklist,
   categoryStatuses,
+  categoryCoverage,
 }: WorkspaceProgressPanelProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -531,6 +627,22 @@ export function WorkspaceProgressPanel({
     });
   }, []);
 
+  const collapseTask = useCallback((taskId: string) => {
+    setExpandedTasks((prev) => {
+      const next = new Set(prev);
+      next.delete(taskId);
+      return next;
+    });
+  }, []);
+
+  const collapseTaskList = useCallback((taskListId: string) => {
+    setExpandedTaskLists((prev) => {
+      const next = new Set(prev);
+      next.delete(taskListId);
+      return next;
+    });
+  }, []);
+
   const run = useCallback(
     (fn: () => Promise<{ ok: boolean; error?: string }>) => {
       setError(null);
@@ -563,6 +675,11 @@ export function WorkspaceProgressPanel({
     return map;
   }, [checklist, categoryStatuses]);
 
+  const coverageByCategory = useMemo(
+    () => new Map(categoryCoverage.map((c) => [c.category, c])),
+    [categoryCoverage],
+  );
+
   if (categoryStatuses.length === 0) {
     return (
       <div className="max-w-3xl rounded-2xl border border-dashed border-slate-300 bg-white/80 p-10 text-center text-sm text-slate-600">
@@ -590,6 +707,7 @@ export function WorkspaceProgressPanel({
           const allDone = categoryAllLeavesComplete(block);
           const showRecommend =
             !slot.teamCoversCategory && slot.status !== "complete";
+          const cov = coverageByCategory.get(slot.category);
 
           return (
             <li
@@ -623,6 +741,12 @@ export function WorkspaceProgressPanel({
                         ? "No subtasks yet"
                         : `${counts.done} / ${counts.total} subtasks done`}
                     </p>
+                    <SkillTeamRoster
+                      teamLead={cov?.teamLead ?? null}
+                      otherMembers={cov?.otherMembers ?? []}
+                      variant="compact"
+                      complete={slot.status === "complete"}
+                    />
                   </div>
                 </button>
                 {showRecommend ? (
@@ -669,6 +793,8 @@ export function WorkspaceProgressPanel({
                     }))
                   }
                   onRun={run}
+                  onCollapseTask={collapseTask}
+                  onCollapseTaskList={collapseTaskList}
                 />
               ) : null}
             </li>

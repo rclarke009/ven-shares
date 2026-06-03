@@ -15,6 +15,7 @@ export type WorkspaceFileRow = {
   filename: string;
   content_type: string | null;
   byte_size: number;
+  job_category: string | null;
   created_at: string;
   deleted_at: string | null;
   deleted_by_clerk_user_id: string | null;
@@ -290,6 +291,7 @@ export async function uploadWorkspaceFileRecord(
   filename: string,
   contentType: string | null,
   byteSize: number,
+  jobCategory: string | null = null,
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase
@@ -301,6 +303,7 @@ export async function uploadWorkspaceFileRecord(
       filename,
       content_type: contentType,
       byte_size: byteSize,
+      job_category: jobCategory,
     })
     .select("id")
     .single();
@@ -315,7 +318,7 @@ export async function uploadWorkspaceFileRecord(
     projectId,
     uploadedByClerkUserId,
     "file_uploaded",
-    { file_id: id, filename },
+    { file_id: id, filename, job_category: jobCategory },
   );
   return { ok: true, id };
 }

@@ -10,6 +10,7 @@ import type { ArenaCategorySlotStatus, ArenaProject } from "@/lib/projects-arena
 import type { VenRole } from "@/lib/ven-role";
 
 import { ArenaUserAvatar } from "./arena-user-avatar";
+import { SkillTeamRoster } from "./skill-team-roster";
 import { arenaProjectImageUrl } from "./utils";
 import { JoinTeamForm } from "./join-team-form";
 
@@ -125,15 +126,17 @@ export function ProjectDetailView({
                         workspaceChecklistStarted,
                       }) => {
                         const cov = coverageByCategory.get(category);
-                        const coverMembers = cov?.members ?? [];
+                        const teamLead = cov?.teamLead ?? null;
+                        const otherMembers = cov?.otherMembers ?? [];
+                        const hasCoverage = teamLead != null;
                         const badge = categoryStatusBadge(status);
                         const showChecklistProgressNote =
                           status === "in_progress" &&
-                          coverMembers.length === 0 &&
+                          !hasCoverage &&
                           workspaceChecklistStarted;
                         const showCoveragePendingNote =
                           status === "in_progress" &&
-                          coverMembers.length === 0 &&
+                          !hasCoverage &&
                           teamCoversCategory &&
                           !workspaceChecklistStarted;
                         return (
@@ -155,39 +158,13 @@ export function ProjectDetailView({
                                   No longer needed
                                 </span>
                               ) : null}
-                              {coverMembers.length > 0 ? (
-                                <div className="flex flex-row items-center pl-0.5">
-                                  {coverMembers.map((m, i) => (
-                                    <span
-                                      key={m.clerkUserId}
-                                      className={i > 0 ? "-ml-2" : ""}
-                                    >
-                                      <ArenaUserAvatar
-                                        displayName={m.displayName}
-                                        imageUrl={m.imageUrl}
-                                        size={26}
-                                      />
-                                    </span>
-                                  ))}
-                                </div>
-                              ) : null}
                             </div>
-                            {status !== "complete" && coverMembers.length > 0 ? (
-                              <p className="text-[11px] text-slate-600 mt-1.5 leading-snug">
-                                Covered by{" "}
-                                {coverMembers
-                                  .map((m) => m.displayName)
-                                  .join(", ")}
-                              </p>
-                            ) : null}
-                            {status === "complete" && coverMembers.length > 0 ? (
-                              <p className="text-[11px] text-slate-500 mt-1.5 leading-snug">
-                                Previously covered by{" "}
-                                {coverMembers
-                                  .map((m) => m.displayName)
-                                  .join(", ")}
-                              </p>
-                            ) : null}
+                            <SkillTeamRoster
+                              teamLead={teamLead}
+                              otherMembers={otherMembers}
+                              variant="detail"
+                              complete={status === "complete"}
+                            />
                             {showChecklistProgressNote ? (
                               <p className="text-[11px] text-slate-600 mt-1.5 leading-snug">
                                 Progress from workspace checklist.
