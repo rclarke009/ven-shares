@@ -12,10 +12,13 @@ import {
 } from "react";
 
 import {
-  actionDeleteWorkspaceFile,
+  actionArchiveWorkspaceFile,
   actionGetWorkspaceFileDownloadUrl,
   actionUploadWorkspaceFile,
 } from "@/app/idea-arena/[projectId]/workspace/actions";
+import { WorkspaceArchiveControl } from "@/components/workspace/workspace-archive-control";
+import { WorkspaceFileThumbnail } from "@/components/workspace/workspace-file-thumbnail";
+import { WorkspaceFileUploadPreview } from "@/components/workspace/workspace-file-upload-preview";
 import type { ArenaCategorySlot } from "@/lib/projects-arena";
 import type { ProfessionalJobCategory } from "@/lib/professional-onboarding";
 import { useWorkspaceSkillExpand } from "@/lib/use-workspace-skill-expand";
@@ -97,6 +100,7 @@ function FileUploadForm({
   const fileInputId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   return (
@@ -111,6 +115,7 @@ function FileUploadForm({
           onUploadError(r.error);
         } else {
           setFileName(null);
+          setSelectedFile(null);
           if (fileInputRef.current) {
             fileInputRef.current.value = "";
           }
@@ -130,9 +135,11 @@ function FileUploadForm({
             type="file"
             required
             className="sr-only"
-            onChange={(e) =>
-              setFileName(e.target.files?.[0]?.name ?? null)
-            }
+            onChange={(e) => {
+              const f = e.target.files?.[0] ?? null;
+              setSelectedFile(f);
+              setFileName(f?.name ?? null);
+            }}
           />
           <label
             htmlFor={`${fileInputId}-${formIdSuffix}`}
@@ -141,6 +148,7 @@ function FileUploadForm({
             Choose file
           </label>
         </div>
+        <WorkspaceFileUploadPreview file={selectedFile} />
         {fileName ? (
           <span className="text-xs text-slate-600 truncate max-w-[min(100%,14rem)]">
             {fileName}
@@ -161,65 +169,51 @@ function FileUploadForm({
 }
 
 type WorkspaceFileRowProps = {
+  projectId: string;
   file: WorkspaceFileDTO;
   nameMap: Record<string, string>;
-  canRemove: boolean;
-  pendingDeleteId: string | null;
-  deleteBusy: string | null;
+  canArchive: boolean;
+  pendingArchiveId: string | null;
+  archiveBusy: string | null;
   downloadBusy: string | null;
   previewLoading: boolean;
   previewTargetId: string | null;
   onDownload: (fileId: string) => void;
   onPreview: (file: WorkspaceFileDTO) => void;
-  onRequestDelete: (fileId: string) => void;
-  onCancelDelete: () => void;
-  onConfirmDelete: (fileId: string) => void;
+  onRequestArchive: (fileId: string) => void;
+  onCancelArchive: () => void;
+  onConfirmArchive: (fileId: string) => void;
 };
 
 function WorkspaceFileRow({
+  projectId,
   file,
   nameMap,
-  canRemove,
-  pendingDeleteId,
-  deleteBusy,
+  canArchive,
+  pendingArchiveId,
+  archiveBusy,
   downloadBusy,
   previewLoading,
   previewTargetId,
   onDownload,
   onPreview,
-  onRequestDelete,
-  onCancelDelete,
-  onConfirmDelete,
+  onRequestArchive,
+  onCancelArchive,
+  onConfirmArchive,
 }: WorkspaceFileRowProps) {
   const previewable = getWorkspacePreviewKind(file) !== null;
-  const showDeleteConfirm = pendingDeleteId === file.id;
+  const showArchiveConfirm = pendingArchiveId === file.id;
 
-  if (showDeleteConfirm) {
+  if (showArchiveConfirm) {
     return (
       <li className="px-4 py-3 bg-slate-50/50">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-slate-700">
-            Remove this file? It will move to Removed files.
-          </p>
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <button
-              type="button"
-              disabled={deleteBusy === file.id}
-              onClick={onCancelDelete}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              disabled={deleteBusy === file.id}
-              onClick={() => void onConfirmDelete(file.id)}
-              className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
-            >
-              {deleteBusy === file.id ? "Removing…" : "Remove"}
-            </button>
-          </div>
-        </div>
+        <WorkspaceArchiveControl
+          showConfirm
+          confirmMessage="Archive this file? It will move to archived files."
+          pending={archiveBusy === file.id}
+          onCancel={onCancelArchive}
+          onConfirm={() => void onConfirmArchive(file.id)}
+        />
       </li>
     );
   }
@@ -227,14 +221,25 @@ function WorkspaceFileRow({
   return (
     <li className="px-4 py-3 bg-slate-50/50">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-slate-900 truncate">
-            {file.filename}
-          </p>
-          <p className="text-xs text-slate-500">
-            {nameMap[file.uploaded_by_clerk_user_id] ?? "Someone"} ·{" "}
-            {formatBytes(file.byte_size)} · {formatTime(file.created_at)}
-          </p>
+        <div className="flex min-w-0 items-start gap-3">
+          <WorkspaceFileThumbnail
+            projectId={projectId}
+            fileId={file.id}
+            filename={file.filename}
+            content_type={file.content_type}
+            onThumbClick={
+              previewable ? () => void onPreview(file) : undefined
+            }
+          />
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-slate-900 truncate">
+              {file.filename}
+            </p>
+            <p className="text-xs text-slate-500">
+              {nameMap[file.uploaded_by_clerk_user_id] ?? "Someone"} ·{" "}
+              {formatBytes(file.byte_size)} · {formatTime(file.created_at)}
+            </p>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 shrink-0">
           {previewable ? (
@@ -256,14 +261,11 @@ function WorkspaceFileRow({
           >
             {downloadBusy === file.id ? "…" : "Download"}
           </button>
-          {canRemove ? (
-            <button
-              type="button"
-              onClick={() => onRequestDelete(file.id)}
-              className="text-sm font-medium text-slate-500 hover:text-red-700 hover:underline"
-            >
-              Remove
-            </button>
+          {canArchive ? (
+            <WorkspaceArchiveControl
+              pending={archiveBusy === file.id}
+              onRequestArchive={() => onRequestArchive(file.id)}
+            />
           ) : null}
         </div>
       </div>
@@ -272,39 +274,41 @@ function WorkspaceFileRow({
 }
 
 type FileListProps = {
+  projectId: string;
   files: WorkspaceFileDTO[];
   emptyMessage: string;
   nameMap: Record<string, string>;
   currentUserId: string;
   isProjectOwner: boolean;
-  pendingDeleteId: string | null;
-  deleteBusy: string | null;
+  pendingArchiveId: string | null;
+  archiveBusy: string | null;
   downloadBusy: string | null;
   previewLoading: boolean;
   previewTargetId: string | null;
   onDownload: (fileId: string) => void;
   onPreview: (file: WorkspaceFileDTO) => void;
-  onRequestDelete: (fileId: string) => void;
-  onCancelDelete: () => void;
-  onConfirmDelete: (fileId: string) => void;
+  onRequestArchive: (fileId: string) => void;
+  onCancelArchive: () => void;
+  onConfirmArchive: (fileId: string) => void;
 };
 
 function FileList({
+  projectId,
   files,
   emptyMessage,
   nameMap,
   currentUserId,
   isProjectOwner,
-  pendingDeleteId,
-  deleteBusy,
+  pendingArchiveId,
+  archiveBusy,
   downloadBusy,
   previewLoading,
   previewTargetId,
   onDownload,
   onPreview,
-  onRequestDelete,
-  onCancelDelete,
-  onConfirmDelete,
+  onRequestArchive,
+  onCancelArchive,
+  onConfirmArchive,
 }: FileListProps) {
   if (files.length === 0) {
     return <p className="text-sm text-slate-600 mb-2">{emptyMessage}</p>;
@@ -315,21 +319,22 @@ function FileList({
       {files.map((f) => (
         <WorkspaceFileRow
           key={f.id}
+          projectId={projectId}
           file={f}
           nameMap={nameMap}
-          canRemove={
+          canArchive={
             f.uploaded_by_clerk_user_id === currentUserId || isProjectOwner
           }
-          pendingDeleteId={pendingDeleteId}
-          deleteBusy={deleteBusy}
+          pendingArchiveId={pendingArchiveId}
+          archiveBusy={archiveBusy}
           downloadBusy={downloadBusy}
           previewLoading={previewLoading}
           previewTargetId={previewTargetId}
           onDownload={onDownload}
           onPreview={onPreview}
-          onRequestDelete={onRequestDelete}
-          onCancelDelete={onCancelDelete}
-          onConfirmDelete={onConfirmDelete}
+          onRequestArchive={onRequestArchive}
+          onCancelArchive={onCancelArchive}
+          onConfirmArchive={onConfirmArchive}
         />
       ))}
     </ul>
@@ -359,11 +364,11 @@ export function WorkspaceFilesPanel({
   const previewTitleId = useId();
   const previewCloseRef = useRef<HTMLButtonElement>(null);
 
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
-  const [deleteBusy, setDeleteBusy] = useState<string | null>(null);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
+  const [pendingArchiveId, setPendingArchiveId] = useState<string | null>(null);
+  const [archiveBusy, setArchiveBusy] = useState<string | null>(null);
   const [downloadBusy, setDownloadBusy] = useState<string | null>(null);
-  const [deprecatedExpanded, setDeprecatedExpanded] = useState(false);
+  const [archivedExpanded, setArchivedExpanded] = useState(false);
   const { expandedSkills, toggleSkill } = useWorkspaceSkillExpand({
     projectId,
     userId: currentUserId,
@@ -411,19 +416,19 @@ export function WorkspaceFilesPanel({
     }
   }
 
-  async function onConfirmDelete(fileId: string) {
-    setDeleteError(null);
-    setDeleteBusy(fileId);
+  async function onConfirmArchive(fileId: string) {
+    setArchiveError(null);
+    setArchiveBusy(fileId);
     try {
-      const r = await actionDeleteWorkspaceFile(projectId, fileId);
+      const r = await actionArchiveWorkspaceFile(projectId, fileId);
       if (!r.ok) {
-        setDeleteError(r.error);
+        setArchiveError(r.error);
       } else {
-        setPendingDeleteId(null);
+        setPendingArchiveId(null);
         router.refresh();
       }
     } finally {
-      setDeleteBusy(null);
+      setArchiveBusy(null);
     }
   }
 
@@ -503,25 +508,26 @@ export function WorkspaceFilesPanel({
   }
 
   const fileListProps = {
+    projectId,
     nameMap,
     currentUserId,
     isProjectOwner,
-    pendingDeleteId,
-    deleteBusy,
+    pendingArchiveId,
+    archiveBusy,
     downloadBusy,
     previewLoading,
     previewTargetId: previewTarget?.id ?? null,
     onDownload,
     onPreview: openPreview,
-    onRequestDelete: (fileId: string) => {
-      setPendingDeleteId(fileId);
-      setDeleteError(null);
+    onRequestArchive: (fileId: string) => {
+      setPendingArchiveId(fileId);
+      setArchiveError(null);
     },
-    onCancelDelete: () => {
-      setPendingDeleteId(null);
-      setDeleteError(null);
+    onCancelArchive: () => {
+      setPendingArchiveId(null);
+      setArchiveError(null);
     },
-    onConfirmDelete,
+    onConfirmArchive,
   };
 
   return (
@@ -605,44 +611,52 @@ export function WorkspaceFilesPanel({
           </ul>
         ) : null}
 
-        {deleteError ? (
-          <p className="text-sm text-red-600 mt-3">{deleteError}</p>
+        {archiveError ? (
+          <p className="text-sm text-red-600 mt-3">{archiveError}</p>
         ) : null}
 
         {deprecatedFiles.length > 0 ? (
           <div className="mt-6 border border-slate-200 rounded-xl overflow-hidden">
             <button
               type="button"
-              onClick={() => setDeprecatedExpanded((v) => !v)}
+              onClick={() => setArchivedExpanded((v) => !v)}
               className="flex w-full items-center justify-between gap-2 px-4 py-3 bg-slate-100/80 text-left hover:bg-slate-100 transition"
-              aria-expanded={deprecatedExpanded}
+              aria-expanded={archivedExpanded}
             >
               <span className="text-sm font-medium text-slate-600">
-                Removed files ({deprecatedFiles.length})
+                Archived files ({deprecatedFiles.length})
               </span>
               <ChevronDown
-                className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${deprecatedExpanded ? "rotate-180" : ""}`}
+                className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${archivedExpanded ? "rotate-180" : ""}`}
                 aria-hidden
               />
             </button>
-            {deprecatedExpanded ? (
+            {archivedExpanded ? (
               <ul className="divide-y divide-slate-100">
                 {deprecatedFiles.map((f) => (
                   <li
                     key={f.id}
                     className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 bg-slate-50/30"
                   >
-                    <div className="min-w-0">
+                    <div className="flex min-w-0 items-start gap-3">
+                      <WorkspaceFileThumbnail
+                        projectId={projectId}
+                        fileId={f.id}
+                        filename={f.filename}
+                        content_type={f.content_type}
+                        dimmed
+                      />
+                      <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="text-sm font-medium text-slate-500 truncate">
                           {f.filename}
                         </p>
                         <span className="rounded-full bg-slate-200/80 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-500">
-                          Removed
+                          Archived
                         </span>
                       </div>
                       <p className="text-xs text-slate-400 mt-0.5">
-                        Removed by{" "}
+                        Archived by{" "}
                         {nameMap[f.deleted_by_clerk_user_id ?? ""] ??
                           "Someone"}{" "}
                         · {formatTime(f.deleted_at ?? f.created_at)}
@@ -653,6 +667,7 @@ export function WorkspaceFilesPanel({
                         {formatBytes(f.byte_size)} · {formatTime(f.created_at)}
                         {f.job_category ? ` · ${f.job_category}` : null}
                       </p>
+                      </div>
                     </div>
                     <button
                       type="button"

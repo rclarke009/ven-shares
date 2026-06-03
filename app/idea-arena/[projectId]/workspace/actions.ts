@@ -11,7 +11,7 @@ import {
   addCustomSubtask,
   addCustomTask,
   addCustomTaskList,
-  deleteCustomProgressItem,
+  archiveCustomProgressItem,
   mergeChecklistWithTemplates,
   moveTaskInCategory,
   reorderSubtasksInTask,
@@ -33,6 +33,7 @@ import {
   postWorkspaceMessage,
   softDeleteWorkspaceFile,
   softDeleteWorkspaceMessage,
+  updateWorkspaceFileDescription,
   uploadWorkspaceFileRecord,
   upsertWorkspacePresence,
 } from "@/lib/workspace";
@@ -45,6 +46,7 @@ function revalidateArenaAndWorkspace(projectId: string) {
   revalidatePath("/idea-arena");
   revalidatePath(`/idea-arena/${projectId}`);
   revalidatePath(workspacePath(projectId));
+  revalidatePath("/dashboard");
 }
 
 function isMissingWorkspaceProgressColumn(error: {
@@ -325,7 +327,7 @@ export async function actionProgressReorderSubtasks(
   return { ok: true };
 }
 
-export async function actionProgressDeleteCustomItem(
+export async function actionProgressArchiveCustomItem(
   projectId: string,
   category: ProfessionalJobCategory,
   kind: ProgressCustomItemKind,
@@ -344,13 +346,13 @@ export async function actionProgressDeleteCustomItem(
     return { ok: false, error: "That category is not part of this project." };
   }
 
-  const next = deleteCustomProgressItem(
+  const next = archiveCustomProgressItem(
     loaded.merged,
     category,
     kind,
     itemId,
   );
-  if (!next) return { ok: false, error: "That item cannot be removed." };
+  if (!next) return { ok: false, error: "That item cannot be archived." };
 
   const persist = await persistWorkspaceProgress(projectId, next);
   if (!persist.ok) return persist;
@@ -358,6 +360,9 @@ export async function actionProgressDeleteCustomItem(
   revalidateArenaAndWorkspace(projectId);
   return { ok: true };
 }
+
+/** @deprecated Use actionProgressArchiveCustomItem */
+export const actionProgressDeleteCustomItem = actionProgressArchiveCustomItem;
 
 function safeStorageFileSegment(name: string): string {
   const base = name.replace(/[^a-zA-Z0-9._-]+/g, "_").slice(0, 120);
@@ -444,7 +449,7 @@ export async function actionPostWorkspaceMessage(
   return result;
 }
 
-export async function actionDeleteWorkspaceMessage(
+export async function actionArchiveWorkspaceMessage(
   projectId: string,
   messageId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -460,7 +465,7 @@ export async function actionDeleteWorkspaceMessage(
     return { ok: false, error: "Message not found." };
   }
   if (row.deleted_at) {
-    return { ok: false, error: "Message is already removed." };
+    return { ok: false, error: "Message is already archived." };
   }
 
   const meta = await getWorkspaceProjectMeta(projectId);
@@ -471,7 +476,7 @@ export async function actionDeleteWorkspaceMessage(
   const isAuthor = userId === row.author_clerk_user_id;
   const isOwner = userId === meta.clerk_user_id;
   if (!isAuthor && !isOwner) {
-    return { ok: false, error: "You can’t remove this message." };
+    return { ok: false, error: "You can’t archive this message." };
   }
 
   const result = await softDeleteWorkspaceMessage(projectId, messageId, userId);
@@ -480,6 +485,9 @@ export async function actionDeleteWorkspaceMessage(
   revalidatePath(workspacePath(projectId));
   return { ok: true };
 }
+
+/** @deprecated Use actionArchiveWorkspaceMessage */
+export const actionDeleteWorkspaceMessage = actionArchiveWorkspaceMessage;
 
 export async function actionUpsertWorkspacePresence(
   projectId: string,
@@ -593,11 +601,11 @@ export async function actionUploadWorkspaceFile(
     return rec;
   }
 
-  revalidatePath(workspacePath(projectId));
+  revalidateArenaAndWorkspace(projectId);
   return { ok: true };
 }
 
-export async function actionDeleteWorkspaceFile(
+export async function actionArchiveWorkspaceFile(
   projectId: string,
   fileId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -613,7 +621,7 @@ export async function actionDeleteWorkspaceFile(
     return { ok: false, error: "File not found." };
   }
   if (row.deleted_at) {
-    return { ok: false, error: "File is already removed." };
+    return { ok: false, error: "File is already archived." };
   }
 
   const meta = await getWorkspaceProjectMeta(projectId);
@@ -624,19 +632,84 @@ export async function actionDeleteWorkspaceFile(
   const isUploader = userId === row.uploaded_by_clerk_user_id;
   const isOwner = userId === meta.clerk_user_id;
   if (!isUploader && !isOwner) {
-    return { ok: false, error: "You can’t remove this file." };
+    return { ok: false, error: "You can’t archive this file." };
   }
 
   const result = await softDeleteWorkspaceFile(projectId, fileId, userId);
   if (!result.ok) return result;
 
-  revalidatePath(workspacePath(projectId));
+  revalidateArenaAndWorkspace(projectId);
   return { ok: true };
 }
+
+/** @deprecated Use actionArchiveWorkspaceFile */
+export const actionDeleteWorkspaceFile = actionArchiveWorkspaceFile;
+
+export async function actionUpdateWorkspaceFileDescription(
+  projectId: string,
+  fileId: string,
+  description: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { userId } = await auth();
+  if (!userId || !isProjectUuid(projectId)) {
+    return { ok: false, error: "Unauthorized." };
+  }
+  const allowed = await canAccessWorkspace(projectId, userId);
+  if (!allowed) return { ok: false, error: "Unauthorized." };
+
+  const row = await getWorkspaceFileById(projectId, fileId);
+  if (!row) {
+    return { ok: false, error: "File not found." };
+  }
+  if (row.deleted_at) {
+    return { ok: false, error: "Cannot edit an archived file." };
+  }
+
+  const meta = await getWorkspaceProjectMeta(projectId);
+  if (!meta) {
+    return { ok: false, error: "Project not found." };
+  }
+
+  const isUploader = userId === row.uploaded_by_clerk_user_id;
+  const isOwner = userId === meta.clerk_user_id;
+  if (!isUploader && !isOwner) {
+    return { ok: false, error: "You can’t edit this file’s description." };
+  }
+
+  const trimmed = description.trim();
+  if (trimmed.length > MAX_WORKSPACE_FILE_DESCRIPTION_LENGTH) {
+    return {
+      ok: false,
+      error: `Description is too long (max ${MAX_WORKSPACE_FILE_DESCRIPTION_LENGTH} characters).`,
+    };
+  }
+
+  const result = await updateWorkspaceFileDescription(
+    projectId,
+    fileId,
+    trimmed ? trimmed : null,
+    userId,
+  );
+  if (!result.ok) return result;
+
+  revalidateArenaAndWorkspace(projectId);
+  return { ok: true };
+}
+
+export type WorkspaceFileSignedUrlPurpose = "download" | "display";
+
+const WORKSPACE_FILE_SIGNED_URL_SECONDS: Record<
+  WorkspaceFileSignedUrlPurpose,
+  number
+> = {
+  download: 120,
+  display: 3600,
+};
 
 export async function actionGetWorkspaceFileDownloadUrl(
   projectId: string,
   fileId: string,
+  purpose: WorkspaceFileSignedUrlPurpose = "download",
 ): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
   const { userId } = await auth();
   if (!userId || !isProjectUuid(projectId)) {
@@ -650,10 +723,11 @@ export async function actionGetWorkspaceFileDownloadUrl(
     return { ok: false, error: "File not found." };
   }
 
+  const expiresIn = WORKSPACE_FILE_SIGNED_URL_SECONDS[purpose];
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase.storage
     .from(WORKSPACE_FILES_BUCKET)
-    .createSignedUrl(row.storage_path, 120);
+    .createSignedUrl(row.storage_path, expiresIn);
 
   if (error || !data?.signedUrl) {
     console.log("MYDEBUG →", error?.message);

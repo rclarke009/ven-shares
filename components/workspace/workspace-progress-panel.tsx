@@ -17,7 +17,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { ChevronDown } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -33,7 +33,7 @@ import {
   actionProgressAddCustomSubtask,
   actionProgressAddCustomTask,
   actionProgressAddCustomTaskList,
-  actionProgressDeleteCustomItem,
+  actionProgressArchiveCustomItem,
   actionProgressMoveTask,
   actionProgressReorderSubtasks,
   actionProgressSetCategoryLeaves,
@@ -45,6 +45,7 @@ import {
   taskSortableId,
 } from "@/components/workspace/progress-task-row";
 import { ProgressStatusIcon } from "@/components/workspace/progress-status-icon";
+import { WorkspaceArchiveControl } from "@/components/workspace/workspace-archive-control";
 import {
   OrganizerSkillFiles,
   OrganizerUncategorizedFiles,
@@ -58,6 +59,7 @@ import type {
   ArenaCategorySlotStatus,
 } from "@/lib/projects-arena";
 import type {
+  ArchivedProgressEntry,
   ProgressCustomItemKind,
   WorkspaceProgressCategoryBlock,
   WorkspaceProgressChecklist,
@@ -67,12 +69,88 @@ import type {
 import {
   categoryAllLeavesComplete,
   categoryHasAnyLeafCompleted,
+  collectArchivedProgressEntries,
   collectLeavesForCategory,
   deriveTaskListStatus,
+  filterActiveTaskLists,
   progressItemStatusLabel,
   setAllLeavesInCategory,
   setLeafCompleted,
 } from "@/lib/workspace-progress-checklist";
+
+function formatArchivedTime(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  } catch {
+    return iso;
+  }
+}
+
+function archivedEntryLabel(entry: ArchivedProgressEntry): string {
+  if (entry.kind === "taskList") return entry.item.title;
+  if (entry.kind === "task") return entry.item.title;
+  return entry.item.title;
+}
+
+function archivedEntryKindLabel(kind: ArchivedProgressEntry["kind"]): string {
+  switch (kind) {
+    case "taskList":
+      return "Task list";
+    case "task":
+      return "Task";
+    default:
+      return "Subtask";
+  }
+}
+
+type ArchivedTasksSectionProps = {
+  entries: ArchivedProgressEntry[];
+};
+
+function ArchivedTasksSection({ entries }: ArchivedTasksSectionProps) {
+  const [expanded, setExpanded] = useState(false);
+  if (entries.length === 0) return null;
+
+  return (
+    <div className="pt-2 border-t border-slate-200/80">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="flex w-full items-center gap-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 hover:text-slate-700"
+      >
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 transition-transform ${expanded ? "rotate-0" : "-rotate-90"}`}
+          aria-hidden
+        />
+        Archived tasks ({entries.length})
+      </button>
+      {expanded ? (
+        <ul className="mt-2 space-y-1.5">
+          {entries.map((entry) => (
+            <li
+              key={`${entry.kind}-${entry.item.id}`}
+              className="rounded-lg border border-slate-200 bg-white/80 px-2.5 py-2 text-xs text-slate-600"
+            >
+              <span className="font-medium text-slate-800">
+                {archivedEntryLabel(entry)}
+              </span>
+              <span className="text-slate-400"> · </span>
+              {archivedEntryKindLabel(entry.kind)}
+              <span className="block text-[11px] text-slate-500 mt-0.5">
+                Archived {formatArchivedTime(entry.archived_at)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
 
 function deriveSlotStatus(
   block: WorkspaceProgressCategoryBlock | undefined,
@@ -144,6 +222,7 @@ type SkillProgressBodyProps = {
   projectId: string;
   slot: ArenaCategorySlot;
   taskLists: WorkspaceProgressTaskList[];
+  archivedEntries: ArchivedProgressEntry[];
   counts: { done: number; total: number };
   allDone: boolean;
   pending: boolean;
@@ -169,6 +248,7 @@ function SkillProgressBody({
   projectId,
   slot,
   taskLists,
+  archivedEntries,
   counts,
   allDone,
   pending,
@@ -190,7 +270,7 @@ function SkillProgressBody({
   onCollapseTaskList,
 }: SkillProgressBodyProps) {
   const category = slot.category as ProfessionalJobCategory;
-  const [pendingDeleteKey, setPendingDeleteKey] = useState<string | null>(null);
+  const [pendingArchiveKey, setPendingArchiveKey] = useState<string | null>(null);
 
   const allTaskSortableIds = useMemo(
     () =>
@@ -321,28 +401,28 @@ function SkillProgressBody({
     [category, onExpandTask, onNewSubtaskTitleChange, onRun, projectId],
   );
 
-  const handleRequestDelete = useCallback(
+  const handleRequestArchive = useCallback(
     (kind: ProgressCustomItemKind, itemId: string) => {
-      setPendingDeleteKey(`${kind}:${itemId}`);
+      setPendingArchiveKey(`${kind}:${itemId}`);
     },
     [],
   );
 
-  const handleCancelDelete = useCallback(() => {
-    setPendingDeleteKey(null);
+  const handleCancelArchive = useCallback(() => {
+    setPendingArchiveKey(null);
   }, []);
 
-  const handleConfirmDelete = useCallback(
+  const handleConfirmArchive = useCallback(
     (kind: ProgressCustomItemKind, itemId: string) => {
       onRun(async () => {
-        const r = await actionProgressDeleteCustomItem(
+        const r = await actionProgressArchiveCustomItem(
           projectId,
           category,
           kind,
           itemId,
         );
         if (r.ok) {
-          setPendingDeleteKey(null);
+          setPendingArchiveKey(null);
           if (kind === "task") {
             onCollapseTask(itemId);
           } else if (kind === "taskList") {
@@ -390,7 +470,7 @@ function SkillProgressBody({
               const taskListOpen = expandedTaskLists.has(taskList.id);
               const taskListConfirmKey = `taskList:${taskList.id}`;
               const showTaskListConfirm =
-                pendingDeleteKey === taskListConfirmKey;
+                pendingArchiveKey === taskListConfirmKey;
               const taskListStatus = deriveTaskListStatus(taskList);
 
               return (
@@ -400,31 +480,16 @@ function SkillProgressBody({
                 >
                   {showTaskListConfirm ? (
                     <div className="px-3 py-2">
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <p className="text-xs text-slate-700">
-                          Remove this task list?
-                        </p>
-                        <div className="flex flex-wrap items-center gap-2 shrink-0">
-                          <button
-                            type="button"
-                            disabled={pending}
-                            onClick={handleCancelDelete}
-                            className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            type="button"
-                            disabled={pending}
-                            onClick={() =>
-                              handleConfirmDelete("taskList", taskList.id)
-                            }
-                            className="rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
-                          >
-                            {pending ? "Removing…" : "Remove"}
-                          </button>
-                        </div>
-                      </div>
+                      <WorkspaceArchiveControl
+                        size="sm"
+                        showConfirm
+                        confirmMessage="Archive this task list? It will stay until the project ends."
+                        pending={pending}
+                        onCancel={handleCancelArchive}
+                        onConfirm={() =>
+                          handleConfirmArchive("taskList", taskList.id)
+                        }
+                      />
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 px-3 py-2">
@@ -448,16 +513,14 @@ function SkillProgressBody({
                         ) : null}
                       </button>
                       {!taskList.standard ? (
-                        <button
-                          type="button"
+                        <WorkspaceArchiveControl
+                          size="sm"
+                          pending={pending}
                           disabled={pending}
-                          onClick={() =>
-                            handleRequestDelete("taskList", taskList.id)
+                          onRequestArchive={() =>
+                            handleRequestArchive("taskList", taskList.id)
                           }
-                          className="text-xs font-medium text-slate-500 hover:text-red-700 hover:underline disabled:opacity-50 shrink-0"
-                        >
-                          Remove
-                        </button>
+                        />
                       ) : null}
                     </div>
                   )}
@@ -472,15 +535,15 @@ function SkillProgressBody({
                             taskListId={taskList.id}
                             taskOpen={expandedTasks.has(task.id)}
                             pending={pending}
-                            pendingDeleteKey={pendingDeleteKey}
+                            pendingArchiveKey={pendingArchiveKey}
                             newSubtaskTitle={newSubtaskTitle[task.id] ?? ""}
                             onToggleTask={onToggleTask}
                             onToggleLeaf={onToggleLeaf}
                             onNewSubtaskTitleChange={onNewSubtaskTitleChange}
                             onAddSubtask={handleAddSubtask}
-                            onRequestDelete={handleRequestDelete}
-                            onCancelDelete={handleCancelDelete}
-                            onConfirmDelete={handleConfirmDelete}
+                            onRequestArchive={handleRequestArchive}
+                            onCancelArchive={handleCancelArchive}
+                            onConfirmArchive={handleConfirmArchive}
                           />
                         ))}
                       </TaskListDropZone>
@@ -560,6 +623,8 @@ function SkillProgressBody({
         </button>
       </div>
 
+      <ArchivedTasksSection entries={archivedEntries} />
+
       {allDone && counts.total > 0 ? (
         <p className="text-xs text-emerald-800 font-medium">
           All subtasks for this skill are done — the Idea Arena card shows this
@@ -596,6 +661,8 @@ export function WorkspaceOrganizerPanel({
   isProjectOwner,
 }: WorkspaceOrganizerPanelProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const highlightFileId = searchParams.get("file");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [localChecklist, setLocalChecklist] =
@@ -605,12 +672,19 @@ export function WorkspaceOrganizerPanel({
     setLocalChecklist(checklist);
   }, [checklist]);
 
-  const { expandedSkills, toggleSkill } = useWorkspaceSkillExpand({
+  const { expandedSkills, toggleSkill, expandSkill } = useWorkspaceSkillExpand({
     projectId,
     userId: currentUserId,
     userSkills: viewerCoveredCategories,
     allCategories: categoryStatuses.map((s) => s.category),
   });
+
+  useEffect(() => {
+    if (!highlightFileId) return;
+    const target = files.find((f) => f.id === highlightFileId);
+    if (!target?.job_category) return;
+    expandSkill(target.job_category);
+  }, [highlightFileId, files, expandSkill]);
   const [expandedTaskLists, setExpandedTaskLists] = useState<Set<string>>(
     () => new Set(),
   );
@@ -791,7 +865,8 @@ export function WorkspaceOrganizerPanel({
       <ul className="space-y-3">
         {categoryStatuses.map((slot) => {
           const block = localChecklist[slot.category];
-          const taskLists = block?.taskLists ?? [];
+          const taskLists = filterActiveTaskLists(block);
+          const archivedEntries = collectArchivedProgressEntries(block);
           const counts = leafCounts.get(slot.category) ?? { done: 0, total: 0 };
           const slotStatus = deriveSlotStatus(block, slot.teamCoversCategory);
           const badge = slotBadge(slotStatus);
@@ -857,6 +932,7 @@ export function WorkspaceOrganizerPanel({
                     projectId={projectId}
                     slot={slot}
                     taskLists={taskLists}
+                    archivedEntries={archivedEntries}
                     counts={counts}
                     allDone={allDone}
                     pending={pending}
@@ -898,11 +974,13 @@ export function WorkspaceOrganizerPanel({
                   />
                   <OrganizerSkillFiles
                     projectId={projectId}
+                    projectTitle={projectTitle}
                     category={slot.category as ProfessionalJobCategory}
                     files={files}
                     nameMap={nameMap}
                     currentUserId={currentUserId}
                     isProjectOwner={isProjectOwner}
+                    highlightFileId={highlightFileId}
                   />
                 </>
               ) : null}
@@ -913,10 +991,12 @@ export function WorkspaceOrganizerPanel({
 
       <OrganizerUncategorizedFiles
         projectId={projectId}
+        projectTitle={projectTitle}
         files={files}
         nameMap={nameMap}
         currentUserId={currentUserId}
         isProjectOwner={isProjectOwner}
+        highlightFileId={highlightFileId}
       />
     </div>
   );

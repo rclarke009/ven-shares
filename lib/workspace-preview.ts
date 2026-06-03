@@ -56,3 +56,10 @@ export function getWorkspacePreviewKind(file: {
 export function isTextPreviewTooLarge(byteSize: number): boolean {
   return byteSize > MAX_TEXT_PREVIEW_BYTES;
 }
+
+/** Types that get an inline visual thumbnail (image or PDF first page). */
+export function hasVisualThumbnail(
+  kind: WorkspacePreviewKind | null,
+): kind is "image" | "pdf" {
+  return kind === "image" || kind === "pdf";
+}

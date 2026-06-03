@@ -132,14 +132,40 @@ export async function listWorkspaceMessages(
     console.log("MYDEBUG →", error.message);
     return [];
   }
-  return (data ?? []).map((row) => ({
+  return (data ?? []).map((row) => mapWorkspaceMessageRow(row));
+}
+
+function mapWorkspaceMessageRow(row: Record<string, unknown>): WorkspaceMessageRow {
+  return {
     ...(row as WorkspaceMessageRow),
     job_category: (row.job_category as string | null) ?? null,
     is_urgent: Boolean(row.is_urgent),
     deleted_at: (row.deleted_at as string | null) ?? null,
     deleted_by_clerk_user_id:
       (row.deleted_by_clerk_user_id as string | null) ?? null,
-  }));
+  };
+}
+
+export async function listArchivedWorkspaceMessages(
+  projectId: string,
+  limit = 200,
+): Promise<WorkspaceMessageRow[]> {
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("project_workspace_messages")
+    .select("*")
+    .eq("project_id", projectId)
+    .not("deleted_at", "is", null)
+    .order("deleted_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.log("MYDEBUG →", error.message);
+    return [];
+  }
+  return (data ?? []).map((row) =>
+    mapWorkspaceMessageRow(row as Record<string, unknown>),
+  );
 }
 
 export async function getWorkspaceMessageById(
@@ -292,7 +318,7 @@ export async function softDeleteWorkspaceMessage(
     return { ok: false, error: "Message not found." };
   }
   if (row.deleted_at) {
-    return { ok: false, error: "Message is already removed." };
+    return { ok: false, error: "Message is already archived." };
   }
 
   const supabase = createServerSupabaseClient();
@@ -308,7 +334,7 @@ export async function softDeleteWorkspaceMessage(
 
   if (error) {
     console.log("MYDEBUG →", error.message);
-    return { ok: false, error: "Could not remove message." };
+    return { ok: false, error: "Could not archive message." };
   }
 
   await insertWorkspaceActivity(
@@ -452,7 +478,7 @@ export async function softDeleteWorkspaceFile(
     return { ok: false, error: "File not found." };
   }
   if (row.deleted_at) {
-    return { ok: false, error: "File is already removed." };
+    return { ok: false, error: "File is already archived." };
   }
 
   const supabase = createServerSupabaseClient();
@@ -468,13 +494,53 @@ export async function softDeleteWorkspaceFile(
 
   if (error) {
     console.log("MYDEBUG →", error.message);
-    return { ok: false, error: "Could not remove file." };
+    return { ok: false, error: "Could not archive file." };
   }
 
   await insertWorkspaceActivity(
     projectId,
     deletedByClerkUserId,
     "file_deleted",
+    {
+      file_id: fileId,
+      filename: row.filename,
+      ...(row.job_category ? { job_category: row.job_category } : {}),
+    },
+  );
+  return { ok: true };
+}
+
+export async function updateWorkspaceFileDescription(
+  projectId: string,
+  fileId: string,
+  description: string | null,
+  updatedByClerkUserId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const row = await getWorkspaceFileById(projectId, fileId);
+  if (!row) {
+    return { ok: false, error: "File not found." };
+  }
+  if (row.deleted_at) {
+    return { ok: false, error: "Cannot edit an archived file." };
+  }
+
+  const supabase = createServerSupabaseClient();
+  const { error } = await supabase
+    .from("project_workspace_files")
+    .update({ description })
+    .eq("project_id", projectId)
+    .eq("id", fileId)
+    .is("deleted_at", null);
+
+  if (error) {
+    console.log("MYDEBUG →", error.message);
+    return { ok: false, error: "Could not update description." };
+  }
+
+  await insertWorkspaceActivity(
+    projectId,
+    updatedByClerkUserId,
+    "file_updated",
     {
       file_id: fileId,
       filename: row.filename,

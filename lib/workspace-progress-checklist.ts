@@ -3,7 +3,11 @@ import {
   type ProfessionalJobCategory,
 } from "@/lib/professional-onboarding";
 
-export type WorkspaceProgressSubtask = {
+export type WorkspaceProgressArchivable = {
+  archived_at?: string | null;
+};
+
+export type WorkspaceProgressSubtask = WorkspaceProgressArchivable & {
   id: string;
   title: string;
   standard: boolean;
@@ -16,7 +20,7 @@ export type WorkspaceProgressLeaf = {
   completed: boolean;
 };
 
-export type WorkspaceProgressTask = {
+export type WorkspaceProgressTask = WorkspaceProgressArchivable & {
   id: string;
   title: string;
   standard: boolean;
@@ -24,7 +28,7 @@ export type WorkspaceProgressTask = {
   subtasks: WorkspaceProgressSubtask[];
 };
 
-export type WorkspaceProgressTaskList = {
+export type WorkspaceProgressTaskList = WorkspaceProgressArchivable & {
   id: string;
   title: string;
   standard: boolean;
@@ -224,17 +228,29 @@ export const WORKSPACE_PROGRESS_STANDARD_TEMPLATE: Record<
   ],
 };
 
+export function isProgressItemArchived(
+  item: WorkspaceProgressArchivable,
+): boolean {
+  return typeof item.archived_at === "string" && item.archived_at.length > 0;
+}
+
+function parseArchivedAt(raw: unknown): string | null {
+  return typeof raw === "string" && raw.length > 0 ? raw : null;
+}
+
 function parseSubtask(raw: unknown): WorkspaceProgressSubtask | null {
   if (!raw || typeof raw !== "object") return null;
   const o = raw as Record<string, unknown>;
   const id = typeof o.id === "string" ? o.id : "";
   const title = typeof o.title === "string" ? o.title : "";
   if (!id || !title) return null;
+  const archived_at = parseArchivedAt(o.archived_at);
   return {
     id,
     title,
     standard: o.standard === true,
     completed: o.completed === true,
+    ...(archived_at ? { archived_at } : {}),
   };
 }
 
@@ -252,12 +268,14 @@ function parseTask(raw: unknown): WorkspaceProgressTask | null {
       if (parsed) subtasks.push(parsed);
     }
   }
+  const archived_at = parseArchivedAt(o.archived_at);
   return {
     id,
     title,
     standard: o.standard === true,
     completed: o.completed === true,
     subtasks,
+    ...(archived_at ? { archived_at } : {}),
   };
 }
 
@@ -275,7 +293,66 @@ function parseTaskList(raw: unknown): WorkspaceProgressTaskList | null {
       if (parsed) tasks.push(parsed);
     }
   }
-  return { id, title, standard: o.standard === true, tasks };
+  const archived_at = parseArchivedAt(o.archived_at);
+  return {
+    id,
+    title,
+    standard: o.standard === true,
+    tasks,
+    ...(archived_at ? { archived_at } : {}),
+  };
+}
+
+/** Active (non-archived) task lists for UI and completion. */
+export function filterActiveTaskLists(
+  block: WorkspaceProgressCategoryBlock | undefined,
+): WorkspaceProgressTaskList[] {
+  if (!block?.taskLists?.length) return [];
+  return block.taskLists
+    .filter((list) => !isProgressItemArchived(list))
+    .map((list) => ({
+      ...list,
+      tasks: list.tasks
+        .filter((task) => !isProgressItemArchived(task))
+        .map((task) => ({
+          ...task,
+          subtasks: task.subtasks.filter((s) => !isProgressItemArchived(s)),
+        })),
+    }));
+}
+
+export type ArchivedProgressEntry =
+  | { kind: "taskList"; item: WorkspaceProgressTaskList; archived_at: string }
+  | { kind: "task"; item: WorkspaceProgressTask; archived_at: string }
+  | { kind: "subtask"; item: WorkspaceProgressSubtask; archived_at: string };
+
+export function collectArchivedProgressEntries(
+  block: WorkspaceProgressCategoryBlock | undefined,
+): ArchivedProgressEntry[] {
+  if (!block?.taskLists?.length) return [];
+  const out: ArchivedProgressEntry[] = [];
+  for (const list of block.taskLists) {
+    if (isProgressItemArchived(list) && list.archived_at) {
+      out.push({ kind: "taskList", item: list, archived_at: list.archived_at });
+      continue;
+    }
+    for (const task of list.tasks) {
+      if (isProgressItemArchived(task) && task.archived_at) {
+        out.push({ kind: "task", item: task, archived_at: task.archived_at });
+        continue;
+      }
+      for (const sub of task.subtasks) {
+        if (isProgressItemArchived(sub) && sub.archived_at) {
+          out.push({ kind: "subtask", item: sub, archived_at: sub.archived_at });
+        }
+      }
+    }
+  }
+  out.sort(
+    (a, b) =>
+      new Date(b.archived_at).getTime() - new Date(a.archived_at).getTime(),
+  );
+  return out;
 }
 
 function legacyMinorToTask(
@@ -431,9 +508,11 @@ function findSubtaskInBlock(
 ): WorkspaceProgressSubtask | undefined {
   if (!block) return undefined;
   for (const list of block.taskLists) {
+    if (isProgressItemArchived(list)) continue;
     for (const task of list.tasks) {
+      if (isProgressItemArchived(task)) continue;
       const found = task.subtasks.find((s) => s.id === subtaskId);
-      if (found) return found;
+      if (found && !isProgressItemArchived(found)) return found;
     }
   }
   return undefined;
@@ -444,7 +523,9 @@ export type ProgressItemStatus = "not_started" | "in_progress" | "completed";
 export function collectLeavesForTask(
   task: WorkspaceProgressTask,
 ): WorkspaceProgressLeaf[] {
-  if (task.subtasks.length === 0) {
+  if (isProgressItemArchived(task)) return [];
+  const activeSubtasks = task.subtasks.filter((s) => !isProgressItemArchived(s));
+  if (activeSubtasks.length === 0) {
     return [
       {
         id: task.id,
@@ -453,7 +534,7 @@ export function collectLeavesForTask(
       },
     ];
   }
-  return task.subtasks.map((sub) => ({
+  return activeSubtasks.map((sub) => ({
     id: sub.id,
     title: sub.title,
     completed: sub.completed,
@@ -463,7 +544,10 @@ export function collectLeavesForTask(
 export function collectLeavesForTaskList(
   taskList: WorkspaceProgressTaskList,
 ): WorkspaceProgressLeaf[] {
-  return taskList.tasks.flatMap((task) => collectLeavesForTask(task));
+  if (isProgressItemArchived(taskList)) return [];
+  return taskList.tasks
+    .filter((task) => !isProgressItemArchived(task))
+    .flatMap((task) => collectLeavesForTask(task));
 }
 
 export function deriveProgressItemStatus(
@@ -499,8 +583,9 @@ export function progressItemStatusLabel(status: ProgressItemStatus): string {
 export function collectLeavesForCategory(
   block: WorkspaceProgressCategoryBlock | undefined,
 ): WorkspaceProgressLeaf[] {
-  if (!block?.taskLists?.length) return [];
-  return block.taskLists.flatMap((list) => collectLeavesForTaskList(list));
+  return filterActiveTaskLists(block).flatMap((list) =>
+    collectLeavesForTaskList(list),
+  );
 }
 
 export function categoryAllLeavesComplete(
@@ -792,12 +877,17 @@ export function setLeafCompleted(
   const block = next[category];
   if (!block) return null;
   for (const list of block.taskLists) {
+    if (isProgressItemArchived(list)) continue;
     for (const task of list.tasks) {
-      if (task.subtasks.length === 0 && task.id === leafId) {
+      if (isProgressItemArchived(task)) continue;
+      const activeSubtasks = task.subtasks.filter(
+        (s) => !isProgressItemArchived(s),
+      );
+      if (activeSubtasks.length === 0 && task.id === leafId) {
         task.completed = completed;
         return next;
       }
-      const found = task.subtasks.find((s) => s.id === leafId);
+      const found = activeSubtasks.find((s) => s.id === leafId);
       if (found) {
         found.completed = completed;
         return next;
@@ -886,11 +976,16 @@ export function setAllLeavesInCategory(
   const block = next[category];
   if (!block) return null;
   for (const list of block.taskLists) {
+    if (isProgressItemArchived(list)) continue;
     for (const task of list.tasks) {
-      if (task.subtasks.length === 0) {
+      if (isProgressItemArchived(task)) continue;
+      const activeSubtasks = task.subtasks.filter(
+        (s) => !isProgressItemArchived(s),
+      );
+      if (activeSubtasks.length === 0) {
         task.completed = completed;
       } else {
-        for (const sub of task.subtasks) {
+        for (const sub of activeSubtasks) {
           sub.completed = completed;
         }
       }
@@ -985,7 +1080,7 @@ export function reorderSubtasksInTask(
 
 export type ProgressCustomItemKind = "taskList" | "task" | "subtask";
 
-export function deleteCustomProgressItem(
+export function archiveCustomProgressItem(
   checklist: WorkspaceProgressChecklist,
   category: ProfessionalJobCategory,
   kind: ProgressCustomItemKind,
@@ -995,20 +1090,23 @@ export function deleteCustomProgressItem(
   const block = next[category];
   if (!block) return null;
 
+  const now = new Date().toISOString();
+
   if (kind === "taskList") {
-    const listIndex = block.taskLists.findIndex((l) => l.id === itemId);
-    if (listIndex === -1) return null;
-    if (block.taskLists[listIndex].standard) return null;
-    block.taskLists.splice(listIndex, 1);
+    const list = block.taskLists.find((l) => l.id === itemId);
+    if (!list || list.standard) return null;
+    if (isProgressItemArchived(list)) return next;
+    list.archived_at = now;
     return next;
   }
 
   if (kind === "task") {
     for (const list of block.taskLists) {
-      const taskIndex = list.tasks.findIndex((t) => t.id === itemId);
-      if (taskIndex === -1) continue;
-      if (list.tasks[taskIndex].standard) return null;
-      list.tasks.splice(taskIndex, 1);
+      const task = list.tasks.find((t) => t.id === itemId);
+      if (!task) continue;
+      if (task.standard) return null;
+      if (isProgressItemArchived(task)) return next;
+      task.archived_at = now;
       return next;
     }
     return null;
@@ -1016,12 +1114,16 @@ export function deleteCustomProgressItem(
 
   for (const list of block.taskLists) {
     for (const task of list.tasks) {
-      const subIndex = task.subtasks.findIndex((s) => s.id === itemId);
-      if (subIndex === -1) continue;
-      if (task.subtasks[subIndex].standard) return null;
-      task.subtasks.splice(subIndex, 1);
+      const sub = task.subtasks.find((s) => s.id === itemId);
+      if (!sub) continue;
+      if (sub.standard) return null;
+      if (isProgressItemArchived(sub)) return next;
+      sub.archived_at = now;
       return next;
     }
   }
   return null;
 }
+
+/** @deprecated Use archiveCustomProgressItem */
+export const deleteCustomProgressItem = archiveCustomProgressItem;

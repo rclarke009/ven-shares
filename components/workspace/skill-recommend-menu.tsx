@@ -84,13 +84,14 @@ export function SkillRecommendMenu({
         type="button"
         aria-expanded={open}
         aria-haspopup="menu"
+        aria-label={`Recommend team member for ${skillCategory}`}
         onClick={(e) => {
           e.stopPropagation();
           setOpen((prev) => !prev);
         }}
-        className="text-xs font-semibold rounded-md px-2.5 py-1 border border-[#15803d]/40 bg-white text-[#15803d] hover:bg-emerald-50/80 transition-colors"
+        className="whitespace-nowrap text-xs font-semibold rounded-md px-2 py-1 border border-[#15803d]/40 bg-white text-[#15803d] hover:bg-emerald-50/80 transition-colors"
       >
-        {copied ? "Copied!" : "Recommend"}
+        {copied ? "Copied!" : "Recommend Team Member"}
       </button>
 
       {open ? (

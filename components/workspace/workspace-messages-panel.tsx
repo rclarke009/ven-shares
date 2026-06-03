@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Loader2, RefreshCw } from "lucide-react";
+import { ChevronDown, Loader2, RefreshCw } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   useCallback,
@@ -13,11 +13,15 @@ import {
 } from "react";
 
 import {
-  actionDeleteWorkspaceMessage,
+  actionArchiveWorkspaceMessage,
   actionPostWorkspaceMessage,
   actionUpsertWorkspacePresence,
 } from "@/app/idea-arena/[projectId]/workspace/actions";
-import type { WorkspaceMessageDTO } from "@/components/workspace/workspace-shell";
+import { WorkspaceArchiveControl } from "@/components/workspace/workspace-archive-control";
+import type {
+  WorkspaceArchivedMessageDTO,
+  WorkspaceMessageDTO,
+} from "@/components/workspace/workspace-shell";
 import type { ProfessionalJobCategory } from "@/lib/professional-onboarding";
 import {
   boardParamFromCategory,
@@ -55,6 +59,7 @@ type WorkspaceMessagesPanelProps = {
   isProjectOwner: boolean;
   requiredJobCategories: ProfessionalJobCategory[];
   messages: WorkspaceMessageDTO[];
+  archivedMessages: WorkspaceArchivedMessageDTO[];
   nameMap: Record<string, string>;
   highlightMessageId: string | null;
   initialBoardParam: string;
@@ -66,6 +71,7 @@ export function WorkspaceMessagesPanel({
   isProjectOwner,
   requiredJobCategories,
   messages,
+  archivedMessages,
   nameMap,
   highlightMessageId,
   initialBoardParam,
@@ -79,9 +85,10 @@ export function WorkspaceMessagesPanel({
   const [isUrgent, setIsUrgent] = useState(false);
   const [msgError, setMsgError] = useState<string | null>(null);
   const [presenceError, setPresenceError] = useState<string | null>(null);
-  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
-  const [deleteBusy, setDeleteBusy] = useState<string | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [pendingArchiveId, setPendingArchiveId] = useState<string | null>(null);
+  const [archiveBusy, setArchiveBusy] = useState<string | null>(null);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
+  const [archivedExpanded, setArchivedExpanded] = useState(false);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
 
   const highlightMessage = highlightMessageId
@@ -113,6 +120,14 @@ export function WorkspaceMessagesPanel({
         messagesMatchBoard(m.job_category ?? null, activeBoardCategory),
       ),
     [messages, activeBoardCategory],
+  );
+
+  const archivedBoardMessages = useMemo(
+    () =>
+      archivedMessages.filter((m) =>
+        messagesMatchBoard(m.job_category ?? null, activeBoardCategory),
+      ),
+    [archivedMessages, activeBoardCategory],
   );
 
   const urgentCount = useMemo(
@@ -178,20 +193,20 @@ export function WorkspaceMessagesPanel({
     }
   }, [highlightMessageId, boardMessages, activeBoardParam]);
 
-  async function onConfirmDelete(messageId: string) {
-    setDeleteError(null);
-    setDeleteBusy(messageId);
+  async function onConfirmArchive(messageId: string) {
+    setArchiveError(null);
+    setArchiveBusy(messageId);
     try {
-      const r = await actionDeleteWorkspaceMessage(projectId, messageId);
+      const r = await actionArchiveWorkspaceMessage(projectId, messageId);
       if (!r.ok) {
-        setDeleteError(r.error);
+        setArchiveError(r.error);
         return;
       }
-      setPendingDeleteId(null);
+      setPendingArchiveId(null);
       if (replyToId === messageId) setReplyToId(null);
       router.refresh();
     } finally {
-      setDeleteBusy(null);
+      setArchiveBusy(null);
     }
   }
 
@@ -286,41 +301,27 @@ export function WorkspaceMessagesPanel({
             <li className="text-sm text-slate-600">No messages yet.</li>
           ) : (
             boardMessages.map((m) => {
-              const canDelete =
+              const canArchive =
                 isProjectOwner || m.author_clerk_user_id === currentUserId;
-              const showDeleteConfirm = pendingDeleteId === m.id;
+              const showArchiveConfirm = pendingArchiveId === m.id;
               const boardParam = boardParamFromCategory(
                 m.job_category ?? null,
               );
 
-              if (showDeleteConfirm) {
+              if (showArchiveConfirm) {
                 return (
                   <li
                     key={m.id}
                     id={`msg-${m.id}`}
                     className="rounded-xl px-3 py-2 bg-slate-50 border border-slate-200"
                   >
-                    <p className="text-sm text-slate-700">
-                      Remove this message? It will be deleted permanently.
-                    </p>
-                    <div className="flex flex-wrap items-center gap-2 mt-2">
-                      <button
-                        type="button"
-                        disabled={deleteBusy === m.id}
-                        onClick={() => setPendingDeleteId(null)}
-                        className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        disabled={deleteBusy === m.id}
-                        onClick={() => void onConfirmDelete(m.id)}
-                        className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
-                      >
-                        {deleteBusy === m.id ? "Removing…" : "Remove"}
-                      </button>
-                    </div>
+                    <WorkspaceArchiveControl
+                      showConfirm
+                      confirmMessage="Archive this message? It will leave the board but stay until the project ends."
+                      pending={archiveBusy === m.id}
+                      onCancel={() => setPendingArchiveId(null)}
+                      onConfirm={() => void onConfirmArchive(m.id)}
+                    />
                   </li>
                 );
               }
@@ -375,17 +376,15 @@ export function WorkspaceMessagesPanel({
                     >
                       Reply
                     </button>
-                    {canDelete ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setDeleteError(null);
-                          setPendingDeleteId(m.id);
+                    {canArchive ? (
+                      <WorkspaceArchiveControl
+                        pending={archiveBusy === m.id}
+                        disabled={msgPending}
+                        onRequestArchive={() => {
+                          setArchiveError(null);
+                          setPendingArchiveId(m.id);
                         }}
-                        className="text-[11px] font-medium text-red-700 hover:underline"
-                      >
-                        Delete
-                      </button>
+                      />
                     ) : null}
                   </div>
                 </li>
@@ -394,8 +393,51 @@ export function WorkspaceMessagesPanel({
           )}
         </ul>
 
-        {deleteError ? (
-          <p className="px-4 text-sm text-red-600">{deleteError}</p>
+        {archivedBoardMessages.length > 0 ? (
+          <div className="border-t border-slate-100 px-4 py-3">
+            <button
+              type="button"
+              onClick={() => setArchivedExpanded((v) => !v)}
+              className="flex w-full items-center gap-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 hover:text-slate-700"
+            >
+              <ChevronDown
+                className={`h-4 w-4 shrink-0 transition-transform ${archivedExpanded ? "rotate-0" : "-rotate-90"}`}
+                aria-hidden
+              />
+              Archived messages ({archivedBoardMessages.length})
+            </button>
+            {archivedExpanded ? (
+              <ul className="mt-3 space-y-3 max-h-[30vh] overflow-y-auto">
+                {archivedBoardMessages.map((m) => (
+                  <li
+                    key={m.id}
+                    className="rounded-xl px-3 py-2 bg-slate-50/80 border border-slate-200"
+                  >
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="text-sm font-semibold text-slate-700">
+                        {nameMap[m.author_clerk_user_id] ?? "Someone"}
+                      </span>
+                      <span className="text-xs text-slate-400 shrink-0">
+                        {formatTime(m.created_at)}
+                      </span>
+                    </div>
+                    <p className="text-sm text-slate-600 mt-1 whitespace-pre-wrap line-clamp-4">
+                      {m.body}
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-2">
+                      Archived by{" "}
+                      {nameMap[m.deleted_by_clerk_user_id ?? ""] ?? "Someone"} ·{" "}
+                      {formatTime(m.deleted_at)}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
+
+        {archiveError ? (
+          <p className="px-4 text-sm text-red-600">{archiveError}</p>
         ) : null}
 
         <form

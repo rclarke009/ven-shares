@@ -147,6 +147,7 @@ function buildArenaTeamMemberDisplay(
       imageUrl: clerkUser.imageUrl?.trim() || null,
       coveredCategories,
       joinedAt,
+      role: "member",
     };
   }
 
@@ -161,6 +162,33 @@ function buildArenaTeamMemberDisplay(
     imageUrl: null,
     coveredCategories,
     joinedAt,
+    role: "member",
+  };
+}
+
+function buildArenaOwnerMemberDisplay(
+  clerkUserId: string,
+  clerkUser: ClerkUserRecord | null,
+  joinedAt: string,
+): ArenaTeamMemberDisplay {
+  if (clerkUser) {
+    return {
+      clerkUserId,
+      displayName: displayNameFromClerkUser(clerkUser),
+      imageUrl: clerkUser.imageUrl?.trim() || null,
+      coveredCategories: [],
+      joinedAt,
+      role: "owner",
+    };
+  }
+
+  return {
+    clerkUserId,
+    displayName: "Inventor",
+    imageUrl: null,
+    coveredCategories: [],
+    joinedAt,
+    role: "owner",
   };
 }
 
@@ -182,6 +210,31 @@ export async function getArenaTeamPreviewForProjects(
   const projectIds = projects.map((p) => p.id);
 
   const supabase = createServerSupabaseClient();
+
+  const { data: ownerRows, error: ownerError } = await supabase
+    .from("projects")
+    .select("id, clerk_user_id, created_at")
+    .in("id", projectIds);
+
+  if (ownerError) {
+    console.log("MYDEBUG →", ownerError.message);
+  }
+
+  const ownerByProjectId = new Map<
+    string,
+    { clerk_user_id: string; joinedAt: string }
+  >();
+  for (const row of ownerRows ?? []) {
+    const pid = typeof row.id === "string" ? row.id : "";
+    const cid =
+      typeof row.clerk_user_id === "string" ? row.clerk_user_id : "";
+    if (!pid || !cid) continue;
+    ownerByProjectId.set(pid, {
+      clerk_user_id: cid,
+      joinedAt: parseJoinedAt(row.created_at),
+    });
+  }
+
   const previewPrimary = await supabase
     .from("project_members")
     .select("project_id, clerk_user_id, covered_job_categories, created_at")
@@ -210,6 +263,9 @@ export async function getArenaTeamPreviewForProjects(
     { clerk_user_id: string; covered_job_categories: unknown; joinedAt: string }[]
   >();
   const uniqueClerkIds = new Set<string>();
+  for (const owner of ownerByProjectId.values()) {
+    uniqueClerkIds.add(owner.clerk_user_id);
+  }
 
   for (const row of rows ?? []) {
     const pid = typeof row.project_id === "string" ? row.project_id : "";
@@ -246,13 +302,29 @@ export async function getArenaTeamPreviewForProjects(
   for (const projectId of projectIds) {
     const required = requiredByProjectId.get(projectId) ?? [];
     const memberRows = rowsByProject.get(projectId) ?? [];
-    const members: ArenaTeamMemberDisplay[] = memberRows.map((r) =>
-      buildArenaTeamMemberDisplay(
-        r.clerk_user_id,
-        r.covered_job_categories,
-        clerkById.get(r.clerk_user_id) ?? null,
-        required,
-        r.joinedAt,
+    const memberIdSet = new Set(memberRows.map((r) => r.clerk_user_id));
+    const members: ArenaTeamMemberDisplay[] = [];
+
+    const owner = ownerByProjectId.get(projectId);
+    if (owner && !memberIdSet.has(owner.clerk_user_id)) {
+      members.push(
+        buildArenaOwnerMemberDisplay(
+          owner.clerk_user_id,
+          clerkById.get(owner.clerk_user_id) ?? null,
+          owner.joinedAt,
+        ),
+      );
+    }
+
+    members.push(
+      ...memberRows.map((r) =>
+        buildArenaTeamMemberDisplay(
+          r.clerk_user_id,
+          r.covered_job_categories,
+          clerkById.get(r.clerk_user_id) ?? null,
+          required,
+          r.joinedAt,
+        ),
       ),
     );
     out.set(projectId, members);
@@ -280,6 +352,17 @@ export async function getArenaTeamDisplay(
   }
 
   const supabase = createServerSupabaseClient();
+
+  const { data: projectRow, error: projectError } = await supabase
+    .from("projects")
+    .select("clerk_user_id, created_at")
+    .eq("id", projectId)
+    .maybeSingle();
+
+  if (projectError) {
+    console.log("MYDEBUG →", projectError.message);
+  }
+
   const detailPrimary = await supabase
     .from("project_members")
     .select("clerk_user_id, covered_job_categories, created_at")
@@ -307,11 +390,32 @@ export async function getArenaTeamDisplay(
 
   const client = await clerkClient();
   const members: ArenaTeamMemberDisplay[] = [];
+  const ownerClerkUserId =
+    typeof projectRow?.clerk_user_id === "string"
+      ? projectRow.clerk_user_id
+      : "";
+  const ownerJoinedAt = parseJoinedAt(projectRow?.created_at);
+
+  if (ownerClerkUserId) {
+    let ownerUser: ClerkUserRecord | null = null;
+    try {
+      ownerUser = await client.users.getUser(ownerClerkUserId);
+    } catch {
+      console.log("MYDEBUG →", "clerk getUser failed", ownerClerkUserId);
+    }
+    members.push(
+      buildArenaOwnerMemberDisplay(
+        ownerClerkUserId,
+        ownerUser,
+        ownerJoinedAt,
+      ),
+    );
+  }
 
   for (const row of rows ?? []) {
     const clerkUserId =
       typeof row.clerk_user_id === "string" ? row.clerk_user_id : "";
-    if (!clerkUserId) continue;
+    if (!clerkUserId || clerkUserId === ownerClerkUserId) continue;
 
     let user: ClerkUserRecord | null = null;
     try {

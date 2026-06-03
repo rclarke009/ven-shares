@@ -6,6 +6,7 @@ import type {
   ArenaCategoryCoverage,
   ArenaTeamMemberDisplay,
 } from "@/lib/arena-team";
+import { arenaTeamMemberRailLabel } from "@/lib/arena-team-display";
 import type { ArenaCategorySlotStatus, ArenaProject } from "@/lib/projects-arena";
 import type { VenRole } from "@/lib/ven-role";
 
@@ -288,9 +289,9 @@ export function ProjectDetailView({
                       <span className="text-[11px] text-white text-center leading-tight font-medium line-clamp-2 w-full px-0.5">
                         {m.displayName}
                       </span>
-                      {m.coveredCategories.length > 0 ? (
+                      {m.role === "owner" || m.coveredCategories.length > 0 ? (
                         <span className="text-[10px] text-slate-400 text-center leading-snug line-clamp-4 px-0.5">
-                          {m.coveredCategories.join(" · ")}
+                          {arenaTeamMemberRailLabel(m)}
                         </span>
                       ) : (
                         <span className="text-[10px] text-slate-500 text-center italic">

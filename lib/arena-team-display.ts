@@ -8,7 +8,16 @@ export type ArenaTeamMemberDisplay = {
   coveredCategories: ProfessionalJobCategory[];
   /** When this member joined the project (from project_members.created_at). */
   joinedAt: string;
+  /** Project owner (inventor) vs professional team member. */
+  role?: "owner" | "member";
 };
+
+/** Label under avatar on Idea Arena team rails. */
+export function arenaTeamMemberRailLabel(m: ArenaTeamMemberDisplay): string {
+  if (m.role === "owner") return "Inventor";
+  if (m.coveredCategories.length > 0) return m.coveredCategories.join(" · ");
+  return "On the team";
+}
 
 export type ArenaCategoryCoverage = {
   category: ProfessionalJobCategory;

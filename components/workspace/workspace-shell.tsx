@@ -84,6 +84,11 @@ export type WorkspaceMessageDTO = {
   created_at: string;
 };
 
+export type WorkspaceArchivedMessageDTO = WorkspaceMessageDTO & {
+  deleted_at: string;
+  deleted_by_clerk_user_id: string | null;
+};
+
 export type WorkspaceActivityDTO = {
   id: string;
   actor_clerk_user_id: string;
@@ -108,6 +113,7 @@ type WorkspaceShellProps = {
   highlightMessageId: string | null;
   initialBoardParam: string;
   messages: WorkspaceMessageDTO[];
+  archivedMessages: WorkspaceArchivedMessageDTO[];
   requiredJobCategories: ProfessionalJobCategory[];
   files: WorkspaceFileDTO[];
   activities: WorkspaceActivityDTO[];
@@ -150,7 +156,7 @@ function activityDescription(
   if (kind === "message_deleted") {
     const category =
       typeof payload?.job_category === "string" ? payload.job_category : null;
-    return `Removed a message${messageActivityBoardSuffix(category)}`;
+    return `Archived a message${messageActivityBoardSuffix(category)}`;
   }
   if (kind === "file_uploaded") {
     const name =
@@ -164,7 +170,16 @@ function activityDescription(
       typeof payload?.filename === "string" ? payload.filename : "a file";
     const category =
       typeof payload?.job_category === "string" ? payload.job_category : null;
-    return category ? `Removed ${name} from ${category}` : `Removed ${name}`;
+    return category ? `Archived ${name} from ${category}` : `Archived ${name}`;
+  }
+  if (kind === "file_updated") {
+    const name =
+      typeof payload?.filename === "string" ? payload.filename : "a file";
+    const category =
+      typeof payload?.job_category === "string" ? payload.job_category : null;
+    return category
+      ? `Updated description for ${name} in ${category}`
+      : `Updated description for ${name}`;
   }
   if (kind === "status_updated") {
     const s =
@@ -224,6 +239,7 @@ export function WorkspaceShell({
   highlightMessageId,
   initialBoardParam,
   messages,
+  archivedMessages,
   requiredJobCategories,
   files,
   activities,
@@ -475,6 +491,7 @@ export function WorkspaceShell({
               isProjectOwner={isProjectOwner}
               requiredJobCategories={messageBoardCategories}
               messages={messages}
+              archivedMessages={archivedMessages}
               nameMap={nameMap}
               highlightMessageId={highlightMessageId}
               initialBoardParam={initialBoardParam}

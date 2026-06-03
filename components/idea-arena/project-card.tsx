@@ -2,11 +2,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { Check } from "lucide-react";
 
-import type {
-  ArenaCategorySlotStatus,
-  ArenaProjectForViewer,
-} from "@/lib/projects-arena";
-import type { ProfessionalJobCategory } from "@/lib/professional-onboarding";
+import {
+  categoryAbbrev,
+  miniStatusChipClasses,
+  summarizeCategoryStatuses,
+} from "@/lib/dashboard-mini-status";
+import type { ArenaProjectForViewer } from "@/lib/projects-arena";
+import { arenaTeamMemberRailLabel } from "@/lib/arena-team-display";
 
 import { ArenaUserAvatar } from "./arena-user-avatar";
 import { arenaProjectImageUrl } from "./utils";
@@ -14,52 +16,6 @@ import { arenaProjectImageUrl } from "./utils";
 const TEAM_RAIL_PREVIEW_MAX = 4;
 const DESC_PREVIEW_MAX = 1000;
 const ARIA_DESC_SNIPPET_MAX = 120;
-
-function categoryAbbrev(category: ProfessionalJobCategory): string {
-  const bySlash = category
-    .split("/")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (bySlash.length >= 2) {
-    const a = bySlash[0][0];
-    const b = bySlash[1][0];
-    return `${a}${b}`.toUpperCase();
-  }
-  const words = category.split(/\s+/).filter(Boolean);
-  if (words.length >= 2) {
-    return `${words[0][0]}${words[1][0]}`.toUpperCase();
-  }
-  return category.slice(0, 2).toUpperCase();
-}
-
-function slotClasses(status: ArenaCategorySlotStatus): string {
-  switch (status) {
-    case "complete":
-      return "bg-emerald-500 text-white ring-1 ring-emerald-600/40";
-    case "in_progress":
-      return "bg-sky-500 text-white ring-1 ring-sky-600/40";
-    default:
-      return "bg-amber-200 text-amber-950 ring-1 ring-amber-400/50";
-  }
-}
-
-function summarizeStatuses(
-  slots: ArenaProjectForViewer["category_statuses"],
-): string {
-  let needed = 0;
-  let inProgress = 0;
-  let complete = 0;
-  for (const s of slots) {
-    if (s.status === "needed") needed++;
-    else if (s.status === "in_progress") inProgress++;
-    else complete++;
-  }
-  const parts: string[] = [];
-  if (needed) parts.push(`${needed} needed`);
-  if (inProgress) parts.push(`${inProgress} in progress`);
-  if (complete) parts.push(`${complete} complete`);
-  return parts.length ? parts.join(", ") : "No team skills listed";
-}
 
 type ProjectCardProps = {
   project: ArenaProjectForViewer;
@@ -75,7 +31,7 @@ export function ProjectCard({
 }: ProjectCardProps) {
   const src = arenaProjectImageUrl(project);
   const slots = project.category_statuses;
-  const skillsSummary = summarizeStatuses(slots);
+  const skillsSummary = summarizeCategoryStatuses(slots);
   const myRelation = project.myRelation;
   const teamPreview = project.teamPreview;
 
@@ -154,7 +110,7 @@ export function ProjectCard({
               <span
                 key={category}
                 title={category}
-                className={`inline-flex h-6 min-w-6 px-1 items-center justify-center rounded-md text-[9px] font-bold leading-none ${slotClasses(status)}`}
+                className={`inline-flex h-6 min-w-6 px-1 items-center justify-center rounded-md text-[9px] font-bold leading-none ${miniStatusChipClasses(status)}`}
               >
                 {status === "complete" ? (
                   <Check className="h-3 w-3" strokeWidth={3} aria-hidden />
@@ -182,10 +138,7 @@ export function ProjectCard({
           ) : (
             <>
               {shownMembers.map((m) => {
-                const label =
-                  m.coveredCategories.length > 0
-                    ? m.coveredCategories.join(" · ")
-                    : "On the team";
+                const label = arenaTeamMemberRailLabel(m);
                 return (
                   <div
                     key={m.clerkUserId}

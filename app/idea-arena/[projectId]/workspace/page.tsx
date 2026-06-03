@@ -1,4 +1,3 @@
-import { currentUser } from "@clerk/nextjs/server";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
@@ -6,16 +5,12 @@ import { ArenaHeader } from "@/components/idea-arena/arena-header";
 import {
   WorkspaceShell,
   type WorkspaceActivityDTO,
-  type WorkspaceFileDTO,
+  type WorkspaceArchivedMessageDTO,
   type WorkspaceMessageDTO,
   type WorkspaceRosterEntryDTO,
 } from "@/components/workspace/workspace-shell";
 import { getProjectByIdForArena, isProjectUuid } from "@/lib/projects-arena";
-import {
-  getArenaTeamDisplay,
-  resolveViewerCoveredCategories,
-} from "@/lib/arena-team";
-import { getProfessionalJobCategoriesFromMetadata } from "@/lib/skills-match";
+import { loadWorkspaceOrganizerBundle } from "@/lib/workspace-organizer-bundle.server";
 import {
   boardParamFromCategory,
   resolveBoardCategory,
@@ -26,12 +21,11 @@ import {
   getWorkspaceAccessFlags,
 } from "@/lib/workspace-access";
 import { resolveClerkDisplayNames } from "@/lib/workspace-display-names";
-import { ensureWorkspaceProgressChecklistSynced } from "@/lib/workspace-progress-sync";
 import {
   getWorkspaceProjectMeta,
   listMemberClerkIdsForProject,
   listWorkspaceActivities,
-  listWorkspaceFiles,
+  listArchivedWorkspaceMessages,
   listWorkspaceMessages,
   listWorkspacePresence,
 } from "@/lib/workspace";
@@ -66,41 +60,31 @@ async function WorkspacePageContent({
   const meta = await getWorkspaceProjectMeta(projectId);
   if (!meta) notFound();
 
-  const progressBundle = await ensureWorkspaceProgressChecklistSynced(projectId);
-  if (!progressBundle) notFound();
+  const organizerBundle = await loadWorkspaceOrganizerBundle(projectId, userId);
+  if (!organizerBundle) notFound();
 
   const arenaProject = await getProjectByIdForArena(projectId);
   if (!arenaProject) notFound();
 
-  const { members, categoryCoverage } = await getArenaTeamDisplay(
-    projectId,
-    arenaProject.required_job_categories,
-  );
-
-  const profileSkills = getProfessionalJobCategoriesFromMetadata(
-    (await currentUser())?.publicMetadata as Record<string, unknown>,
-  );
-  const viewerCoveredCategories = resolveViewerCoveredCategories(
-    userId,
-    members,
-    arenaProject.required_job_categories,
-    profileSkills,
-  );
-
-  const [files, messages, activities, presence, memberIds] = await Promise.all([
-    listWorkspaceFiles(projectId),
-    listWorkspaceMessages(projectId),
-    listWorkspaceActivities(projectId),
-    listWorkspacePresence(projectId),
-    listMemberClerkIdsForProject(projectId),
-  ]);
+  const [messages, archivedMessages, activities, presence, memberIds] =
+    await Promise.all([
+      listWorkspaceMessages(projectId),
+      listArchivedWorkspaceMessages(projectId),
+      listWorkspaceActivities(projectId),
+      listWorkspacePresence(projectId),
+      listMemberClerkIdsForProject(projectId),
+    ]);
 
   const allIds = new Set<string>();
   allIds.add(meta.clerk_user_id);
   for (const id of memberIds) allIds.add(id);
   for (const m of messages) allIds.add(m.author_clerk_user_id);
+  for (const m of archivedMessages) {
+    allIds.add(m.author_clerk_user_id);
+    if (m.deleted_by_clerk_user_id) allIds.add(m.deleted_by_clerk_user_id);
+  }
   for (const a of activities) allIds.add(a.actor_clerk_user_id);
-  for (const f of files) {
+  for (const f of organizerBundle.files) {
     allIds.add(f.uploaded_by_clerk_user_id);
     if (f.deleted_by_clerk_user_id) allIds.add(f.deleted_by_clerk_user_id);
   }
@@ -150,18 +134,18 @@ async function WorkspacePageContent({
     created_at: m.created_at,
   }));
 
-  const filesDto: WorkspaceFileDTO[] = files.map((f) => ({
-    id: f.id,
-    uploaded_by_clerk_user_id: f.uploaded_by_clerk_user_id,
-    filename: f.filename,
-    content_type: f.content_type,
-    byte_size: Number(f.byte_size),
-    job_category: f.job_category ?? null,
-    description: f.description ?? null,
-    created_at: f.created_at,
-    deleted_at: f.deleted_at ?? null,
-    deleted_by_clerk_user_id: f.deleted_by_clerk_user_id ?? null,
-  }));
+  const archivedMessagesDto: WorkspaceArchivedMessageDTO[] =
+    archivedMessages.map((m) => ({
+      id: m.id,
+      author_clerk_user_id: m.author_clerk_user_id,
+      body: m.body,
+      reply_to_id: m.reply_to_id,
+      job_category: m.job_category ?? null,
+      is_urgent: m.is_urgent,
+      created_at: m.created_at,
+      deleted_at: m.deleted_at!,
+      deleted_by_clerk_user_id: m.deleted_by_clerk_user_id,
+    }));
 
   const activitiesDto: WorkspaceActivityDTO[] = activities.map((a) => ({
     id: a.id,
@@ -202,15 +186,16 @@ async function WorkspacePageContent({
       highlightMessageId={highlightMessageId}
       initialBoardParam={initialBoardParam}
       messages={messagesDto}
+      archivedMessages={archivedMessagesDto}
       requiredJobCategories={arenaProject.required_job_categories}
-      files={filesDto}
+      files={organizerBundle.files}
       activities={activitiesDto}
       roster={roster}
       nameMap={nameMapRecord}
-      progressChecklist={progressBundle.checklist}
-      progressCategoryStatuses={arenaProject.category_statuses}
-      categoryCoverage={categoryCoverage}
-      viewerCoveredCategories={viewerCoveredCategories}
+      progressChecklist={organizerBundle.checklist}
+      progressCategoryStatuses={organizerBundle.categoryStatuses}
+      categoryCoverage={organizerBundle.categoryCoverage}
+      viewerCoveredCategories={organizerBundle.viewerCoveredCategories}
       isProjectOwner={accessFlags.isOwner}
       editableProject={
         accessFlags.isOwner

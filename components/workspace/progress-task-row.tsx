@@ -6,6 +6,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { ChevronDown, GripVertical } from "lucide-react";
 
 import { ProgressStatusIcon } from "@/components/workspace/progress-status-icon";
+import { WorkspaceArchiveControl } from "@/components/workspace/workspace-archive-control";
 import type {
   ProgressCustomItemKind,
   WorkspaceProgressLeaf,
@@ -25,46 +26,8 @@ export function subtaskSortableId(subtaskId: string): string {
   return `subtask:${subtaskId}`;
 }
 
-function deleteKey(kind: ProgressCustomItemKind, itemId: string): string {
+function archiveKey(kind: ProgressCustomItemKind, itemId: string): string {
   return `${kind}:${itemId}`;
-}
-
-type RemoveConfirmProps = {
-  message: string;
-  pending: boolean;
-  onCancel: () => void;
-  onConfirm: () => void;
-};
-
-function RemoveConfirm({
-  message,
-  pending,
-  onCancel,
-  onConfirm,
-}: RemoveConfirmProps) {
-  return (
-    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between w-full">
-      <p className="text-xs text-slate-700">{message}</p>
-      <div className="flex flex-wrap items-center gap-2 shrink-0">
-        <button
-          type="button"
-          disabled={pending}
-          onClick={onCancel}
-          className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          disabled={pending}
-          onClick={onConfirm}
-          className="rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
-        >
-          {pending ? "Removing…" : "Remove"}
-        </button>
-      </div>
-    </div>
-  );
 }
 
 type ProgressTaskRowProps = {
@@ -73,15 +36,15 @@ type ProgressTaskRowProps = {
   taskListId: string;
   taskOpen: boolean;
   pending: boolean;
-  pendingDeleteKey: string | null;
+  pendingArchiveKey: string | null;
   newSubtaskTitle: string;
   onToggleTask: (taskId: string) => void;
   onToggleLeaf: (leafId: string, completed: boolean) => void;
   onNewSubtaskTitleChange: (taskId: string, value: string) => void;
   onAddSubtask: (taskId: string, title: string) => void;
-  onRequestDelete: (kind: ProgressCustomItemKind, itemId: string) => void;
-  onCancelDelete: () => void;
-  onConfirmDelete: (kind: ProgressCustomItemKind, itemId: string) => void;
+  onRequestArchive: (kind: ProgressCustomItemKind, itemId: string) => void;
+  onCancelArchive: () => void;
+  onConfirmArchive: (kind: ProgressCustomItemKind, itemId: string) => void;
 };
 
 function headerCheckboxLeaf(
@@ -105,11 +68,11 @@ type SortableSubtaskRowProps = {
   subtask: WorkspaceProgressSubtask;
   taskId: string;
   pending: boolean;
-  pendingDeleteKey: string | null;
+  pendingArchiveKey: string | null;
   onToggleLeaf: (leafId: string, completed: boolean) => void;
-  onRequestDelete: (kind: ProgressCustomItemKind, itemId: string) => void;
-  onCancelDelete: () => void;
-  onConfirmDelete: (kind: ProgressCustomItemKind, itemId: string) => void;
+  onRequestArchive: (kind: ProgressCustomItemKind, itemId: string) => void;
+  onCancelArchive: () => void;
+  onConfirmArchive: (kind: ProgressCustomItemKind, itemId: string) => void;
 };
 
 function SortableSubtaskRow({
@@ -117,11 +80,11 @@ function SortableSubtaskRow({
   subtask,
   taskId,
   pending,
-  pendingDeleteKey,
+  pendingArchiveKey,
   onToggleLeaf,
-  onRequestDelete,
-  onCancelDelete,
-  onConfirmDelete,
+  onRequestArchive,
+  onCancelArchive,
+  onConfirmArchive,
 }: SortableSubtaskRowProps) {
   const {
     attributes,
@@ -142,17 +105,19 @@ function SortableSubtaskRow({
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const confirmKey = deleteKey("subtask", subtask.id);
-  const showConfirm = pendingDeleteKey === confirmKey;
+  const confirmKey = archiveKey("subtask", subtask.id);
+  const showConfirm = pendingArchiveKey === confirmKey;
 
   if (showConfirm) {
     return (
       <li ref={setNodeRef} style={style} className="py-1">
-        <RemoveConfirm
-          message="Remove this subtask?"
+        <WorkspaceArchiveControl
+          size="sm"
+          showConfirm
+          confirmMessage="Archive this subtask? It will stay until the project ends."
           pending={pending}
-          onCancel={onCancelDelete}
-          onConfirm={() => onConfirmDelete("subtask", subtask.id)}
+          onCancel={onCancelArchive}
+          onConfirm={() => onConfirmArchive("subtask", subtask.id)}
         />
       </li>
     );
@@ -190,17 +155,12 @@ function SortableSubtaskRow({
         {subtask.title}
       </label>
       {!subtask.standard ? (
-        <button
-          type="button"
+        <WorkspaceArchiveControl
+          size="sm"
+          pending={pending}
           disabled={pending}
-          onClick={(e) => {
-            e.stopPropagation();
-            onRequestDelete("subtask", subtask.id);
-          }}
-          className="text-xs font-medium text-slate-500 hover:text-red-700 hover:underline disabled:opacity-50 shrink-0"
-        >
-          Remove
-        </button>
+          onRequestArchive={() => onRequestArchive("subtask", subtask.id)}
+        />
       ) : null}
     </li>
   );
@@ -212,15 +172,15 @@ export function ProgressTaskRow({
   taskListId,
   taskOpen,
   pending,
-  pendingDeleteKey,
+  pendingArchiveKey,
   newSubtaskTitle,
   onToggleTask,
   onToggleLeaf,
   onNewSubtaskTitleChange,
   onAddSubtask,
-  onRequestDelete,
-  onCancelDelete,
-  onConfirmDelete,
+  onRequestArchive,
+  onCancelArchive,
+  onConfirmArchive,
 }: ProgressTaskRowProps) {
   const {
     attributes,
@@ -245,8 +205,8 @@ export function ProgressTaskRow({
   const showSubtaskList = taskOpen && task.subtasks.length > 1;
   const showTaskStatusIcon = task.subtasks.length > 1;
   const taskStatus = deriveTaskStatus(task);
-  const taskConfirmKey = deleteKey("task", task.id);
-  const showTaskConfirm = pendingDeleteKey === taskConfirmKey;
+  const taskConfirmKey = archiveKey("task", task.id);
+  const showTaskConfirm = pendingArchiveKey === taskConfirmKey;
 
   return (
     <li
@@ -256,11 +216,13 @@ export function ProgressTaskRow({
     >
       {showTaskConfirm ? (
         <div className="px-2.5 py-2">
-          <RemoveConfirm
-            message="Remove this task?"
+          <WorkspaceArchiveControl
+            size="sm"
+            showConfirm
+            confirmMessage="Archive this task? It will stay until the project ends."
             pending={pending}
-            onCancel={onCancelDelete}
-            onConfirm={() => onConfirmDelete("task", task.id)}
+            onCancel={onCancelArchive}
+            onConfirm={() => onConfirmArchive("task", task.id)}
           />
         </div>
       ) : (
@@ -320,17 +282,13 @@ export function ProgressTaskRow({
           </button>
 
           {!task.standard ? (
-            <button
-              type="button"
+            <WorkspaceArchiveControl
+              size="sm"
+              pending={pending}
               disabled={pending}
-              onClick={(e) => {
-                e.stopPropagation();
-                onRequestDelete("task", task.id);
-              }}
-              className="text-xs font-medium text-slate-500 hover:text-red-700 hover:underline disabled:opacity-50 shrink-0 mr-1"
-            >
-              Remove
-            </button>
+              className="mr-1"
+              onRequestArchive={() => onRequestArchive("task", task.id)}
+            />
           ) : null}
         </div>
       )}
@@ -350,11 +308,11 @@ export function ProgressTaskRow({
                     subtask={sub}
                     taskId={task.id}
                     pending={pending}
-                    pendingDeleteKey={pendingDeleteKey}
+                    pendingArchiveKey={pendingArchiveKey}
                     onToggleLeaf={onToggleLeaf}
-                    onRequestDelete={onRequestDelete}
-                    onCancelDelete={onCancelDelete}
-                    onConfirmDelete={onConfirmDelete}
+                    onRequestArchive={onRequestArchive}
+                    onCancelArchive={onCancelArchive}
+                    onConfirmArchive={onConfirmArchive}
                   />
                 ))}
               </ul>

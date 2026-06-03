@@ -69,6 +69,21 @@ function computeExpandedSkills(
   return expanded;
 }
 
+function openSkillInOverrides(
+  category: string,
+  userSkillSet: Set<string>,
+  prev: SkillExpandOverrides,
+): SkillExpandOverrides {
+  const next: SkillExpandOverrides = {
+    manuallyOpened: [...prev.manuallyOpened],
+    manuallyClosed: prev.manuallyClosed.filter((c) => c !== category),
+  };
+  if (!userSkillSet.has(category) && !next.manuallyOpened.includes(category)) {
+    next.manuallyOpened.push(category);
+  }
+  return next;
+}
+
 export function useWorkspaceSkillExpand({
   projectId,
   userId,
@@ -79,7 +94,11 @@ export function useWorkspaceSkillExpand({
   userId: string;
   userSkills: string[];
   allCategories: string[];
-}): { expandedSkills: Set<string>; toggleSkill: (category: string) => void } {
+}): {
+  expandedSkills: Set<string>;
+  toggleSkill: (category: string) => void;
+  expandSkill: (category: string) => void;
+} {
   const key = useMemo(
     () => storageKey(projectId, userId),
     [projectId, userId],
@@ -149,5 +168,25 @@ export function useWorkspaceSkillExpand({
     [allCategories, key, userSkillSet],
   );
 
-  return { expandedSkills, toggleSkill };
+  const expandSkill = useCallback(
+    (category: string) => {
+      if (!allCategories.includes(category)) return;
+
+      setOverrides((prev) => {
+        const currentlyOpen = computeExpandedSkills(
+          userSkillSet,
+          allCategories,
+          prev,
+        ).has(category);
+        if (currentlyOpen) return prev;
+
+        const next = openSkillInOverrides(category, userSkillSet, prev);
+        writeOverrides(key, next);
+        return next;
+      });
+    },
+    [allCategories, key, userSkillSet],
+  );
+
+  return { expandedSkills, toggleSkill, expandSkill };
 }
