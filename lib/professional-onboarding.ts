@@ -11,7 +11,8 @@ export const PROFESSIONAL_HOURS_BAND_KEY = "professionalHoursBand" as const;
 export const PROFESSIONAL_JOB_CATEGORY_OPTIONS = [
   "Patent / IP law",
   "Engineering / product",
-  "Finance / accounting",
+  "Finance",
+  "Accounting",
   "Marketing / growth",
   "Operations",
   "Design / UX",
@@ -59,16 +60,37 @@ export function getProfessionalHoursBandFromMetadata(
   return isValidProfessionalHoursBand(raw) ? raw : null;
 }
 
+const PRESET_CATEGORY_ALLOWLIST = new Set<string>(
+  PROFESSIONAL_JOB_CATEGORY_OPTIONS,
+);
+
+function dedupeAllowlistedCategories(
+  selected: string[],
+  max: number | null,
+): ProfessionalJobCategory[] {
+  const out: ProfessionalJobCategory[] = [];
+  for (const s of selected) {
+    if (
+      PRESET_CATEGORY_ALLOWLIST.has(s) &&
+      !out.includes(s as ProfessionalJobCategory)
+    ) {
+      out.push(s as ProfessionalJobCategory);
+    }
+    if (max != null && out.length >= max) break;
+  }
+  return out;
+}
+
+/** Professional profiles: allowlist, dedupe, max 5. */
 export function normalizeProfessionalJobCategories(
   selected: string[],
 ): ProfessionalJobCategory[] {
-  const allowed = new Set<string>(PROFESSIONAL_JOB_CATEGORY_OPTIONS);
-  const out: ProfessionalJobCategory[] = [];
-  for (const s of selected) {
-    if (allowed.has(s) && !out.includes(s as ProfessionalJobCategory)) {
-      out.push(s as ProfessionalJobCategory);
-    }
-    if (out.length >= 5) break;
-  }
-  return out;
+  return dedupeAllowlistedCategories(selected, 5);
+}
+
+/** Inventor projects: allowlist, dedupe, no cap beyond the preset catalog. */
+export function normalizeProjectRequiredJobCategories(
+  selected: string[],
+): ProfessionalJobCategory[] {
+  return dedupeAllowlistedCategories(selected, null);
 }

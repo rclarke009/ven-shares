@@ -89,21 +89,39 @@ export const WORKSPACE_PROGRESS_STANDARD_TEMPLATE: Record<
       ],
     },
   ],
-  "Finance / accounting": [
+  Finance: [
     {
-      title: "Modeling & controls",
+      title: "Modeling & runway",
       minors: [
         { title: "Build financial model and key assumptions" },
-        { title: "Set up bookkeeping / reporting cadence" },
         { title: "Review cash runway and funding needs" },
+        { title: "Support due diligence data room" },
+      ],
+    },
+    {
+      title: "Strategy & reporting",
+      minors: [
+        { title: "Define KPIs and reporting cadence for investors" },
+        { title: "Align entity structure with funding plan" },
+        { title: "Prepare board / investor updates" },
+      ],
+    },
+  ],
+  Accounting: [
+    {
+      title: "Bookkeeping & controls",
+      minors: [
+        { title: "Set up chart of accounts and bookkeeping cadence" },
+        { title: "Reconcile accounts and manage AP/AR" },
+        { title: "Establish internal controls" },
       ],
     },
     {
       title: "Compliance & close",
       minors: [
-        { title: "Align tax and entity structure" },
-        { title: "Support due diligence data room" },
-        { title: "Close monthly / quarterly reporting" },
+        { title: "Align tax filings and entity compliance" },
+        { title: "Close monthly / quarterly books" },
+        { title: "Support audit and data-room requests" },
       ],
     },
   ],

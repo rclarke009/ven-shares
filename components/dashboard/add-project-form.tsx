@@ -8,16 +8,23 @@ import {
 } from "@/app/dashboard/projects/actions";
 import { PROFESSIONAL_JOB_CATEGORY_OPTIONS } from "@/lib/professional-onboarding";
 
+import { ProjectDescriptionField } from "./project-description-field";
 import { ProjectRequiredSkillRows } from "./project-required-skill-rows";
 
 const initialState: CreateProjectState = { ok: false, error: "" };
 
-const MAX_CATEGORIES = 5;
-
 const fileFieldButtonClass =
   "inline-flex cursor-pointer items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 active:bg-slate-100";
 
-export function AddProjectForm() {
+type AddProjectFormProps = {
+  onSuccess?: () => void;
+  onCancel?: () => void;
+};
+
+export function AddProjectForm({
+  onSuccess,
+  onCancel,
+}: AddProjectFormProps = {}) {
   const [selected, setSelected] = useState<string[]>([]);
   const [skillRowsKey, setSkillRowsKey] = useState(0);
   const [imageFileName, setImageFileName] = useState<string | null>(null);
@@ -35,17 +42,16 @@ export function AddProjectForm() {
         setImageFileName(null);
         setSkillRowsKey((k) => k + 1);
       });
+      onSuccess?.();
     }
-  }, [state.ok]);
+  }, [state.ok, onSuccess]);
 
   function toggleCategory(value: string) {
-    setSelected((prev) => {
-      if (prev.includes(value)) {
-        return prev.filter((x) => x !== value);
-      }
-      if (prev.length >= MAX_CATEGORIES) return prev;
-      return [...prev, value];
-    });
+    setSelected((prev) =>
+      prev.includes(value)
+        ? prev.filter((x) => x !== value)
+        : [...prev, value],
+    );
   }
 
   return (
@@ -75,46 +81,26 @@ export function AddProjectForm() {
             placeholder="Your invention or venture name"
           />
         </div>
-        <div>
-          <label
-            htmlFor="project-description"
-            className="block text-sm font-medium text-slate-700 mb-1"
-          >
-            Description{" "}
-            <span className="font-normal text-slate-500">(optional)</span>
-          </label>
-          <textarea
-            id="project-description"
-            name="description"
-            rows={3}
-            maxLength={4000}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 shadow-sm focus:border-[#22c55e] focus:outline-none focus:ring-1 focus:ring-[#22c55e]"
-            placeholder="Short summary"
-          />
-        </div>
+        <ProjectDescriptionField />
         <fieldset className="space-y-2">
           <legend className="block text-sm font-medium text-slate-700">
-            Team skills needed{" "}
+            Minimum team skills{" "}
             <span className="font-normal text-slate-500">(required)</span>
           </legend>
           <p className="text-xs text-slate-500">
-            Professionals need at least one matching job category to join.
-            Choose up to {MAX_CATEGORIES}.
+            Select every category your team needs at minimum. Professionals can
+            join if they match at least one — they do not need every box checked.
           </p>
           <ul className="grid gap-2 sm:grid-cols-2 mt-2">
             {PROFESSIONAL_JOB_CATEGORY_OPTIONS.map((cat) => {
               const isChecked = selected.includes(cat);
-              const atCap = selected.length >= MAX_CATEGORIES;
-              const disabled = !isChecked && atCap;
               return (
                 <li key={cat}>
                   <label
                     className={`flex items-start gap-3 rounded-lg border px-3 py-2.5 cursor-pointer text-sm ${
                       isChecked
                         ? "border-[#22c55e] bg-green-50/50"
-                        : disabled
-                          ? "border-slate-100 bg-slate-50 opacity-60 cursor-not-allowed"
-                          : "border-slate-200 bg-white hover:border-slate-300"
+                        : "border-slate-200 bg-white hover:border-slate-300"
                     }`}
                   >
                     <input
@@ -122,7 +108,6 @@ export function AddProjectForm() {
                       name="categories"
                       value={cat}
                       checked={isChecked}
-                      disabled={disabled}
                       onChange={() => toggleCategory(cat)}
                       className="mt-1 size-4 rounded border-slate-300 text-[#22c55e] focus:ring-[#22c55e]"
                     />
@@ -132,9 +117,6 @@ export function AddProjectForm() {
               );
             })}
           </ul>
-          <p className="text-xs text-slate-500">
-            {selected.length} / {MAX_CATEGORIES} selected
-          </p>
         </fieldset>
         <div>
           <span className="block text-sm font-medium text-slate-700 mb-1">
@@ -180,13 +162,25 @@ export function AddProjectForm() {
       {state.ok ? (
         <p className="mt-3 text-sm text-[#15803d]">Project saved.</p>
       ) : null}
-      <button
-        type="submit"
-        disabled={isPending}
-        className="mt-4 rounded-lg bg-[#22c55e] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#16a34a] disabled:opacity-60"
-      >
-        {isPending ? "Saving…" : "Save project"}
-      </button>
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <button
+          type="submit"
+          disabled={isPending}
+          className="rounded-lg bg-[#22c55e] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#16a34a] disabled:opacity-60"
+        >
+          {isPending ? "Saving…" : "Save project"}
+        </button>
+        {onCancel ? (
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={onCancel}
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+          >
+            Cancel
+          </button>
+        ) : null}
+      </div>
     </form>
   );
 }

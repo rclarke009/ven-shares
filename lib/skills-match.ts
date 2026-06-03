@@ -1,6 +1,7 @@
 import {
   PROFESSIONAL_JOB_CATEGORIES_KEY,
   normalizeProfessionalJobCategories,
+  normalizeProjectRequiredJobCategories,
   type ProfessionalJobCategory,
 } from "@/lib/professional-onboarding";
 
@@ -25,7 +26,7 @@ export function normalizeRequiredJobCategoriesFromDb(
   if (value == null) return [];
   const raw = Array.isArray(value) ? value : [];
   const strings = raw.filter((x): x is string => typeof x === "string");
-  return normalizeProfessionalJobCategories(strings);
+  return normalizeProjectRequiredJobCategories(strings);
 }
 
 export function professionalCanJoinProject(

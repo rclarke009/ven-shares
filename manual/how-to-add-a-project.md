@@ -23,9 +23,9 @@ Only **inventor** accounts can create projects. Skilled professionals see a shor
 1. Open the app and sign in (for example via **Login** on the home page).
 2. Go to **`/dashboard`** (or land there after sign-up).
 3. Confirm **Account type** shows **Inventor**.
-4. In **Add a project**, enter a **Title** (required).
-5. Optionally enter a **Description**.
-6. Under **Team skills needed**, select **at least one** job category (up to five). These are the same labels professionals pick during onboarding; at least one overlap is required before a professional can **Join Team** on this project.
+4. Click **Add new project**, then enter a **Title** (required).
+5. Optionally enter a **Description** — a few detailed sentences (problem, solution, who it helps) work best; professionals read this in Idea Arena when deciding whether to join.
+6. Under **Minimum team skills**, select **at least one** job category (select all that apply — there is no upper cap). These are the same labels professionals pick during onboarding. A professional can **Join Team** if their profile matches **at least one** of your selected categories; they do not need to match every box you check.
 7. Optionally choose a **Representative image** (JPEG, PNG, or WebP, up to 5 MB). It appears on the project card and detail page in the Idea Arena instead of a placeholder.
 8. Optionally use **Add skill** to list **required skills** with a **short description** each (free text, up to ten rows). These are shown on the project detail page in addition to the category chips; they do **not** replace category matching for join.
 9. Click **Save project**.
@@ -36,7 +36,7 @@ If something fails, check the browser and server logs; common issues are missing
 ## Steps (edit an existing project)
 
 1. On **`/dashboard`**, under **Your projects**, expand **Edit project** for a row.
-2. Update title, description, optional new **Representative image** (uploading replaces the previous file in Storage), categories, and required skill rows, then click **Save project**.
+2. Update title, description, optional new **Representative image** (uploading replaces the previous file in Storage), minimum team skills, and required skill rows, then click **Save project**.
 
 ## Notes
 

@@ -12,6 +12,8 @@ import { ArenaUserAvatar } from "./arena-user-avatar";
 import { arenaProjectImageUrl } from "./utils";
 
 const TEAM_RAIL_PREVIEW_MAX = 4;
+const DESC_PREVIEW_MAX = 1000;
+const ARIA_DESC_SNIPPET_MAX = 120;
 
 function categoryAbbrev(category: ProfessionalJobCategory): string {
   const bySlash = category
@@ -73,9 +75,20 @@ export function ProjectCard({
 }: ProjectCardProps) {
   const src = arenaProjectImageUrl(project);
   const slots = project.category_statuses;
-  const summary = summarizeStatuses(slots);
+  const skillsSummary = summarizeStatuses(slots);
   const myRelation = project.myRelation;
   const teamPreview = project.teamPreview;
+
+  const rawDescription = project.description?.trim() ?? "";
+  const isDescriptionTruncated = rawDescription.length > DESC_PREVIEW_MAX;
+  const descriptionPreview = isDescriptionTruncated
+    ? rawDescription.slice(0, DESC_PREVIEW_MAX)
+    : rawDescription;
+  const ariaDescSnippet = rawDescription
+    ? rawDescription.length > ARIA_DESC_SNIPPET_MAX
+      ? `${rawDescription.slice(0, ARIA_DESC_SNIPPET_MAX)}…`
+      : rawDescription
+    : "";
 
   const href =
     detailSearch && detailSearch.length > 0
@@ -89,12 +102,13 @@ export function ProjectCard({
         ? "border-2 border-violet-600"
         : "border border-slate-200/80";
 
+  const descPart = ariaDescSnippet ? ` ${ariaDescSnippet}` : "";
   const ariaLabel =
     myRelation === "owner"
-      ? `${project.title} — your project. ${summary}`
+      ? `${project.title} — your project.${descPart} ${skillsSummary}`
       : myRelation === "team"
-        ? `${project.title} — you're on this team. ${summary}`
-        : `${project.title}. ${summary}.`;
+        ? `${project.title} — you're on this team.${descPart} ${skillsSummary}`
+        : `${project.title}.${descPart} ${skillsSummary}.`;
 
   const shownMembers = teamPreview.slice(0, TEAM_RAIL_PREVIEW_MAX);
   const extraCount = Math.max(0, teamPreview.length - TEAM_RAIL_PREVIEW_MAX);
@@ -111,7 +125,7 @@ export function ProjectCard({
         <h3 className="font-bold text-sm text-slate-900 line-clamp-2 mb-2 leading-snug">
           {project.title}
         </h3>
-        <div className="aspect-square relative bg-slate-300 rounded-lg overflow-hidden mb-2">
+        <div className="aspect-4/3 relative bg-slate-300 rounded-lg overflow-hidden mb-2">
           <Image
             src={src}
             alt=""
@@ -120,6 +134,20 @@ export function ProjectCard({
             sizes="200px"
           />
         </div>
+        {descriptionPreview ? (
+          <p className="text-[11px] text-slate-700 leading-snug mb-2">
+            <span className="font-semibold">Summary: </span>
+            {descriptionPreview}
+            {isDescriptionTruncated ? (
+              <>
+                …{" "}
+                <span className="text-[#22c55e] font-medium group-hover:underline">
+                  Show more
+                </span>
+              </>
+            ) : null}
+          </p>
+        ) : null}
         {slots.length > 0 ? (
           <div className="flex flex-wrap gap-1 mt-auto" aria-hidden>
             {slots.map(({ category, status }) => (

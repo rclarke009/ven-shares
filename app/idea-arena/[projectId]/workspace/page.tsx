@@ -10,7 +10,10 @@ import {
   type WorkspaceRosterEntryDTO,
 } from "@/components/workspace/workspace-shell";
 import { getProjectByIdForArena, isProjectUuid } from "@/lib/projects-arena";
-import { assertWorkspaceAccess } from "@/lib/workspace-access";
+import {
+  assertWorkspaceAccess,
+  getWorkspaceAccessFlags,
+} from "@/lib/workspace-access";
 import { resolveClerkDisplayNames } from "@/lib/workspace-display-names";
 import { ensureWorkspaceProgressChecklistSynced } from "@/lib/workspace-progress-sync";
 import {
@@ -45,6 +48,7 @@ async function WorkspacePageContent({
   messageId: string | undefined;
 }) {
   const userId = await assertWorkspaceAccess(projectId);
+  const accessFlags = await getWorkspaceAccessFlags(projectId, userId);
 
   const meta = await getWorkspaceProjectMeta(projectId);
   if (!meta) notFound();
@@ -152,6 +156,19 @@ async function WorkspacePageContent({
       nameMap={nameMapRecord}
       progressChecklist={progressBundle.checklist}
       progressCategoryStatuses={arenaProject.category_statuses}
+      isProjectOwner={accessFlags.isOwner}
+      editableProject={
+        accessFlags.isOwner
+          ? {
+              id: arenaProject.id,
+              title: arenaProject.title,
+              description: arenaProject.description,
+              required_job_categories: arenaProject.required_job_categories,
+              representative_image_path: arenaProject.representative_image_path,
+              project_required_skills: arenaProject.project_required_skills,
+            }
+          : null
+      }
     />
   );
 }

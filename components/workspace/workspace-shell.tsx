@@ -7,6 +7,7 @@ import {
   Eye,
   FileText,
   MessageCircle,
+  Settings,
   Users,
   Video,
   X,
@@ -36,8 +37,10 @@ import {
   actionWorkspacePresenceHeartbeat,
 } from "@/app/idea-arena/[projectId]/workspace/actions";
 import type { ArenaCategorySlot } from "@/lib/projects-arena";
+import type { ProjectRequiredSkill } from "@/lib/project-required-skills";
 import type { WorkspaceProgressChecklist } from "@/lib/workspace-progress-checklist";
 
+import { EditProjectForm } from "@/components/dashboard/edit-project-form";
 import { WorkspaceProgressPanel } from "@/components/workspace/workspace-progress-panel";
 
 const TABS = [
@@ -47,6 +50,24 @@ const TABS = [
   { id: "progress" as const, label: "Progress", icon: BarChart3 },
   { id: "meeting" as const, label: "Meeting", icon: Video },
 ];
+
+const SETTINGS_TAB = {
+  id: "settings" as const,
+  label: "Settings",
+  icon: Settings,
+};
+
+type BaseTabId = (typeof TABS)[number]["id"];
+type TabId = BaseTabId | "settings";
+
+export type WorkspaceEditableProject = {
+  id: string;
+  title: string;
+  description: string | null;
+  required_job_categories: string[];
+  representative_image_path: string | null;
+  project_required_skills: ProjectRequiredSkill[];
+};
 
 const workspaceFileChooseButtonClass =
   "inline-flex cursor-pointer items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 active:bg-slate-100";
@@ -97,6 +118,8 @@ type WorkspaceShellProps = {
   nameMap: Record<string, string>;
   progressChecklist: WorkspaceProgressChecklist;
   progressCategoryStatuses: ArenaCategorySlot[];
+  isProjectOwner: boolean;
+  editableProject: WorkspaceEditableProject | null;
 };
 
 function formatBytes(n: number): string {
@@ -136,8 +159,19 @@ function activityDescription(
   return kind.replace(/_/g, " ");
 }
 
-function isTabId(v: string): v is (typeof TABS)[number]["id"] {
+function isBaseTabId(v: string): v is BaseTabId {
   return TABS.some((t) => t.id === v);
+}
+
+function resolveTabId(
+  v: string,
+  isProjectOwner: boolean,
+): TabId {
+  if (v === "settings") {
+    return isProjectOwner ? "settings" : "messages";
+  }
+  if (isBaseTabId(v)) return v;
+  return "messages";
 }
 
 export function WorkspaceShell({
@@ -153,12 +187,14 @@ export function WorkspaceShell({
   nameMap,
   progressChecklist,
   progressCategoryStatuses,
+  isProjectOwner,
+  editableProject,
 }: WorkspaceShellProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [tab, setTabState] = useState<(typeof TABS)[number]["id"]>(() =>
-    isTabId(initialTab) ? initialTab : "messages",
+  const [tab, setTabState] = useState<TabId>(() =>
+    resolveTabId(initialTab, isProjectOwner),
   );
   const [, startTransition] = useTransition();
   const [replyToId, setReplyToId] = useState<string | null>(null);
@@ -189,8 +225,8 @@ export function WorkspaceShell({
 
   useEffect(() => {
     const t = searchParams.get("tab");
-    if (t && isTabId(t)) setTabState(t);
-  }, [searchParams]);
+    if (t) setTabState(resolveTabId(t, isProjectOwner));
+  }, [searchParams, isProjectOwner]);
 
   useEffect(() => {
     if (highlightMessageId) {
@@ -213,7 +249,7 @@ export function WorkspaceShell({
     return () => window.clearInterval(id);
   }, [projectId]);
 
-  function setTab(next: (typeof TABS)[number]["id"]) {
+  function setTab(next: TabId) {
     setTabState(next);
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", next);
@@ -339,6 +375,20 @@ export function WorkspaceShell({
               {label}
             </button>
           ))}
+          {isProjectOwner ? (
+            <button
+              type="button"
+              onClick={() => setTab("settings")}
+              className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+                tab === "settings"
+                  ? "bg-slate-500/80 text-white"
+                  : "text-slate-200 hover:bg-slate-600/80"
+              }`}
+            >
+              <Settings className="h-5 w-5 shrink-0 opacity-90" aria-hidden />
+              {SETTINGS_TAB.label}
+            </button>
+          ) : null}
         </nav>
         <div className="mt-auto p-3 border-t border-slate-600/80">
           <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
@@ -705,6 +755,23 @@ export function WorkspaceShell({
               <Video className="h-12 w-12 mx-auto text-slate-400 mb-4" />
               <p className="text-slate-700 font-medium">Meeting</p>
               <p className="text-sm text-slate-500 mt-2">Coming soon.</p>
+            </div>
+          ) : null}
+
+          {tab === "settings" && editableProject ? (
+            <div className="max-w-3xl rounded-2xl border border-slate-200 bg-white shadow-sm p-6">
+              <h2 className="text-base font-semibold text-slate-900 mb-1">
+                Project settings
+              </h2>
+              <p className="text-sm text-slate-600 mb-4">
+                Update how this project appears in Idea Arena and what skills
+                professionals need to join.
+              </p>
+              <EditProjectForm
+                key={`${editableProject.id}-${editableProject.representative_image_path ?? ""}-${editableProject.project_required_skills.map((s) => `${s.skill_name}:${s.skill_description}`).join("|")}-${editableProject.title}`}
+                project={editableProject}
+                variant="workspace"
+              />
             </div>
           ) : null}
         </div>

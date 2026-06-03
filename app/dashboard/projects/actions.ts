@@ -10,7 +10,7 @@ import {
 } from "@/lib/project-required-skills";
 import { readRepresentativeImageFromFormData } from "@/lib/representative-image-upload";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
-import { normalizeProfessionalJobCategories } from "@/lib/professional-onboarding";
+import { normalizeProjectRequiredJobCategories } from "@/lib/professional-onboarding";
 import { isProjectUuid } from "@/lib/projects-arena";
 import { normalizeRequiredJobCategoriesFromDb } from "@/lib/skills-match";
 import {
@@ -200,11 +200,11 @@ export async function createProject(
   const selected = formData.getAll("categories").filter(
     (v): v is string => typeof v === "string",
   );
-  const required_job_categories = normalizeProfessionalJobCategories(selected);
+  const required_job_categories = normalizeProjectRequiredJobCategories(selected);
   if (required_job_categories.length === 0) {
     return {
       ok: false,
-      error: "Choose at least one team skill needed (up to five).",
+      error: "Choose at least one minimum team skill.",
     };
   }
 
@@ -297,11 +297,11 @@ export async function updateProjectWithMediaAndSkills(
   const selected = formData.getAll("categories").filter(
     (v): v is string => typeof v === "string",
   );
-  const required_job_categories = normalizeProfessionalJobCategories(selected);
+  const required_job_categories = normalizeProjectRequiredJobCategories(selected);
   if (required_job_categories.length === 0) {
     return {
       ok: false,
-      error: "Choose at least one team skill needed (up to five).",
+      error: "Choose at least one minimum team skill.",
     };
   }
 
@@ -434,5 +434,6 @@ export async function updateProjectWithMediaAndSkills(
   revalidatePath("/dashboard");
   revalidatePath("/idea-arena");
   revalidatePath(`/idea-arena/${projectId}`);
+  revalidatePath(`/idea-arena/${projectId}/workspace`);
   return { ok: true, error: "" };
 }

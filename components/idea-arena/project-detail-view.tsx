@@ -86,28 +86,30 @@ export function ProjectDetailView({
             <h1 className="text-xl font-bold text-slate-900 mb-4 leading-tight">
               {project.title}
             </h1>
-            <div className="aspect-square max-w-md relative bg-slate-800 rounded-xl overflow-hidden mb-6 mx-auto lg:mx-0">
-              <div
-                className="absolute inset-0 opacity-30"
-                style={{
-                  backgroundImage:
-                    "linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)",
-                  backgroundSize: "24px 24px",
-                }}
-              />
-              <Image
-                src={src}
-                alt=""
-                fill
-                className="object-cover mix-blend-normal"
-                sizes="(max-width: 1024px) 100vw, 28rem"
-                priority
-              />
+            <div className="space-y-3 max-w-md mx-auto lg:mx-0 mb-6">
+              <div className="aspect-4/3 w-full relative bg-slate-800 rounded-xl overflow-hidden">
+                <div
+                  className="absolute inset-0 opacity-30"
+                  style={{
+                    backgroundImage:
+                      "linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)",
+                    backgroundSize: "24px 24px",
+                  }}
+                />
+                <Image
+                  src={src}
+                  alt=""
+                  fill
+                  className="object-cover mix-blend-normal"
+                  sizes="(max-width: 1024px) 100vw, 28rem"
+                  priority
+                />
+              </div>
+              <p className="text-slate-800 text-sm leading-relaxed">
+                <span className="font-bold">Summary: </span>
+                {summary}
+              </p>
             </div>
-            <p className="text-slate-800 text-sm leading-relaxed">
-              <span className="font-bold">Summary: </span>
-              {summary}
-            </p>
             <div className="mt-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
               <div>
                 <p className="text-sm font-semibold text-slate-900 mb-2">

@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import {
   startTransition,
   useActionState,
@@ -18,9 +19,8 @@ import {
 import { publicProjectImageUrl } from "@/lib/project-image-url";
 import { PROFESSIONAL_JOB_CATEGORY_OPTIONS } from "@/lib/professional-onboarding";
 
+import { ProjectDescriptionField } from "./project-description-field";
 import { ProjectRequiredSkillRows } from "./project-required-skill-rows";
-
-const MAX_CATEGORIES = 5;
 
 type EditProjectFormProps = {
   project: Pick<
@@ -32,12 +32,36 @@ type EditProjectFormProps = {
     | "representative_image_path"
     | "project_required_skills"
   >;
+  variant?: "dashboard" | "workspace";
 };
 
 const fileFieldButtonClass =
   "inline-flex cursor-pointer items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 active:bg-slate-100";
 
-export function EditProjectForm({ project }: EditProjectFormProps) {
+const workspaceFileFieldButtonClass =
+  "inline-flex cursor-pointer items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 active:bg-slate-100";
+
+export function EditProjectForm({
+  project,
+  variant = "dashboard",
+}: EditProjectFormProps) {
+  const router = useRouter();
+  const isWorkspace = variant === "workspace";
+  const labelClass = isWorkspace
+    ? "block text-sm font-medium text-slate-700"
+    : "block text-xs font-medium text-slate-700";
+  const sectionTitleClass = isWorkspace
+    ? "text-sm font-medium text-slate-800 mb-2"
+    : "text-xs font-medium text-slate-800 mb-2";
+  const helperTextClass = isWorkspace
+    ? "text-sm text-slate-500 mb-2"
+    : "text-xs text-slate-500 mb-2";
+  const categoryLabelClass = isWorkspace
+    ? "flex items-start gap-2 rounded-lg border px-3 py-2.5 cursor-pointer text-sm"
+    : "flex items-start gap-2 rounded-lg border px-2.5 py-2 cursor-pointer text-xs";
+  const submitButtonClass = isWorkspace
+    ? "mt-4 rounded-lg bg-slate-800 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-900 disabled:opacity-60"
+    : "mt-4 rounded-lg bg-slate-800 px-3 py-2 text-xs font-medium text-white hover:bg-slate-900 disabled:opacity-60";
   const [selected, setSelected] = useState<string[]>(() => [
     ...project.required_job_categories,
   ]);
@@ -60,22 +84,28 @@ export function EditProjectForm({ project }: EditProjectFormProps) {
     startTransition(() => {
       setImageFileName(null);
     });
-  }, [state.ok]);
+    router.refresh();
+  }, [state.ok, router]);
 
   function toggleCategory(value: string) {
-    setSelected((prev) => {
-      if (prev.includes(value)) {
-        return prev.filter((x) => x !== value);
-      }
-      if (prev.length >= MAX_CATEGORIES) return prev;
-      return [...prev, value];
-    });
+    setSelected((prev) =>
+      prev.includes(value)
+        ? prev.filter((x) => x !== value)
+        : [...prev, value],
+    );
   }
 
   return (
-    <form action={formAction} className="mt-4 pt-4 border-t border-slate-100">
+    <form
+      action={formAction}
+      className={
+        isWorkspace ? undefined : "mt-4 pt-4 border-t border-slate-100"
+      }
+    >
       <input type="hidden" name="projectId" value={project.id} />
-      <p className="text-sm font-medium text-slate-800 mb-3">Edit project</p>
+      {!isWorkspace ? (
+        <p className="text-sm font-medium text-slate-800 mb-3">Edit project</p>
+      ) : null}
       {state.error ? (
         <p
           className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 mb-3"
@@ -89,7 +119,7 @@ export function EditProjectForm({ project }: EditProjectFormProps) {
       ) : null}
 
       <div className="space-y-3 mb-4">
-        <label className="block text-xs font-medium text-slate-700">
+        <label className={labelClass}>
           Title
           <input
             name="title"
@@ -100,19 +130,12 @@ export function EditProjectForm({ project }: EditProjectFormProps) {
             className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900"
           />
         </label>
-        <label className="block text-xs font-medium text-slate-700">
-          Description{" "}
-          <span className="font-normal text-slate-500">(optional)</span>
-          <textarea
-            name="description"
-            rows={3}
-            maxLength={4000}
-            defaultValue={project.description ?? ""}
-            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900"
-          />
-        </label>
+        <ProjectDescriptionField
+          defaultValue={project.description ?? ""}
+          variant={variant}
+        />
         <div>
-          <span className="block text-xs font-medium text-slate-700 mb-1">
+          <span className={`${labelClass} mb-1`}>
             Representative image{" "}
             <span className="font-normal text-slate-500">(optional)</span>
           </span>
@@ -143,7 +166,11 @@ export function EditProjectForm({ project }: EditProjectFormProps) {
               />
               <label
                 htmlFor={`representative_image_${project.id}`}
-                className={fileFieldButtonClass}
+                className={
+                  isWorkspace
+                    ? workspaceFileFieldButtonClass
+                    : fileFieldButtonClass
+                }
               >
                 Add a file
               </label>
@@ -154,32 +181,30 @@ export function EditProjectForm({ project }: EditProjectFormProps) {
               </span>
             ) : null}
           </div>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className={`${helperTextClass} mt-1 mb-0`}>
             JPEG, PNG, or WebP, up to 5MB. Uploading replaces the current image.
           </p>
         </div>
       </div>
 
-      <p className="text-xs font-medium text-slate-800 mb-2">
-        Team skills needed (categories)
+      <p className={sectionTitleClass}>
+        Minimum team skills{" "}
+        <span className="font-normal text-slate-500">(required)</span>
       </p>
-      <p className="text-xs text-slate-500 mb-2">
-        Professionals need at least one match. Up to {MAX_CATEGORIES}.
+      <p className={helperTextClass}>
+        Select every category your team needs at minimum. Professionals can join
+        if they match at least one — they do not need every box checked.
       </p>
       <ul className="grid gap-2 sm:grid-cols-2 mb-3">
         {PROFESSIONAL_JOB_CATEGORY_OPTIONS.map((cat) => {
           const isChecked = selected.includes(cat);
-          const atCap = selected.length >= MAX_CATEGORIES;
-          const disabled = !isChecked && atCap;
           return (
             <li key={cat}>
               <label
-                className={`flex items-start gap-2 rounded-lg border px-2.5 py-2 cursor-pointer text-xs ${
+                className={`${categoryLabelClass} ${
                   isChecked
                     ? "border-[#22c55e] bg-green-50/50"
-                    : disabled
-                      ? "border-slate-100 bg-slate-50 opacity-60 cursor-not-allowed"
-                      : "border-slate-200 bg-white hover:border-slate-300"
+                    : "border-slate-200 bg-white hover:border-slate-300"
                 }`}
               >
                 <input
@@ -187,7 +212,6 @@ export function EditProjectForm({ project }: EditProjectFormProps) {
                   name="categories"
                   value={cat}
                   checked={isChecked}
-                  disabled={disabled}
                   onChange={() => toggleCategory(cat)}
                   className="mt-0.5 size-3.5 rounded border-slate-300 text-[#22c55e] focus:ring-[#22c55e]"
                 />
@@ -197,9 +221,6 @@ export function EditProjectForm({ project }: EditProjectFormProps) {
           );
         })}
       </ul>
-      <p className="text-xs text-slate-500 mb-3">
-        {selected.length} / {MAX_CATEGORIES} selected
-      </p>
 
       <ProjectRequiredSkillRows
         key={`${project.id}-${project.project_required_skills.map((s) => `${s.skill_name}:${s.skill_description}`).join("|")}`}
@@ -209,7 +230,7 @@ export function EditProjectForm({ project }: EditProjectFormProps) {
       <button
         type="submit"
         disabled={pending}
-        className="mt-4 rounded-lg bg-slate-800 px-3 py-2 text-xs font-medium text-white hover:bg-slate-900 disabled:opacity-60"
+        className={submitButtonClass}
       >
         {pending ? "Saving…" : "Save project"}
       </button>

@@ -28,7 +28,13 @@ export function ArenaHeader() {
             </Link>
           ))}
         </nav>
-        <div className="shrink-0">
+        <div className="flex items-center gap-4 shrink-0">
+          <Link
+            href="/dashboard"
+            className="text-sm font-medium text-slate-700 hover:text-[#22c55e] transition-colors"
+          >
+            Dashboard
+          </Link>
           <VenUserButton />
         </div>
       </div>
