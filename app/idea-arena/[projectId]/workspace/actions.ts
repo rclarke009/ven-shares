@@ -11,7 +11,8 @@ import {
   addCustomTask,
   addCustomTaskList,
   mergeChecklistWithTemplates,
-  parseWorkspaceProgressChecklist,
+  moveTaskInCategory,
+  reorderSubtasksInTask,
   setAllLeavesInCategory,
   setLeafCompleted,
 } from "@/lib/workspace-progress-checklist";
@@ -232,6 +233,84 @@ export async function actionProgressSetCategoryLeaves(
 
   const next = setAllLeavesInCategory(loaded.merged, category, completed);
   if (!next) return { ok: false, error: "Could not update tasks." };
+
+  const persist = await persistWorkspaceProgress(projectId, next);
+  if (!persist.ok) return persist;
+
+  revalidateArenaAndWorkspace(projectId);
+  return { ok: true };
+}
+
+export async function actionProgressMoveTask(
+  projectId: string,
+  category: ProfessionalJobCategory,
+  taskId: string,
+  targetTaskListId: string,
+  targetIndex: number,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { userId } = await auth();
+  if (!userId || !isProjectUuid(projectId)) {
+    return { ok: false, error: "Unauthorized." };
+  }
+  const allowed = await canAccessWorkspace(projectId, userId);
+  if (!allowed) return { ok: false, error: "Unauthorized." };
+
+  const loaded = await loadMergedChecklist(projectId);
+  if (!loaded) return { ok: false, error: "Could not load project." };
+  if (!loaded.required.includes(category)) {
+    return { ok: false, error: "That category is not part of this project." };
+  }
+
+  if (!Number.isInteger(targetIndex) || targetIndex < 0) {
+    return { ok: false, error: "Invalid position." };
+  }
+
+  const next = moveTaskInCategory(
+    loaded.merged,
+    category,
+    taskId,
+    targetTaskListId,
+    targetIndex,
+  );
+  if (!next) return { ok: false, error: "Could not move task." };
+
+  const persist = await persistWorkspaceProgress(projectId, next);
+  if (!persist.ok) return persist;
+
+  revalidateArenaAndWorkspace(projectId);
+  return { ok: true };
+}
+
+export async function actionProgressReorderSubtasks(
+  projectId: string,
+  category: ProfessionalJobCategory,
+  taskId: string,
+  orderedSubtaskIds: string[],
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { userId } = await auth();
+  if (!userId || !isProjectUuid(projectId)) {
+    return { ok: false, error: "Unauthorized." };
+  }
+  const allowed = await canAccessWorkspace(projectId, userId);
+  if (!allowed) return { ok: false, error: "Unauthorized." };
+
+  const loaded = await loadMergedChecklist(projectId);
+  if (!loaded) return { ok: false, error: "Could not load project." };
+  if (!loaded.required.includes(category)) {
+    return { ok: false, error: "That category is not part of this project." };
+  }
+
+  if (!Array.isArray(orderedSubtaskIds) || orderedSubtaskIds.length === 0) {
+    return { ok: false, error: "Invalid subtask order." };
+  }
+
+  const next = reorderSubtasksInTask(
+    loaded.merged,
+    category,
+    taskId,
+    orderedSubtaskIds,
+  );
+  if (!next) return { ok: false, error: "Could not reorder subtasks." };
 
   const persist = await persistWorkspaceProgress(projectId, next);
   if (!persist.ok) return persist;

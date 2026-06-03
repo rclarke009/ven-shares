@@ -487,6 +487,161 @@ export function completedCategoriesFromChecklist(
   );
 }
 
+function mergeSubtasksForStandardTask(
+  category: ProfessionalJobCategory,
+  listIndex: number,
+  taskIndex: number,
+  templateSubtasks: TemplateSubtask[],
+  oldTask: WorkspaceProgressTask | undefined,
+  existing: WorkspaceProgressCategoryBlock | undefined,
+  templateSubtaskIds: Set<string>,
+  persisted: boolean,
+  completedSet: Set<ProfessionalJobCategory>,
+): WorkspaceProgressSubtask[] {
+  const templateById = new Map<string, WorkspaceProgressSubtask>();
+  for (let si = 0; si < templateSubtasks.length; si++) {
+    const subtaskId = stdSubtaskId(category, listIndex, taskIndex, si);
+    const oldSub =
+      findSubtaskInBlock(existing, subtaskId) ??
+      oldTask?.subtasks.find((s) => s.id === subtaskId);
+    const defaultCompleted = !persisted && completedSet.has(category);
+    templateById.set(subtaskId, {
+      id: subtaskId,
+      title: templateSubtasks[si].title,
+      standard: true,
+      completed: oldSub ? oldSub.completed : defaultCompleted,
+    });
+  }
+
+  const customById = new Map<string, WorkspaceProgressSubtask>();
+  if (oldTask) {
+    for (const s of oldTask.subtasks) {
+      if (!templateSubtaskIds.has(s.id)) {
+        customById.set(s.id, { ...s });
+      }
+    }
+  }
+
+  const ordered: WorkspaceProgressSubtask[] = [];
+  const seen = new Set<string>();
+
+  if (oldTask) {
+    for (const s of oldTask.subtasks) {
+      const merged = templateById.get(s.id) ?? customById.get(s.id);
+      if (merged) {
+        ordered.push(merged);
+        seen.add(s.id);
+      }
+    }
+  }
+
+  for (let si = 0; si < templateSubtasks.length; si++) {
+    const subtaskId = stdSubtaskId(category, listIndex, taskIndex, si);
+    if (!seen.has(subtaskId)) {
+      ordered.push(templateById.get(subtaskId)!);
+      seen.add(subtaskId);
+    }
+  }
+
+  for (const [id, sub] of customById) {
+    if (!seen.has(id)) {
+      ordered.push(sub);
+      seen.add(id);
+    }
+  }
+
+  return ordered;
+}
+
+function mergeTasksForStandardTaskList(
+  category: ProfessionalJobCategory,
+  listIndex: number,
+  tList: TemplateTaskList,
+  oldTaskList: WorkspaceProgressTaskList | undefined,
+  existing: WorkspaceProgressCategoryBlock | undefined,
+  templateSubtaskIds: Set<string>,
+  templateTaskIds: Set<string>,
+  persisted: boolean,
+  completedSet: Set<ProfessionalJobCategory>,
+): WorkspaceProgressTask[] {
+  const mergedById = new Map<string, WorkspaceProgressTask>();
+
+  for (let ti = 0; ti < tList.tasks.length; ti++) {
+    const tTask = tList.tasks[ti];
+    const taskId = stdTaskId(category, listIndex, ti);
+    const oldTask = oldTaskList?.tasks.find((t) => t.id === taskId);
+    mergedById.set(taskId, {
+      id: taskId,
+      title: tTask.title,
+      standard: true,
+      completed: false,
+      subtasks: mergeSubtasksForStandardTask(
+        category,
+        listIndex,
+        ti,
+        tTask.subtasks,
+        oldTask,
+        existing,
+        templateSubtaskIds,
+        persisted,
+        completedSet,
+      ),
+    });
+  }
+
+  const customById = new Map<string, WorkspaceProgressTask>();
+  if (oldTaskList) {
+    for (const t of oldTaskList.tasks) {
+      if (!templateTaskIds.has(t.id) && t.id.startsWith("cust:")) {
+        customById.set(t.id, {
+          id: t.id,
+          title: t.title,
+          standard: false,
+          completed: t.completed,
+          subtasks: t.subtasks.map((s) => ({ ...s })),
+        });
+      }
+    }
+  }
+
+  const ordered: WorkspaceProgressTask[] = [];
+  const seen = new Set<string>();
+
+  if (oldTaskList) {
+    for (const t of oldTaskList.tasks) {
+      let merged = mergedById.get(t.id) ?? customById.get(t.id);
+      if (!merged) {
+        merged = {
+          id: t.id,
+          title: t.title,
+          standard: t.standard,
+          completed: t.completed,
+          subtasks: t.subtasks.map((s) => ({ ...s })),
+        };
+      }
+      ordered.push(merged);
+      seen.add(t.id);
+    }
+  }
+
+  for (let ti = 0; ti < tList.tasks.length; ti++) {
+    const taskId = stdTaskId(category, listIndex, ti);
+    if (!seen.has(taskId)) {
+      ordered.push(mergedById.get(taskId)!);
+      seen.add(taskId);
+    }
+  }
+
+  for (const [id, task] of customById) {
+    if (!seen.has(id)) {
+      ordered.push(task);
+      seen.add(id);
+    }
+  }
+
+  return ordered;
+}
+
 export function mergeChecklistWithTemplates(
   required: ProfessionalJobCategory[],
   rawFromDb: unknown,
@@ -511,66 +666,21 @@ export function mergeChecklistWithTemplates(
       const taskListId = stdTaskListId(category, li);
       const oldTaskList = existing?.taskLists.find((l) => l.id === taskListId);
 
-      const mergedTasks: WorkspaceProgressTask[] = [];
-
-      for (let ti = 0; ti < tList.tasks.length; ti++) {
-        const tTask = tList.tasks[ti];
-        const taskId = stdTaskId(category, li, ti);
-        const oldTask = oldTaskList?.tasks.find((t) => t.id === taskId);
-
-        const mergedSubtasks: WorkspaceProgressSubtask[] = [];
-
-        for (let si = 0; si < tTask.subtasks.length; si++) {
-          const subtaskId = stdSubtaskId(category, li, ti, si);
-          const oldSub =
-            findSubtaskInBlock(existing, subtaskId) ??
-            oldTask?.subtasks.find((s) => s.id === subtaskId);
-          const defaultCompleted =
-            !persisted && completedSet.has(category);
-          mergedSubtasks.push({
-            id: subtaskId,
-            title: tTask.subtasks[si].title,
-            standard: true,
-            completed: oldSub ? oldSub.completed : defaultCompleted,
-          });
-        }
-
-        if (oldTask) {
-          for (const s of oldTask.subtasks) {
-            if (!templateSubtaskIds.has(s.id)) {
-              mergedSubtasks.push({ ...s });
-            }
-          }
-        }
-
-        mergedTasks.push({
-          id: taskId,
-          title: tTask.title,
-          standard: true,
-          completed: false,
-          subtasks: mergedSubtasks,
-        });
-      }
-
-      if (oldTaskList) {
-        for (const t of oldTaskList.tasks) {
-          if (!templateTaskIds.has(t.id) && t.id.startsWith("cust:")) {
-            mergedTasks.push({
-              id: t.id,
-              title: t.title,
-              standard: false,
-              completed: t.completed,
-              subtasks: t.subtasks.map((s) => ({ ...s })),
-            });
-          }
-        }
-      }
-
       mergedTaskLists.push({
         id: taskListId,
         title: tList.title,
         standard: true,
-        tasks: mergedTasks,
+        tasks: mergeTasksForStandardTaskList(
+          category,
+          li,
+          tList,
+          oldTaskList,
+          existing,
+          templateSubtaskIds,
+          templateTaskIds,
+          persisted,
+          completedSet,
+        ),
       });
     }
 
@@ -746,4 +856,88 @@ export function setAllLeavesInCategory(
     }
   }
   return next;
+}
+
+function arrayMoveByIndex<T>(array: T[], from: number, to: number): T[] {
+  const newArray = array.slice();
+  const [removed] = newArray.splice(from, 1);
+  newArray.splice(to, 0, removed);
+  return newArray;
+}
+
+export function moveTaskInCategory(
+  checklist: WorkspaceProgressChecklist,
+  category: ProfessionalJobCategory,
+  taskId: string,
+  targetTaskListId: string,
+  targetIndex: number,
+): WorkspaceProgressChecklist | null {
+  const next = cloneChecklist(checklist);
+  const block = next[category];
+  if (!block) return null;
+
+  let sourceList: WorkspaceProgressTaskList | undefined;
+  let task: WorkspaceProgressTask | undefined;
+  let sourceIndex = -1;
+
+  for (const list of block.taskLists) {
+    const idx = list.tasks.findIndex((t) => t.id === taskId);
+    if (idx !== -1) {
+      sourceList = list;
+      task = list.tasks[idx];
+      sourceIndex = idx;
+      break;
+    }
+  }
+  if (!task || !sourceList) return null;
+
+  const targetList = block.taskLists.find((l) => l.id === targetTaskListId);
+  if (!targetList) return null;
+
+  const clampedTarget = Math.max(
+    0,
+    Math.min(targetIndex, targetList.tasks.length),
+  );
+
+  if (sourceList.id === targetList.id) {
+    if (sourceIndex === clampedTarget) return null;
+    sourceList.tasks = arrayMoveByIndex(
+      sourceList.tasks,
+      sourceIndex,
+      clampedTarget,
+    );
+    return next;
+  }
+
+  sourceList.tasks.splice(sourceIndex, 1);
+  const insertIndex = Math.max(
+    0,
+    Math.min(clampedTarget, targetList.tasks.length),
+  );
+  targetList.tasks.splice(insertIndex, 0, task);
+  return next;
+}
+
+export function reorderSubtasksInTask(
+  checklist: WorkspaceProgressChecklist,
+  category: ProfessionalJobCategory,
+  taskId: string,
+  orderedSubtaskIds: string[],
+): WorkspaceProgressChecklist | null {
+  const next = cloneChecklist(checklist);
+  const block = next[category];
+  if (!block) return null;
+
+  for (const list of block.taskLists) {
+    const task = list.tasks.find((t) => t.id === taskId);
+    if (!task) continue;
+
+    const byId = new Map(task.subtasks.map((s) => [s.id, s]));
+    if (orderedSubtaskIds.length !== task.subtasks.length) return null;
+    if (!orderedSubtaskIds.every((id) => byId.has(id))) return null;
+
+    task.subtasks = orderedSubtaskIds.map((id) => byId.get(id)!);
+    return next;
+  }
+  return null;
 }
