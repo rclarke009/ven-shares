@@ -254,7 +254,11 @@ export function WorkspaceMessagesPanel({
               {refreshPending ? "Refreshing…" : "Refresh"}
             </button>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Message boards
+            </p>
+            <div className="flex flex-wrap gap-2">
             {boards.map(({ category, label }) => {
               const param = boardParamFromCategory(category);
               const isActive = param === activeBoardParam;
@@ -273,6 +277,7 @@ export function WorkspaceMessagesPanel({
                 </button>
               );
             })}
+            </div>
           </div>
         </div>
 
@@ -362,7 +367,7 @@ export function WorkspaceMessagesPanel({
                   <p className="text-sm text-slate-800 mt-1 whitespace-pre-wrap">
                     {m.body}
                   </p>
-                  <div className="flex flex-wrap items-center gap-2 mt-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mt-2">
                     <button
                       type="button"
                       onClick={() => setReplyToId(m.id)}

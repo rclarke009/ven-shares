@@ -11,6 +11,7 @@ import {
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   useEffect,
+  useMemo,
   useState,
   useTransition,
 } from "react";
@@ -26,6 +27,9 @@ import type { WorkspaceProgressChecklist } from "@/lib/workspace-progress-checkl
 import {
   boardParamFromCategory,
   messageActivityBoardSuffix,
+  messageBoardLabel,
+  resolveBoardCategory,
+  TEAM_BOARD_PARAM,
 } from "@/lib/workspace-message-boards";
 
 import { EditProjectForm } from "@/components/dashboard/edit-project-form";
@@ -240,6 +244,32 @@ export function WorkspaceShell({
   );
   const [, startTransition] = useTransition();
 
+  const messageBoardCategories = useMemo(
+    () =>
+      requiredJobCategories.length > 0
+        ? requiredJobCategories
+        : progressCategoryStatuses.map((s) => s.category),
+    [requiredJobCategories, progressCategoryStatuses],
+  );
+
+  const messageBoards = useMemo(
+    () => [
+      { category: null as string | null, label: messageBoardLabel(null) },
+      ...messageBoardCategories.map((category) => ({
+        category,
+        label: messageBoardLabel(category),
+      })),
+    ],
+    [messageBoardCategories],
+  );
+
+  const activeBoardCategory = useMemo(() => {
+    const boardParam = searchParams.get("board") ?? initialBoardParam;
+    return resolveBoardCategory(boardParam, messageBoardCategories);
+  }, [searchParams, initialBoardParam, messageBoardCategories]);
+
+  const activeBoardParam = boardParamFromCategory(activeBoardCategory);
+
   useEffect(() => {
     const t = searchParams.get("tab");
     if (t) setTabState(resolveTabId(t, isProjectOwner));
@@ -263,6 +293,20 @@ export function WorkspaceShell({
     setTabState(next);
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", next);
+    if (next === "messages" && !params.get("board")) {
+      params.set("board", TEAM_BOARD_PARAM);
+    }
+    startTransition(() => {
+      router.replace(`${pathname}?${params.toString()}`);
+    });
+  }
+
+  function setMessageBoard(category: string | null) {
+    setTabState("messages");
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", "messages");
+    params.set("board", boardParamFromCategory(category));
+    params.delete("m");
     startTransition(() => {
       router.replace(`${pathname}?${params.toString()}`);
     });
@@ -270,22 +314,49 @@ export function WorkspaceShell({
 
   return (
     <div className="flex min-h-[calc(100vh-4rem)] bg-[#e8eef5]">
-      <aside className="w-52 shrink-0 bg-slate-700 text-slate-100 flex flex-col border-r border-slate-600">
+      <aside className="w-60 shrink-0 bg-slate-700 text-slate-100 flex flex-col border-r border-slate-600">
         <nav className="flex flex-col gap-0.5 p-3 pt-6">
           {TABS.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setTab(id)}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors ${
-                tab === id
-                  ? "bg-slate-500/80 text-white"
-                  : "text-slate-200 hover:bg-slate-600/80"
-              }`}
-            >
-              <Icon className="h-5 w-5 shrink-0 opacity-90" aria-hidden />
-              {label}
-            </button>
+            <div key={id}>
+              <button
+                type="button"
+                onClick={() => setTab(id)}
+                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+                  tab === id
+                    ? "bg-slate-500/80 text-white"
+                    : "text-slate-200 hover:bg-slate-600/80"
+                }`}
+              >
+                <Icon className="h-5 w-5 shrink-0 opacity-90" aria-hidden />
+                {label}
+              </button>
+              {id === "messages" && tab === "messages" ? (
+                <ul
+                  className="mt-1 ml-4 space-y-0.5 border-l border-slate-600 pl-2"
+                  aria-label="Message boards"
+                >
+                  {messageBoards.map(({ category, label: boardLabel }) => {
+                    const param = boardParamFromCategory(category);
+                    const isActive = param === activeBoardParam;
+                    return (
+                      <li key={param}>
+                        <button
+                          type="button"
+                          onClick={() => setMessageBoard(category)}
+                          className={`block w-full rounded-md px-2 py-1.5 text-left text-xs leading-snug transition-colors ${
+                            isActive
+                              ? "bg-slate-600/90 font-semibold text-white"
+                              : "text-slate-300 hover:bg-slate-600/60 hover:text-white"
+                          }`}
+                        >
+                          {boardLabel}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : null}
+            </div>
           ))}
           {isProjectOwner ? (
             <button
@@ -402,11 +473,7 @@ export function WorkspaceShell({
               projectId={projectId}
               currentUserId={currentUserId}
               isProjectOwner={isProjectOwner}
-              requiredJobCategories={
-                requiredJobCategories.length > 0
-                  ? requiredJobCategories
-                  : progressCategoryStatuses.map((s) => s.category)
-              }
+              requiredJobCategories={messageBoardCategories}
               messages={messages}
               nameMap={nameMap}
               highlightMessageId={highlightMessageId}
