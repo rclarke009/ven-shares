@@ -13,6 +13,13 @@ export const VEN_ROLE_METADATA_KEY = "venRole" as const;
 
 export type VenRole = "inventor" | "professional";
 
+/** Drives Clerk UserButton modal pages and menu links from server-known auth state. */
+export type VenUserButtonProfileMode =
+  | "signed-out"
+  | "inventor"
+  | "professional-incomplete"
+  | "professional-complete";
+
 export function isVenRole(value: unknown): value is VenRole {
   return value === "inventor" || value === "professional";
 }

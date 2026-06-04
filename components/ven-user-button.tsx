@@ -8,6 +8,7 @@ import { isProfessionalOnboardingComplete } from "@/lib/professional-onboarding"
 import {
   getVenRoleFromPublicMetadata,
   isProfessionalVenRole,
+  type VenUserButtonProfileMode,
 } from "@/lib/ven-role";
 
 const userButtonAppearance = {
@@ -17,20 +18,44 @@ const userButtonAppearance = {
   },
 };
 
-export function VenUserButton() {
+function resolveProfileModeFromClient(
+  isLoaded: boolean,
+  meta: Record<string, unknown>,
+): VenUserButtonProfileMode | undefined {
+  if (!isLoaded) return undefined;
+  const role = getVenRoleFromPublicMetadata(meta);
+  if (role === "inventor") return "inventor";
+  if (role === "professional") {
+    return isProfessionalOnboardingComplete(meta)
+      ? "professional-complete"
+      : "professional-incomplete";
+  }
+  return "signed-out";
+}
+
+type VenUserButtonProps = {
+  profileMode?: VenUserButtonProfileMode;
+};
+
+export function VenUserButton({ profileMode: profileModeProp }: VenUserButtonProps) {
   const { user, isLoaded } = useUser();
 
   const username = isLoaded ? user?.username?.trim() : null;
 
   const meta = (user?.publicMetadata ?? {}) as Record<string, unknown>;
-  const role = getVenRoleFromPublicMetadata(meta);
-  const isProfessional = isProfessionalVenRole(role);
-  const onboardingComplete = isProfessionalOnboardingComplete(meta);
+  const profileMode =
+    profileModeProp ?? resolveProfileModeFromClient(isLoaded, meta);
+
+  const showSkillsPages = profileMode === "professional-complete";
+  const showOnboardingLink = profileMode === "professional-incomplete";
 
   return (
     <div className="flex flex-col items-center gap-0.5 shrink-0">
-      <UserButton appearance={userButtonAppearance}>
-        {isLoaded && isProfessional && onboardingComplete ? (
+      <UserButton
+        key={profileMode ?? "loading"}
+        appearance={userButtonAppearance}
+      >
+        {showSkillsPages ? (
           <>
             <UserButton.UserProfilePage
               label="Skills & availability"
@@ -41,9 +66,16 @@ export function VenUserButton() {
             </UserButton.UserProfilePage>
             <UserButton.UserProfilePage label="account" />
             <UserButton.UserProfilePage label="security" />
+            <UserButton.MenuItems>
+              <UserButton.UserProfileLink
+                label="Skills & availability"
+                url="skills"
+                labelIcon={<Briefcase className="size-4" aria-hidden />}
+              />
+            </UserButton.MenuItems>
           </>
         ) : null}
-        {isLoaded && isProfessional && !onboardingComplete ? (
+        {showOnboardingLink ? (
           <UserButton.MenuItems>
             <UserButton.Link
               href="/onboarding/professional"

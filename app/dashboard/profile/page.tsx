@@ -3,7 +3,7 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
 import { VenSharesLogo } from "@/components/venshares-logo";
-import { VenUserButton } from "@/components/ven-user-button";
+import { VenUserButtonFromServer } from "@/components/ven-user-button-from-server";
 import { updateProfessionalProfileSkills } from "@/app/dashboard/profile/actions";
 import { ProfessionalOnboardingForm } from "@/components/onboarding/professional-onboarding-form";
 import {
@@ -50,7 +50,7 @@ export default async function ProfessionalProfilePage() {
             >
               Idea Arena
             </Link>
-            <VenUserButton />
+            <VenUserButtonFromServer />
           </div>
         </div>
       </header>

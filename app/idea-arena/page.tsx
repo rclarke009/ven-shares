@@ -14,7 +14,10 @@ import {
 } from "@/lib/arena-skill-filter";
 import { listProjectsForArenaForViewer } from "@/lib/projects-arena";
 import { getProfessionalJobCategoriesFromMetadata } from "@/lib/skills-match";
-import { getVenRoleForCurrentUser } from "@/lib/ven-role.server";
+import {
+  getVenRoleForCurrentUser,
+  getVenUserButtonProfileMode,
+} from "@/lib/ven-role.server";
 
 export default async function IdeaArenaPage({
   searchParams,
@@ -58,9 +61,11 @@ export default async function IdeaArenaPage({
     parsed.mode === "mine" &&
     professionalCategories.length === 0;
 
+  const profileMode = await getVenUserButtonProfileMode();
+
   return (
     <div className="min-h-screen bg-[#f8fafc] flex flex-col">
-      <ArenaHeader />
+      <ArenaHeader profileMode={profileMode} />
       <section className="hero-bg py-14 md:py-20 px-6 text-center">
         <p className="text-lg md:text-2xl text-white max-w-3xl mx-auto font-medium drop-shadow-md">
           If you find a job you love, you&apos;ll never work again...
@@ -84,12 +89,16 @@ export default async function IdeaArenaPage({
         ) : emptyMineNoProfile ? (
           <p className="text-slate-600 text-sm max-w-lg">
             Add your job categories to your profile to see jobs that match your
-            skills.{" "}
+            skills. Open your account menu (top right) → Manage account →{" "}
+            <span className="font-medium text-slate-800">
+              Skills &amp; availability
+            </span>
+            , or{" "}
             <Link
               href="/dashboard/profile"
               className="text-[#22c55e] font-medium hover:underline"
             >
-              Edit profile skills
+              edit on the full profile page
             </Link>
             .
           </p>

@@ -10,6 +10,7 @@ import {
   type WorkspaceRosterEntryDTO,
 } from "@/components/workspace/workspace-shell";
 import { getProjectByIdForArena, isProjectUuid } from "@/lib/projects-arena";
+import { getVenUserButtonProfileMode } from "@/lib/ven-role.server";
 import { loadWorkspaceOrganizerBundle } from "@/lib/workspace-organizer-bundle.server";
 import {
   boardParamFromCategory,
@@ -221,9 +222,11 @@ export default async function WorkspacePage({ params, searchParams }: PageProps)
     notFound();
   }
 
+  const profileMode = await getVenUserButtonProfileMode();
+
   return (
     <div className="min-h-screen bg-[#f8fafc] flex flex-col">
-      <ArenaHeader />
+      <ArenaHeader profileMode={profileMode} />
       <Suspense fallback={<WorkspaceFallback />}>
         <WorkspacePageContent
           projectId={projectId}

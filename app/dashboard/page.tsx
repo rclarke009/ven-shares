@@ -6,7 +6,7 @@ import { DashboardAddProjectHeader } from "@/components/dashboard/dashboard-add-
 import { DashboardProfessionalHeader } from "@/components/dashboard/dashboard-professional-header";
 import { DashboardProjectProgressStack } from "@/components/dashboard/dashboard-project-progress-stack";
 import { VenSharesLogo } from "@/components/venshares-logo";
-import { VenUserButton } from "@/components/ven-user-button";
+import { VenUserButtonFromServer } from "@/components/ven-user-button-from-server";
 import { listProjectsForCurrentUser } from "@/app/dashboard/projects/actions";
 import { listJoinedProjectsForCurrentUser } from "@/lib/project-members";
 import { getVenRoleForCurrentUser } from "@/lib/ven-role.server";
@@ -58,7 +58,7 @@ export default async function DashboardPage() {
             >
               Idea Arena
             </Link>
-            <VenUserButton />
+            <VenUserButtonFromServer />
           </div>
         </div>
       </header>
@@ -68,13 +68,7 @@ export default async function DashboardPage() {
             <DashboardProfessionalHeader />
             {joinedProjects.length === 0 ? (
               <p className="text-slate-600 text-sm mb-10">
-                You haven&apos;t joined a team yet.{" "}
-                <Link
-                  href="/idea-arena"
-                  className="font-medium text-[#22c55e] hover:underline"
-                >
-                  Browse Idea Arena
-                </Link>{" "}
+                You haven&apos;t joined a team yet. Use Idea Arena in the header
                 to find projects that match your skills.
               </p>
             ) : (

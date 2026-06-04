@@ -16,7 +16,10 @@ import {
   getProfessionalJoinSkillBlockReason,
   normalizeRequiredJobCategoriesFromDb,
 } from "@/lib/skills-match";
-import { getVenRoleForCurrentUser } from "@/lib/ven-role.server";
+import {
+  getVenRoleForCurrentUser,
+  getVenUserButtonProfileMode,
+} from "@/lib/ven-role.server";
 import { getWorkspaceAccessFlags } from "@/lib/workspace-access";
 
 type PageProps = {
@@ -93,9 +96,11 @@ export default async function IdeaArenaProjectPage({
     }
   }
 
+  const profileMode = await getVenUserButtonProfileMode();
+
   return (
     <div className="min-h-screen bg-[#f8fafc] flex flex-col">
-      <ArenaHeader />
+      <ArenaHeader profileMode={profileMode} />
       <main className="flex-1">
         <ProjectDetailView
           project={project}

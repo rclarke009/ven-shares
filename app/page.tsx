@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { Show, SignInButton } from '@clerk/nextjs';
 
 import { VenSharesLogo } from '@/components/venshares-logo';
-import { VenUserButton } from '@/components/ven-user-button';
+import { VenUserButtonFromServer } from '@/components/ven-user-button-from-server';
 
 const NAV_LINKS = [
   { label: 'INVENT', href: '#inventors' },
@@ -108,7 +108,7 @@ export default function LandingPage() {
               <Link href="/dashboard" className="ven-cta text-sm px-6 lg:px-8 py-3">
                 Dashboard
               </Link>
-              <VenUserButton />
+              <VenUserButtonFromServer />
             </Show>
           </div>
 
@@ -137,7 +137,7 @@ export default function LandingPage() {
                     Dashboard
                   </Link>
                   <div className="flex justify-center pt-1">
-                    <VenUserButton />
+                    <VenUserButtonFromServer />
                   </div>
                 </Show>
               </div>

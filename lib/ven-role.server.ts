@@ -9,6 +9,7 @@ import {
   getVenRoleFromPublicMetadata,
   isProfessionalVenRole,
   type VenRole,
+  type VenUserButtonProfileMode,
 } from "./ven-role";
 
 /**
@@ -47,4 +48,23 @@ export async function isCurrentUserProfessionalOnboardingComplete(): Promise<boo
   return isProfessionalOnboardingComplete(
     user.publicMetadata as Record<string, unknown>,
   );
+}
+
+/**
+ * Server-only: stable profile mode for VenUserButton (avoids client isLoaded mount race).
+ */
+export async function getVenUserButtonProfileMode(): Promise<VenUserButtonProfileMode> {
+  const user = await currentUser();
+  if (!user) return "signed-out";
+
+  const meta = user.publicMetadata as Record<string, unknown>;
+  const role = getVenRoleFromPublicMetadata(meta);
+
+  if (role === "inventor") return "inventor";
+  if (role === "professional") {
+    return isProfessionalOnboardingComplete(meta)
+      ? "professional-complete"
+      : "professional-incomplete";
+  }
+  return "signed-out";
 }
