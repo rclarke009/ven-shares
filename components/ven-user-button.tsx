@@ -56,24 +56,28 @@ export function VenUserButton({ profileMode: profileModeProp }: VenUserButtonPro
         appearance={userButtonAppearance}
       >
         {showSkillsPages ? (
-          <>
-            <UserButton.UserProfilePage
+          <UserButton.UserProfilePage
+            label="Skills & availability"
+            url="skills"
+            labelIcon={<Briefcase className="size-4" aria-hidden />}
+          >
+            <ProfessionalSkillsProfilePanel />
+          </UserButton.UserProfilePage>
+        ) : null}
+        {showSkillsPages ? (
+          <UserButton.UserProfilePage label="account" />
+        ) : null}
+        {showSkillsPages ? (
+          <UserButton.UserProfilePage label="security" />
+        ) : null}
+        {showSkillsPages ? (
+          <UserButton.MenuItems>
+            <UserButton.Action
               label="Skills & availability"
-              url="skills"
               labelIcon={<Briefcase className="size-4" aria-hidden />}
-            >
-              <ProfessionalSkillsProfilePanel />
-            </UserButton.UserProfilePage>
-            <UserButton.UserProfilePage label="account" />
-            <UserButton.UserProfilePage label="security" />
-            <UserButton.MenuItems>
-              <UserButton.UserProfileLink
-                label="Skills & availability"
-                url="skills"
-                labelIcon={<Briefcase className="size-4" aria-hidden />}
-              />
-            </UserButton.MenuItems>
-          </>
+              open="skills"
+            />
+          </UserButton.MenuItems>
         ) : null}
         {showOnboardingLink ? (
           <UserButton.MenuItems>
