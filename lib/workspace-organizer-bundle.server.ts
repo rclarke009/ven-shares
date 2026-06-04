@@ -12,6 +12,7 @@ import type { ProfessionalJobCategory } from "@/lib/professional-onboarding";
 import type { ArenaCategorySlot } from "@/lib/projects-arena";
 import { getProjectByIdForArena, isProjectUuid } from "@/lib/projects-arena";
 import { getProfessionalJobCategoriesFromMetadata } from "@/lib/skills-match";
+import { canAccessWorkspace } from "@/lib/workspace-access";
 import { resolveClerkDisplayNames } from "@/lib/workspace-display-names";
 import { ensureWorkspaceProgressChecklistSynced } from "@/lib/workspace-progress-sync";
 import type { WorkspaceProgressChecklist } from "@/lib/workspace-progress-checklist";
@@ -34,8 +35,10 @@ export type WorkspaceOrganizerBundle = {
 };
 
 type LoadOptions = {
-  /** When true, only the project owner may load (dashboard). */
+  /** When true, only the project owner may load (inventor dashboard). */
   ownerOnly?: boolean;
+  /** When true, require owner or team membership via workspace access. */
+  requireAccess?: boolean;
 };
 
 /**
@@ -51,8 +54,10 @@ export async function loadWorkspaceOrganizerBundle(
   const meta = await getWorkspaceProjectMeta(projectId);
   if (!meta) return null;
 
-  if (options.ownerOnly && meta.clerk_user_id !== userId) {
-    return null;
+  if (options.ownerOnly) {
+    if (meta.clerk_user_id !== userId) return null;
+  } else if (options.requireAccess) {
+    if (!(await canAccessWorkspace(projectId, userId))) return null;
   }
 
   const progressBundle = await ensureWorkspaceProgressChecklistSynced(projectId);
@@ -128,6 +133,18 @@ export async function loadWorkspaceOrganizerBundlesForOwner(
   const results = await Promise.all(
     projectIds.map((id) =>
       loadWorkspaceOrganizerBundle(id, userId, { ownerOnly: true }),
+    ),
+  );
+  return results.filter((b): b is WorkspaceOrganizerBundle => b !== null);
+}
+
+export async function loadWorkspaceOrganizerBundlesForMember(
+  projectIds: string[],
+  userId: string,
+): Promise<WorkspaceOrganizerBundle[]> {
+  const results = await Promise.all(
+    projectIds.map((id) =>
+      loadWorkspaceOrganizerBundle(id, userId, { requireAccess: true }),
     ),
   );
   return results.filter((b): b is WorkspaceOrganizerBundle => b !== null);

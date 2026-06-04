@@ -41,6 +41,52 @@ export async function getMembershipForCurrentUser(
   return data != null;
 }
 
+export type JoinedProjectRow = {
+  id: string;
+  title: string;
+  joinedAt: string;
+};
+
+export async function listJoinedProjectsForCurrentUser(): Promise<
+  JoinedProjectRow[]
+> {
+  const { userId } = await auth();
+  if (!userId) return [];
+
+  const venRole = await getVenRoleForCurrentUser();
+  if (venRole !== "professional") return [];
+
+  const supabase = createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("project_members")
+    .select("created_at, projects ( id, title )")
+    .eq("clerk_user_id", userId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.log("MYDEBUG →", error.message);
+    return [];
+  }
+
+  const rows: JoinedProjectRow[] = [];
+  for (const row of data ?? []) {
+    const project = row.projects as
+      | { id: string; title: string }
+      | { id: string; title: string }[]
+      | null;
+    const p = Array.isArray(project) ? project[0] : project;
+    if (!p?.id || typeof p.title !== "string") continue;
+    if (!isProjectUuid(p.id)) continue;
+    rows.push({
+      id: p.id,
+      title: p.title,
+      joinedAt: row.created_at as string,
+    });
+  }
+
+  return rows;
+}
+
 export async function joinProjectAsProfessional(
   projectId: string,
 ): Promise<JoinProjectResult> {

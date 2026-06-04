@@ -19,11 +19,13 @@ function formatDate(iso: string) {
 type DashboardProjectProgressCardProps = {
   bundle: WorkspaceOrganizerBundle;
   currentUserId: string;
+  isProjectOwner?: boolean;
 };
 
 export function DashboardProjectProgressCard({
   bundle,
   currentUserId,
+  isProjectOwner = true,
 }: DashboardProjectProgressCardProps) {
   const { done, total } = countChecklistLeaves(bundle.checklist);
   const workspaceHref = `/idea-arena/${bundle.projectId}/workspace?tab=organizer`;
@@ -55,12 +57,14 @@ export function DashboardProjectProgressCard({
           >
             Open workspace
           </Link>
-          <Link
-            href={settingsHref}
-            className="font-medium text-slate-600 hover:text-[#22c55e] hover:underline"
-          >
-            Arena Card Details
-          </Link>
+          {isProjectOwner ? (
+            <Link
+              href={settingsHref}
+              className="font-medium text-slate-600 hover:text-[#22c55e] hover:underline"
+            >
+              Arena Card Details
+            </Link>
+          ) : null}
         </div>
       </header>
       <div className="px-4 py-4 sm:px-5 sm:py-5">
@@ -74,7 +78,7 @@ export function DashboardProjectProgressCard({
           nameMap={bundle.nameMap}
           currentUserId={currentUserId}
           viewerCoveredCategories={bundle.viewerCoveredCategories}
-          isProjectOwner={true}
+          isProjectOwner={isProjectOwner}
         />
       </div>
     </article>

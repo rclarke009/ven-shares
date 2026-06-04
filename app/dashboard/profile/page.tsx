@@ -59,8 +59,9 @@ export default async function ProfessionalProfilePage() {
           Edit profile skills
         </h1>
         <p className="text-slate-600 mb-8 text-sm leading-relaxed">
-          Update your job categories and weekly availability. Account email,
-          password, and security are managed from your profile menu (top right).
+          Update your job categories, weekly availability, and profile photo.
+          You can also edit categories and hours from your account menu (top
+          right) → Manage account → Skills &amp; availability.
         </p>
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <ProfessionalOnboardingForm
@@ -71,6 +72,8 @@ export default async function ProfessionalProfilePage() {
             formAction={updateProfessionalProfileSkills}
             submitLabel="Save profile"
             showOnboardingCopy={false}
+            variant="full"
+            showProfilePhoto
           />
         </div>
       </main>

@@ -24,6 +24,9 @@ export type ProfessionalOnboardingFormProps = {
   ) => Promise<ProfessionalOnboardingActionState>;
   submitLabel: string;
   showOnboardingCopy?: boolean;
+  /** When false, omit photo block (e.g. Clerk Account tab handles avatar in modal). */
+  showProfilePhoto?: boolean;
+  variant?: "full" | "compact";
 };
 
 export function ProfessionalOnboardingForm({
@@ -33,6 +36,8 @@ export function ProfessionalOnboardingForm({
   formAction,
   submitLabel,
   showOnboardingCopy = true,
+  showProfilePhoto = true,
+  variant = "full",
 }: ProfessionalOnboardingFormProps) {
   const [selected, setSelected] = useState<string[]>(() => [
     ...initialCategories,
@@ -60,8 +65,14 @@ export function ProfessionalOnboardingForm({
     ? "We use this to personalize projects you see in the Idea Arena."
     : "We use this for Idea Arena matching and Join Team eligibility.";
 
+  const isCompact = variant === "compact";
+  const formSpacing = isCompact ? "space-y-4" : "space-y-8";
+  const categoryGrid = isCompact ? "grid gap-2" : "grid gap-2 sm:grid-cols-2";
+  const categoryLabelPadding = isCompact ? "px-3 py-2" : "px-3 py-2.5";
+  const hoursFieldId = isCompact ? "hours_compact" : "hours";
+
   return (
-    <form action={submitAction} className="space-y-8">
+    <form action={submitAction} className={formSpacing}>
       {state.error ? (
         <p
           className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-4 py-3"
@@ -71,53 +82,59 @@ export function ProfessionalOnboardingForm({
         </p>
       ) : null}
 
-      <div className="rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-4 space-y-3">
-        <p className="text-sm font-semibold text-slate-900">Profile photo</p>
-        <p className="text-xs text-slate-600 leading-relaxed">
-          Optional. Shown next to your name when you join Idea Arena teams (JPEG,
-          PNG, or WebP, up to 5 MB).
-        </p>
-        <div className="flex flex-wrap items-center gap-4">
-          {initialProfileImageUrl ? (
-            <Image
-              src={initialProfileImageUrl}
-              alt=""
-              width={72}
-              height={72}
-              className="rounded-full object-cover border-2 border-white shadow-sm"
-            />
-          ) : (
-            <div
-              className="flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-full border border-dashed border-slate-300 bg-white text-center text-[11px] text-slate-500 px-1 leading-tight"
-              aria-hidden
-            >
-              No photo yet
+      {showProfilePhoto ? (
+        <div className="rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-4 space-y-3">
+          <p className="text-sm font-semibold text-slate-900">Profile photo</p>
+          <p className="text-xs text-slate-600 leading-relaxed">
+            Optional. Shown next to your name when you join Idea Arena teams
+            (JPEG, PNG, or WebP, up to 5 MB).
+          </p>
+          <div className="flex flex-wrap items-center gap-4">
+            {initialProfileImageUrl ? (
+              <Image
+                src={initialProfileImageUrl}
+                alt=""
+                width={72}
+                height={72}
+                className="rounded-full object-cover border-2 border-white shadow-sm"
+              />
+            ) : (
+              <div
+                className="flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-full border border-dashed border-slate-300 bg-white text-center text-[11px] text-slate-500 px-1 leading-tight"
+                aria-hidden
+              >
+                No photo yet
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <label
+                htmlFor="profile_photo"
+                className="text-xs font-medium text-slate-700 block mb-1"
+              >
+                Upload or replace
+              </label>
+              <input
+                id="profile_photo"
+                name="profile_photo"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="block w-full max-w-xs text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-xs file:font-medium file:text-slate-800 hover:file:bg-slate-200"
+              />
             </div>
-          )}
-          <div className="min-w-0 flex-1">
-            <label
-              htmlFor="profile_photo"
-              className="text-xs font-medium text-slate-700 block mb-1"
-            >
-              Upload or replace
-            </label>
-            <input
-              id="profile_photo"
-              name="profile_photo"
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              className="block w-full max-w-xs text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-xs file:font-medium file:text-slate-800 hover:file:bg-slate-200"
-            />
           </div>
         </div>
-      </div>
+      ) : null}
 
       <fieldset className="space-y-3">
         <legend className="text-sm font-semibold text-slate-900 mb-2 block">
           {categoriesLegend}
         </legend>
-        <p className="text-sm text-slate-600 mb-3">{categoriesBlurb}</p>
-        <ul className="grid gap-2 sm:grid-cols-2">
+        <p
+          className={`text-slate-600 mb-3 ${isCompact ? "text-xs" : "text-sm"}`}
+        >
+          {categoriesBlurb}
+        </p>
+        <ul className={categoryGrid}>
           {PROFESSIONAL_JOB_CATEGORY_OPTIONS.map((cat) => {
             const isChecked = selected.includes(cat);
             const atCap = selected.length >= MAX_CATEGORIES;
@@ -125,7 +142,7 @@ export function ProfessionalOnboardingForm({
             return (
               <li key={cat}>
                 <label
-                  className={`flex items-start gap-3 rounded-lg border px-3 py-2.5 cursor-pointer transition-colors ${
+                  className={`flex items-start gap-3 rounded-lg border ${categoryLabelPadding} cursor-pointer transition-colors ${
                     isChecked
                       ? "border-[#22c55e] bg-green-50/50"
                       : disabled
@@ -155,16 +172,16 @@ export function ProfessionalOnboardingForm({
 
       <div>
         <label
-          htmlFor="hours"
+          htmlFor={hoursFieldId}
           className="text-sm font-semibold text-slate-900 block mb-2"
         >
           Hours per week
         </label>
         <select
-          id="hours"
+          id={hoursFieldId}
           name="hours"
           required
-          className="w-full max-w-md rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-[#22c55e] focus:outline-none focus:ring-2 focus:ring-[#22c55e]/20"
+          className={`w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-[#22c55e] focus:outline-none focus:ring-2 focus:ring-[#22c55e]/20 ${isCompact ? "" : "max-w-md"}`}
           defaultValue={initialHours || ""}
         >
           <option value="" disabled>
@@ -181,7 +198,9 @@ export function ProfessionalOnboardingForm({
       <button
         type="submit"
         disabled={pending}
-        className="inline-flex items-center justify-center rounded-full bg-[#22c55e] px-8 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#16a34a] disabled:opacity-60 transition-colors"
+        className={`inline-flex items-center justify-center rounded-full bg-[#22c55e] text-sm font-semibold text-white shadow-sm hover:bg-[#16a34a] disabled:opacity-60 transition-colors ${
+          isCompact ? "w-full px-6 py-2.5" : "px-8 py-3"
+        }`}
       >
         {pending ? "Saving…" : submitLabel}
       </button>

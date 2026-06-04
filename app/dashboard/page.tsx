@@ -3,12 +3,17 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
 import { DashboardAddProjectHeader } from "@/components/dashboard/dashboard-add-project-header";
+import { DashboardProfessionalHeader } from "@/components/dashboard/dashboard-professional-header";
 import { DashboardProjectProgressStack } from "@/components/dashboard/dashboard-project-progress-stack";
 import { VenSharesLogo } from "@/components/venshares-logo";
 import { VenUserButton } from "@/components/ven-user-button";
 import { listProjectsForCurrentUser } from "@/app/dashboard/projects/actions";
+import { listJoinedProjectsForCurrentUser } from "@/lib/project-members";
 import { getVenRoleForCurrentUser } from "@/lib/ven-role.server";
-import { loadWorkspaceOrganizerBundlesForOwner } from "@/lib/workspace-organizer-bundle.server";
+import {
+  loadWorkspaceOrganizerBundlesForMember,
+  loadWorkspaceOrganizerBundlesForOwner,
+} from "@/lib/workspace-organizer-bundle.server";
 
 export default async function DashboardPage() {
   const { userId } = await auth();
@@ -20,10 +25,23 @@ export default async function DashboardPage() {
   const projects =
     venRole === "inventor" ? await listProjectsForCurrentUser() : [];
 
+  const joinedProjects =
+    venRole === "professional"
+      ? await listJoinedProjectsForCurrentUser()
+      : [];
+
   const bundles =
     venRole === "inventor" && projects.length > 0
       ? await loadWorkspaceOrganizerBundlesForOwner(
           projects.map((p) => p.id),
+          userId,
+        )
+      : [];
+
+  const professionalBundles =
+    joinedProjects.length > 0
+      ? await loadWorkspaceOrganizerBundlesForMember(
+          joinedProjects.map((p) => p.id),
           userId,
         )
       : [];
@@ -47,28 +65,25 @@ export default async function DashboardPage() {
       <main className="max-w-3xl mx-auto px-6 py-12">
         {venRole === "professional" ? (
           <>
-            <h1 className="text-2xl font-semibold text-slate-900 mb-2">
-              Dashboard
-            </h1>
-            <p className="text-slate-600 mb-6">
-              Account type:{" "}
-              <span className="font-medium text-slate-900">
-                Skilled professional
-              </span>
-            </p>
-            <div className="mb-8 space-y-3">
-              <p className="text-slate-600 text-sm">
-                Adding projects is available to inventor accounts.
-              </p>
-              <p>
+            <DashboardProfessionalHeader />
+            {joinedProjects.length === 0 ? (
+              <p className="text-slate-600 text-sm mb-10">
+                You haven&apos;t joined a team yet.{" "}
                 <Link
-                  href="/dashboard/profile"
-                  className="text-sm font-medium text-[#22c55e] hover:underline"
+                  href="/idea-arena"
+                  className="font-medium text-[#22c55e] hover:underline"
                 >
-                  Edit profile skills
-                </Link>
+                  Browse Idea Arena
+                </Link>{" "}
+                to find projects that match your skills.
               </p>
-            </div>
+            ) : (
+              <DashboardProjectProgressStack
+                bundles={professionalBundles}
+                currentUserId={userId}
+                isProjectOwner={false}
+              />
+            )}
           </>
         ) : venRole === "inventor" ? (
           <>

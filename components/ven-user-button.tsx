@@ -1,8 +1,9 @@
 "use client";
 
 import { UserButton, useUser } from "@clerk/nextjs";
-import { ClipboardList, UserCircle } from "lucide-react";
+import { Briefcase, ClipboardList } from "lucide-react";
 
+import { ProfessionalSkillsProfilePanel } from "@/components/profile/professional-skills-profile-panel";
 import { isProfessionalOnboardingComplete } from "@/lib/professional-onboarding";
 import {
   getVenRoleFromPublicMetadata,
@@ -29,21 +30,26 @@ export function VenUserButton() {
   return (
     <div className="flex flex-col items-center gap-0.5 shrink-0">
       <UserButton appearance={userButtonAppearance}>
-        {isLoaded && isProfessional ? (
+        {isLoaded && isProfessional && onboardingComplete ? (
+          <>
+            <UserButton.UserProfilePage
+              label="Skills & availability"
+              url="skills"
+              labelIcon={<Briefcase className="size-4" aria-hidden />}
+            >
+              <ProfessionalSkillsProfilePanel />
+            </UserButton.UserProfilePage>
+            <UserButton.UserProfilePage label="account" />
+            <UserButton.UserProfilePage label="security" />
+          </>
+        ) : null}
+        {isLoaded && isProfessional && !onboardingComplete ? (
           <UserButton.MenuItems>
-            {!onboardingComplete ? (
-              <UserButton.Link
-                href="/onboarding/professional"
-                label="Complete your profile"
-                labelIcon={<ClipboardList className="size-4" aria-hidden />}
-              />
-            ) : (
-              <UserButton.Link
-                href="/dashboard/profile"
-                label="Profile & skills"
-                labelIcon={<UserCircle className="size-4" aria-hidden />}
-              />
-            )}
+            <UserButton.Link
+              href="/onboarding/professional"
+              label="Complete your profile"
+              labelIcon={<ClipboardList className="size-4" aria-hidden />}
+            />
           </UserButton.MenuItems>
         ) : null}
       </UserButton>

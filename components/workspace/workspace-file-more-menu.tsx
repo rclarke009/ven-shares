@@ -30,6 +30,7 @@ export function WorkspaceFileMoreMenu({
   onRequestArchive,
 }: WorkspaceFileMoreMenuProps) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [forwardOpen, setForwardOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -65,6 +66,80 @@ export function WorkspaceFileMoreMenu({
     const t = window.setTimeout(() => setCopied(false), 2000);
     return () => window.clearTimeout(t);
   }, [copied]);
+
+  useEffect(() => {
+    if (!open || !menuRef.current || !rootRef.current) return;
+
+    const menuRect = menuRef.current.getBoundingClientRect();
+    const rootRect = rootRef.current.getBoundingClientRect();
+    const clippingAncestors: Array<{
+      tag: string;
+      className: string;
+      overflow: string;
+      overflowY: string;
+      rect: DOMRect;
+    }> = [];
+
+    let el: HTMLElement | null = rootRef.current.parentElement;
+    while (el && el !== document.body) {
+      const style = window.getComputedStyle(el);
+      const overflow = style.overflow;
+      const overflowY = style.overflowY;
+      if (
+        overflow === "hidden" ||
+        overflow === "clip" ||
+        overflowY === "hidden" ||
+        overflowY === "clip"
+      ) {
+        clippingAncestors.push({
+          tag: el.tagName,
+          className: el.className.slice(0, 120),
+          overflow,
+          overflowY,
+          rect: el.getBoundingClientRect(),
+        });
+      }
+      el = el.parentElement;
+    }
+
+    const menuBottom = menuRect.bottom;
+    const clippedBy = clippingAncestors.filter(
+      (a) => menuBottom > a.rect.bottom || menuRect.top < a.rect.top,
+    );
+
+    // #region agent log
+    fetch("http://127.0.0.1:7631/ingest/b7a73249-9195-4c44-b33e-29a5fc0583a9", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "a8e89e",
+      },
+      body: JSON.stringify({
+        sessionId: "a8e89e",
+        location: "workspace-file-more-menu.tsx:open-effect",
+        message: "More menu opened — layout diagnostics",
+        data: {
+          menuRect: {
+            top: menuRect.top,
+            bottom: menuRect.bottom,
+            height: menuRect.height,
+          },
+          triggerRect: {
+            top: rootRect.top,
+            bottom: rootRect.bottom,
+          },
+          clippingAncestorCount: clippingAncestors.length,
+          clippingAncestors,
+          likelyClippedBy: clippedBy,
+          menuExtendsBelowTrigger: menuRect.bottom > rootRect.bottom,
+        },
+        timestamp: Date.now(),
+        hypothesisId: "A-B-E",
+        runId: "pre-fix",
+      }),
+    }).catch(() => {});
+    // #endregion
+  }, [open]);
 
   const buildInvite = useCallback(
     () =>
@@ -115,6 +190,7 @@ export function WorkspaceFileMoreMenu({
 
       {open ? (
         <div
+          ref={menuRef}
           role="menu"
           className="absolute right-0 top-full z-20 mt-1 min-w-[10.5rem] rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
           onClick={(e) => e.stopPropagation()}

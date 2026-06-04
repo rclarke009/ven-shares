@@ -7,11 +7,13 @@ import { DashboardProjectProgressCard } from "./dashboard-project-progress-card"
 type DashboardProjectProgressStackProps = {
   bundles: WorkspaceOrganizerBundle[];
   currentUserId: string;
+  isProjectOwner?: boolean;
 };
 
 export function DashboardProjectProgressStack({
   bundles,
   currentUserId,
+  isProjectOwner = true,
 }: DashboardProjectProgressStackProps) {
   const miniSummaries = toMiniProjectSummaries(bundles);
 
@@ -27,6 +29,7 @@ export function DashboardProjectProgressStack({
             key={bundle.projectId}
             bundle={bundle}
             currentUserId={currentUserId}
+            isProjectOwner={isProjectOwner}
           />
         ))}
       </div>

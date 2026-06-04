@@ -20,5 +20,6 @@ export async function joinProjectTeam(
   }
   revalidatePath("/idea-arena");
   revalidatePath(`/idea-arena/${projectId}`);
+  revalidatePath("/dashboard");
   return { ok: true, error: "" };
 }
