@@ -10,16 +10,16 @@ todos:
     status: completed
   - id: professional-header
     content: Create DashboardProfessionalHeader with teams copy + Browse Idea Arena link
-    status: in_progress
+    status: completed
   - id: role-aware-cards
     content: Add isProjectOwner prop to progress stack/card; hide Arena Card Details for members
-    status: pending
+    status: completed
   - id: dashboard-page
     content: Wire professional branch in app/dashboard/page.tsx to header + stack + empty state
-    status: pending
+    status: completed
   - id: revalidate-on-join
     content: revalidatePath('/dashboard') in app/idea-arena/actions.ts joinProjectTeam
-    status: pending
+    status: completed
 isProject: false
 ---
 

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { AnchoredMenuPanel } from "@/components/workspace/anchored-menu-panel";
 import type { ProfessionalJobCategory } from "@/lib/professional-onboarding";
 import { buildSkillRecommendInvite } from "@/lib/skill-recommend-invite";
 
@@ -19,6 +20,8 @@ export function SkillRecommendMenu({
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const close = useCallback(() => {
     setOpen(false);
@@ -43,7 +46,14 @@ export function SkillRecommendMenu({
     };
 
     const onPointerDown = (e: PointerEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) close();
+      const target = e.target as Node;
+      if (
+        rootRef.current?.contains(target) ||
+        menuRef.current?.contains(target)
+      ) {
+        return;
+      }
+      close();
     };
 
     document.addEventListener("keydown", onKeyDown);
@@ -81,6 +91,7 @@ export function SkillRecommendMenu({
   return (
     <div ref={rootRef} className="relative shrink-0">
       <button
+        ref={triggerRef}
         type="button"
         aria-expanded={open}
         aria-haspopup="menu"
@@ -94,36 +105,35 @@ export function SkillRecommendMenu({
         {copied ? "Copied!" : "Recommend Team Member"}
       </button>
 
-      {open ? (
-        <div
-          role="menu"
-          className="absolute right-0 top-full z-20 mt-1 min-w-[10.5rem] rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
-          onClick={(e) => e.stopPropagation()}
+      <AnchoredMenuPanel
+        open={open}
+        triggerRef={triggerRef}
+        menuRef={menuRef}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          role="menuitem"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleEmailInvite();
+          }}
+          className="block w-full px-3 py-2 text-left text-xs font-medium text-slate-800 hover:bg-slate-50"
         >
-          <button
-            type="button"
-            role="menuitem"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleEmailInvite();
-            }}
-            className="block w-full px-3 py-2 text-left text-xs font-medium text-slate-800 hover:bg-slate-50"
-          >
-            Email invite
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={(e) => {
-              e.stopPropagation();
-              void handleCopyLink();
-            }}
-            className="block w-full px-3 py-2 text-left text-xs font-medium text-slate-800 hover:bg-slate-50"
-          >
-            Copy invite link
-          </button>
-        </div>
-      ) : null}
+          Email invite
+        </button>
+        <button
+          type="button"
+          role="menuitem"
+          onClick={(e) => {
+            e.stopPropagation();
+            void handleCopyLink();
+          }}
+          className="block w-full px-3 py-2 text-left text-xs font-medium text-slate-800 hover:bg-slate-50"
+        >
+          Copy invite link
+        </button>
+      </AnchoredMenuPanel>
     </div>
   );
 }
