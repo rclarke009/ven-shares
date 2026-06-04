@@ -16,6 +16,7 @@ import {
   type ProjectRow,
   type UpdateProjectMediaState,
 } from "@/app/dashboard/projects/actions";
+import { arenaProjectImageUrl } from "@/components/idea-arena/utils";
 import { publicProjectImageUrl } from "@/lib/project-image-url";
 import { PROFESSIONAL_JOB_CATEGORY_OPTIONS } from "@/lib/professional-onboarding";
 
@@ -66,6 +67,10 @@ export function EditProjectForm({
     ...project.required_job_categories,
   ]);
   const [imageFileName, setImageFileName] = useState<string | null>(null);
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [imagePreviewBlobUrl, setImagePreviewBlobUrl] = useState<string | null>(
+    null,
+  );
   const imageInputRef = useRef<HTMLInputElement>(null);
   const initialState = useMemo<UpdateProjectMediaState>(
     () => ({ ok: false, error: "" }),
@@ -76,13 +81,25 @@ export function EditProjectForm({
     initialState,
   );
 
-  const previewUrl = publicProjectImageUrl(project.representative_image_path);
+  const savedPreviewUrl = publicProjectImageUrl(project.representative_image_path);
+  const arenaCardPreviewUrl = arenaProjectImageUrl(project);
+
+  useEffect(() => {
+    if (!selectedImageFile) {
+      setImagePreviewBlobUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(selectedImageFile);
+    setImagePreviewBlobUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [selectedImageFile]);
 
   useEffect(() => {
     if (!state.ok) return;
     if (imageInputRef.current) imageInputRef.current.value = "";
     startTransition(() => {
       setImageFileName(null);
+      setSelectedImageFile(null);
     });
     router.refresh();
   }, [state.ok, router]);
@@ -94,6 +111,106 @@ export function EditProjectForm({
         : [...prev, value],
     );
   }
+
+  function handleImageChange(file: File | undefined) {
+    setImageFileName(file?.name ?? null);
+    setSelectedImageFile(file ?? null);
+  }
+
+  const workspaceDisplayPreviewUrl =
+    imagePreviewBlobUrl ?? arenaCardPreviewUrl;
+
+  const imageField = (
+    <div>
+      <span className={`${labelClass} mb-1`}>
+        {isWorkspace ? "Arena card image" : "Representative image"}{" "}
+        <span className="font-normal text-slate-500">(optional)</span>
+      </span>
+      {isWorkspace ? (
+        <>
+          <div className="relative w-full max-w-xl mx-auto aspect-4/3 rounded-xl overflow-hidden border border-slate-200 bg-slate-300 mb-2">
+            <Image
+              src={workspaceDisplayPreviewUrl}
+              alt=""
+              fill
+              className="object-cover"
+              sizes="(max-width: 896px) 36rem, 50vw"
+              unoptimized={!!imagePreviewBlobUrl}
+            />
+          </div>
+          <p className={`${helperTextClass} mt-0 mb-3 text-center`}>
+            This is how your cover appears on Idea Arena cards (4:3 crop).
+          </p>
+        </>
+      ) : savedPreviewUrl ? (
+        <div className="relative h-24 w-24 rounded-lg overflow-hidden border border-slate-200 mb-2">
+          <Image
+            src={savedPreviewUrl}
+            alt=""
+            fill
+            className="object-cover"
+            sizes="96px"
+            unoptimized
+          />
+        </div>
+      ) : null}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="rounded-lg has-[input:focus-visible]:ring-2 has-[input:focus-visible]:ring-[#22c55e] has-[input:focus-visible]:ring-offset-2">
+          <input
+            ref={imageInputRef}
+            id={`representative_image_${project.id}`}
+            name="representative_image"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="sr-only"
+            onChange={(e) => handleImageChange(e.target.files?.[0])}
+          />
+          <label
+            htmlFor={`representative_image_${project.id}`}
+            className={
+              isWorkspace
+                ? workspaceFileFieldButtonClass
+                : fileFieldButtonClass
+            }
+          >
+            Add a file
+          </label>
+        </div>
+        {imageFileName ? (
+          <span
+            className={`text-slate-600 truncate max-w-[min(100%,14rem)] ${
+              isWorkspace ? "text-sm" : "text-xs"
+            }`}
+          >
+            {imageFileName}
+          </span>
+        ) : null}
+      </div>
+      <p className={`${helperTextClass} mt-1 mb-0`}>
+        JPEG, PNG, or WebP, up to 5MB. Uploading replaces the current image.
+      </p>
+    </div>
+  );
+
+  const titleAndDescriptionFields = (
+    <>
+      <label className={labelClass}>
+        Title
+        <input
+          name="title"
+          type="text"
+          required
+          maxLength={500}
+          defaultValue={project.title}
+          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900"
+        />
+      </label>
+      <ProjectDescriptionField
+        defaultValue={project.description ?? ""}
+        variant={variant}
+      />
+    </>
+  );
 
   return (
     <form
@@ -119,72 +236,17 @@ export function EditProjectForm({
       ) : null}
 
       <div className="space-y-3 mb-4">
-        <label className={labelClass}>
-          Title
-          <input
-            name="title"
-            type="text"
-            required
-            maxLength={500}
-            defaultValue={project.title}
-            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900"
-          />
-        </label>
-        <ProjectDescriptionField
-          defaultValue={project.description ?? ""}
-          variant={variant}
-        />
-        <div>
-          <span className={`${labelClass} mb-1`}>
-            Representative image{" "}
-            <span className="font-normal text-slate-500">(optional)</span>
-          </span>
-          {previewUrl ? (
-            <div className="relative h-24 w-24 rounded-lg overflow-hidden border border-slate-200 mb-2">
-              <Image
-                src={previewUrl}
-                alt=""
-                fill
-                className="object-cover"
-                sizes="96px"
-                unoptimized
-              />
-            </div>
-          ) : null}
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="rounded-lg has-[input:focus-visible]:ring-2 has-[input:focus-visible]:ring-[#22c55e] has-[input:focus-visible]:ring-offset-2">
-              <input
-                ref={imageInputRef}
-                id={`representative_image_${project.id}`}
-                name="representative_image"
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className="sr-only"
-                onChange={(e) =>
-                  setImageFileName(e.target.files?.[0]?.name ?? null)
-                }
-              />
-              <label
-                htmlFor={`representative_image_${project.id}`}
-                className={
-                  isWorkspace
-                    ? workspaceFileFieldButtonClass
-                    : fileFieldButtonClass
-                }
-              >
-                Add a file
-              </label>
-            </div>
-            {imageFileName ? (
-              <span className="text-xs text-slate-600 truncate max-w-[min(100%,14rem)]">
-                {imageFileName}
-              </span>
-            ) : null}
-          </div>
-          <p className={`${helperTextClass} mt-1 mb-0`}>
-            JPEG, PNG, or WebP, up to 5MB. Uploading replaces the current image.
-          </p>
-        </div>
+        {isWorkspace ? (
+          <>
+            {imageField}
+            {titleAndDescriptionFields}
+          </>
+        ) : (
+          <>
+            {titleAndDescriptionFields}
+            {imageField}
+          </>
+        )}
       </div>
 
       <p className={sectionTitleClass}>

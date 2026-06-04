@@ -59,7 +59,7 @@ export function DashboardProjectProgressCard({
             href={settingsHref}
             className="font-medium text-slate-600 hover:text-[#22c55e] hover:underline"
           >
-            Project settings
+            Arena Card Details
           </Link>
         </div>
       </header>

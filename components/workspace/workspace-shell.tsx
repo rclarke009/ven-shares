@@ -3,9 +3,9 @@
 import Link from "next/link";
 import {
   Activity,
+  Image,
   LayoutList,
   MessageCircle,
-  Settings,
   Video,
 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -58,8 +58,8 @@ const TABS = [
 
 const SETTINGS_TAB = {
   id: "settings" as const,
-  label: "Settings",
-  icon: Settings,
+  label: "Arena Card Details",
+  icon: Image,
 };
 
 type BaseTabId = (typeof TABS)[number]["id"];
@@ -378,13 +378,17 @@ export function WorkspaceShell({
             <button
               type="button"
               onClick={() => setTab("settings")}
+              aria-label={SETTINGS_TAB.label}
               className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors ${
                 tab === "settings"
                   ? "bg-slate-500/80 text-white"
                   : "text-slate-200 hover:bg-slate-600/80"
               }`}
             >
-              <Settings className="h-5 w-5 shrink-0 opacity-90" aria-hidden />
+              <SETTINGS_TAB.icon
+                className="h-5 w-5 shrink-0 opacity-90"
+                aria-hidden
+              />
               {SETTINGS_TAB.label}
             </button>
           ) : null}
@@ -428,7 +432,7 @@ export function WorkspaceShell({
             href={`/idea-arena/${projectId}`}
             className="text-sm font-medium text-[#22c55e] hover:underline shrink-0"
           >
-            Project page
+            Arena Preview
           </Link>
         </div>
 
@@ -522,13 +526,13 @@ export function WorkspaceShell({
           ) : null}
 
           {tab === "settings" && editableProject ? (
-            <div className="max-w-3xl rounded-2xl border border-slate-200 bg-white shadow-sm p-6">
+            <div className="max-w-4xl rounded-2xl border border-slate-200 bg-white shadow-sm p-6">
               <h2 className="text-base font-semibold text-slate-900 mb-1">
-                Project settings
+                Arena Card Details
               </h2>
               <p className="text-sm text-slate-600 mb-4">
-                Update how this project appears in Idea Arena and what skills
-                professionals need to join.
+                Shape how your project appears on Idea Arena — cover image,
+                title, summary, and the team skills professionals need to join.
               </p>
               <EditProjectForm
                 key={`${editableProject.id}-${editableProject.representative_image_path ?? ""}-${editableProject.project_required_skills.map((s) => `${s.skill_name}:${s.skill_description}`).join("|")}-${editableProject.title}`}
