@@ -9,3 +9,14 @@ export function arenaProjectImageUrl(project: {
   if (custom) return custom;
   return `https://picsum.photos/seed/${encodeURIComponent(project.id)}/400/400`;
 }
+
+/** Workspace banner: hero upload, then arena card image, then picsum placeholder. */
+export function workspaceHeroImageUrl(project: {
+  id: string;
+  hero_image_path: string | null;
+  representative_image_path: string | null;
+}): string {
+  const hero = publicProjectImageUrl(project.hero_image_path);
+  if (hero) return hero;
+  return arenaProjectImageUrl(project);
+}

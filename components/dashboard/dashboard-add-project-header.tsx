@@ -15,7 +15,7 @@ export function DashboardAddProjectHeader() {
     <div className="mb-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Your progress</h1>
+          <h1 className="text-2xl font-semibold text-slate-900">My projects</h1>
           <p className="text-slate-600 text-sm mt-1">
             Track and update checklist progress across your projects.
           </p>

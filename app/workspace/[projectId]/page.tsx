@@ -186,6 +186,7 @@ async function WorkspaceProjectContent({
       joined={joined}
       projectId={projectId}
       projectTitle={meta.title}
+      heroImagePath={arenaProject.hero_image_path}
       representativeImagePath={arenaProject.representative_image_path}
       currentUserId={userId}
       initialTab={tab ?? "messages"}
@@ -211,6 +212,7 @@ async function WorkspaceProjectContent({
               description: arenaProject.description,
               required_job_categories: arenaProject.required_job_categories,
               representative_image_path: arenaProject.representative_image_path,
+              hero_image_path: arenaProject.hero_image_path,
               project_required_skills: arenaProject.project_required_skills,
             }
           : null

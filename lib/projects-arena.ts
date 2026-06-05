@@ -37,6 +37,7 @@ export type ArenaProject = {
   required_job_categories: ProfessionalJobCategory[];
   completed_job_categories: ProfessionalJobCategory[];
   representative_image_path: string | null;
+  hero_image_path: string | null;
   project_required_skills: ProjectRequiredSkill[];
   created_at: string;
   category_statuses: ArenaCategorySlot[];
@@ -183,6 +184,8 @@ function mapArenaRow(
       typeof row.representative_image_path === "string"
         ? row.representative_image_path
         : null,
+    hero_image_path:
+      typeof row.hero_image_path === "string" ? row.hero_image_path : null,
     project_required_skills: normalizeSkillRows(row.project_required_skills),
     created_at: row.created_at as string,
     category_statuses,
@@ -197,6 +200,7 @@ const ARENA_PROJECT_SELECT = `
       completed_job_categories,
       workspace_progress_checklist,
       representative_image_path,
+      hero_image_path,
       created_at,
       project_required_skills ( skill_name, skill_description, sort_order )
     `;
@@ -224,6 +228,19 @@ const ARENA_PROJECT_SELECT_LEGACY = `
       project_required_skills ( skill_name, skill_description, sort_order )
     `;
 
+/** DBs that have not applied migration 014 omit hero_image_path. */
+const ARENA_PROJECT_SELECT_WITHOUT_HERO_IMAGE = `
+      id,
+      title,
+      description,
+      required_job_categories,
+      completed_job_categories,
+      workspace_progress_checklist,
+      representative_image_path,
+      created_at,
+      project_required_skills ( skill_name, skill_description, sort_order )
+    `;
+
 function isMissingCompletedJobCategoriesColumn(error: {
   code?: string;
   message: string;
@@ -244,6 +261,15 @@ function isMissingWorkspaceProgressChecklistColumn(error: {
   );
 }
 
+function isMissingHeroImagePathColumn(error: {
+  code?: string;
+  message: string;
+}): boolean {
+  return (
+    error.code === "42703" && error.message.includes("hero_image_path")
+  );
+}
+
 export async function listProjectsForArena(): Promise<ArenaProject[]> {
   const { userId } = await auth();
   if (!userId) return [];
@@ -256,7 +282,17 @@ export async function listProjectsForArena(): Promise<ArenaProject[]> {
 
   let rows: Record<string, unknown>[];
 
-  if (
+  if (primary.error && isMissingHeroImagePathColumn(primary.error)) {
+    const fallback = await supabase
+      .from("projects")
+      .select(ARENA_PROJECT_SELECT_WITHOUT_HERO_IMAGE)
+      .order("created_at", { ascending: false });
+    if (fallback.error) {
+      console.log("MYDEBUG →", fallback.error.message);
+      return [];
+    }
+    rows = (fallback.data ?? []) as Record<string, unknown>[];
+  } else if (
     primary.error &&
     isMissingCompletedJobCategoriesColumn(primary.error)
   ) {
@@ -377,7 +413,18 @@ export async function getProjectByIdForArena(
 
   let data: Record<string, unknown> | null;
 
-  if (
+  if (primary.error && isMissingHeroImagePathColumn(primary.error)) {
+    const fallback = await supabase
+      .from("projects")
+      .select(ARENA_PROJECT_SELECT_WITHOUT_HERO_IMAGE)
+      .eq("id", id)
+      .maybeSingle();
+    if (fallback.error) {
+      console.log("MYDEBUG →", fallback.error.message);
+      return null;
+    }
+    data = (fallback.data as Record<string, unknown> | null) ?? null;
+  } else if (
     primary.error &&
     isMissingCompletedJobCategoriesColumn(primary.error)
   ) {

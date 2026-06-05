@@ -32,6 +32,7 @@ export type ProjectRow = {
   clerk_user_id: string;
   required_job_categories: string[];
   representative_image_path: string | null;
+  hero_image_path: string | null;
   project_required_skills: ProjectRequiredSkill[];
   created_at: string;
 };
@@ -70,7 +71,7 @@ function normalizeSkillRows(
   return out.sort((a, b) => a.sort_order - b.sort_order);
 }
 
-async function uploadRepresentativeImage(
+async function uploadProjectImage(
   projectId: string,
   image: Extract<RepresentativeImageOk, { skip: false }>,
 ): Promise<{ ok: true; path: string } | { ok: false; message: string }> {
@@ -131,10 +132,18 @@ export async function listProjectsForCurrentUser(): Promise<ProjectRow[]> {
   if (!(await isCurrentUserInventor())) return [];
 
   const supabase = createServerSupabaseClient();
-  const { data, error } = await supabase
-    .from("projects")
-    .select(
-      `
+  const projectSelectWithHero = `
+      id,
+      title,
+      description,
+      clerk_user_id,
+      required_job_categories,
+      representative_image_path,
+      hero_image_path,
+      created_at,
+      project_required_skills ( skill_name, skill_description, sort_order )
+    `;
+  const projectSelectWithoutHero = `
       id,
       title,
       description,
@@ -143,10 +152,30 @@ export async function listProjectsForCurrentUser(): Promise<ProjectRow[]> {
       representative_image_path,
       created_at,
       project_required_skills ( skill_name, skill_description, sort_order )
-    `,
-    )
+    `;
+
+  const primary = await supabase
+    .from("projects")
+    .select(projectSelectWithHero)
     .eq("clerk_user_id", userId)
     .order("created_at", { ascending: false });
+
+  let data: Record<string, unknown>[] | null =
+    (primary.data as Record<string, unknown>[] | null) ?? null;
+  let error = primary.error;
+
+  if (
+    error?.code === "42703" &&
+    error.message.includes("hero_image_path")
+  ) {
+    const fallback = await supabase
+      .from("projects")
+      .select(projectSelectWithoutHero)
+      .eq("clerk_user_id", userId)
+      .order("created_at", { ascending: false });
+    data = (fallback.data as Record<string, unknown>[] | null) ?? null;
+    error = fallback.error;
+  }
 
   if (error) {
     console.log("MYDEBUG →", error.message);
@@ -168,6 +197,8 @@ export async function listProjectsForCurrentUser(): Promise<ProjectRow[]> {
         typeof r.representative_image_path === "string"
           ? r.representative_image_path
           : null,
+      hero_image_path:
+        typeof r.hero_image_path === "string" ? r.hero_image_path : null,
       project_required_skills: normalizeSkillRows(r.project_required_skills),
       created_at: r.created_at as string,
     };
@@ -237,7 +268,7 @@ export async function createProject(
 
   let imagePath: string | null = null;
   if (!imageRead.skip) {
-    const up = await uploadRepresentativeImage(projectId, imageRead);
+    const up = await uploadProjectImage(projectId, imageRead);
     if (!up.ok) {
       await supabase.from("projects").delete().eq("id", projectId);
       return { ok: false, error: up.message };
@@ -305,6 +336,14 @@ export async function updateProjectWithMediaAndSkills(
   const imageRead = await readRepresentativeImageFromFormData(formData);
   if (!imageRead.ok) {
     return { ok: false, error: imageRead.error };
+  }
+
+  const heroImageRead = await readRepresentativeImageFromFormData(formData, {
+    fieldName: "hero_image",
+    baseName: "hero",
+  });
+  if (!heroImageRead.ok) {
+    return { ok: false, error: heroImageRead.error };
   }
 
   const skillsParse = parseRequiredSkillsFromFormData(formData);
@@ -408,7 +447,7 @@ export async function updateProjectWithMediaAndSkills(
   }
 
   if (!imageRead.skip) {
-    const up = await uploadRepresentativeImage(projectId, imageRead);
+    const up = await uploadProjectImage(projectId, imageRead);
     if (!up.ok) {
       return { ok: false, error: up.message };
     }
@@ -420,6 +459,31 @@ export async function updateProjectWithMediaAndSkills(
     if (pathErr) {
       console.log("MYDEBUG →", pathErr.message);
       return { ok: false, error: "Could not save image. Try again." };
+    }
+  }
+
+  if (!heroImageRead.skip) {
+    const up = await uploadProjectImage(projectId, heroImageRead);
+    if (!up.ok) {
+      return { ok: false, error: up.message };
+    }
+    const { error: pathErr } = await supabase
+      .from("projects")
+      .update({ hero_image_path: up.path })
+      .eq("id", projectId)
+      .eq("clerk_user_id", userId);
+    if (
+      pathErr?.code === "42703" &&
+      pathErr.message.includes("hero_image_path")
+    ) {
+      return {
+        ok: false,
+        error: "Hero image is not available yet. Apply the latest database migration.",
+      };
+    }
+    if (pathErr) {
+      console.log("MYDEBUG →", pathErr.message);
+      return { ok: false, error: "Could not save hero image. Try again." };
     }
   }
 

@@ -76,6 +76,7 @@ export type WorkspaceEditableProject = {
   description: string | null;
   required_job_categories: string[];
   representative_image_path: string | null;
+  hero_image_path: string | null;
   project_required_skills: ProjectRequiredSkill[];
 };
 
@@ -115,6 +116,7 @@ type WorkspaceShellProps = {
   joined: WorkspacePickerProject[];
   projectId: string;
   projectTitle: string;
+  heroImagePath: string | null;
   representativeImagePath: string | null;
   currentUserId: string;
   initialTab: string;
@@ -244,6 +246,7 @@ export function WorkspaceShell({
   joined,
   projectId,
   projectTitle,
+  heroImagePath,
   representativeImagePath,
   currentUserId,
   initialTab,
@@ -420,6 +423,7 @@ export function WorkspaceShell({
       <WorkspaceProjectHero
         projectId={projectId}
         projectTitle={projectTitle}
+        heroImagePath={heroImagePath}
         representativeImagePath={representativeImagePath}
       />
       <div className="flex-1 p-6 overflow-auto">
@@ -517,11 +521,11 @@ export function WorkspaceShell({
               Arena Card Details
             </h2>
             <p className="text-sm text-slate-600 mb-4">
-              Shape how your project appears on Idea Arena — cover image,
-              title, summary, and the team skills professionals need to join.
+              Set your workspace banner and Idea Arena card image, plus title,
+              summary, and the team skills professionals need to join.
             </p>
             <EditProjectForm
-              key={`${editableProject.id}-${editableProject.representative_image_path ?? ""}-${editableProject.project_required_skills.map((s) => `${s.skill_name}:${s.skill_description}`).join("|")}-${editableProject.title}`}
+              key={`${editableProject.id}-${editableProject.hero_image_path ?? ""}-${editableProject.representative_image_path ?? ""}-${editableProject.project_required_skills.map((s) => `${s.skill_name}:${s.skill_description}`).join("|")}-${editableProject.title}`}
               project={editableProject}
               variant="workspace"
             />

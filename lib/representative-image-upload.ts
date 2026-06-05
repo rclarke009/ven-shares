@@ -20,11 +20,24 @@ export type RepresentativeImageOk =
     }
   | { ok: false; error: string };
 
+export type ReadProjectImageOptions = {
+  fieldName?: string;
+  /** Storage filename stem before extension, e.g. `cover` or `hero`. */
+  baseName?: string;
+};
+
 export async function readRepresentativeImageFromFormData(
   formData: FormData,
-  fieldName = "representative_image",
+  fieldNameOrOptions: string | ReadProjectImageOptions = "representative_image",
 ): Promise<RepresentativeImageOk> {
-  const entry = formData.get(fieldName);
+  const options =
+    typeof fieldNameOrOptions === "string"
+      ? { fieldName: fieldNameOrOptions, baseName: "cover" }
+      : {
+          fieldName: fieldNameOrOptions.fieldName ?? "representative_image",
+          baseName: fieldNameOrOptions.baseName ?? "cover",
+        };
+  const entry = formData.get(options.fieldName);
   if (!entry || typeof entry === "string") return { ok: true, skip: true };
   const file = entry as File;
   if (file.size === 0) return { ok: true, skip: true };
@@ -41,6 +54,6 @@ export async function readRepresentativeImageFromFormData(
     skip: false,
     buffer,
     contentType: file.type,
-    fileName: `cover.${ext}`,
+    fileName: `${options.baseName}.${ext}`,
   };
 }

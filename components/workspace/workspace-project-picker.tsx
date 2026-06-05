@@ -6,7 +6,6 @@ import { ChevronDown, ChevronUp, LayoutGrid } from "lucide-react";
 import {
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
 } from "react";
@@ -127,15 +126,6 @@ export function WorkspaceProjectPicker({
 
   const isAllProjects = activeProjectId === null;
 
-  const activeProject = useMemo(() => {
-    if (!activeProjectId) return null;
-    return (
-      owned.find((p) => p.id === activeProjectId) ??
-      joined.find((p) => p.id === activeProjectId) ??
-      null
-    );
-  }, [activeProjectId, owned, joined]);
-
   useEffect(() => {
     setSectionCollapsed(readPickerCollapsed(collapseKey));
     setHydrated(true);
@@ -233,17 +223,10 @@ export function WorkspaceProjectPicker({
             aria-haspopup="menu"
             aria-expanded={menuOpen}
             aria-controls="workspace-project-picker-menu"
+            aria-label="Choose project"
           >
-            {isAllProjects || !activeProject ? (
-              <LayoutGrid className="h-5 w-5 shrink-0 opacity-90" aria-hidden />
-            ) : (
-              <ProjectThumb project={activeProject} />
-            )}
-            <span className="truncate flex-1 font-medium">
-              {isAllProjects || !activeProject
-                ? "All Projects"
-                : activeProject.title}
-            </span>
+            <LayoutGrid className="h-5 w-5 shrink-0 opacity-90" aria-hidden />
+            <span className="truncate flex-1 font-medium">Choose Project</span>
             <ChevronDown
               className={`h-4 w-4 shrink-0 opacity-80 transition-transform ${
                 menuOpen ? "rotate-180" : ""

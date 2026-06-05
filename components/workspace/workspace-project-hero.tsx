@@ -1,21 +1,24 @@
 import Image from "next/image";
 import Link from "next/link";
 
-import { arenaProjectImageUrl } from "@/components/idea-arena/utils";
+import { workspaceHeroImageUrl } from "@/components/idea-arena/utils";
 
 type WorkspaceProjectHeroProps = {
   projectId: string;
   projectTitle: string;
+  heroImagePath: string | null;
   representativeImagePath: string | null;
 };
 
 export function WorkspaceProjectHero({
   projectId,
   projectTitle,
+  heroImagePath,
   representativeImagePath,
 }: WorkspaceProjectHeroProps) {
-  const src = arenaProjectImageUrl({
+  const src = workspaceHeroImageUrl({
     id: projectId,
+    hero_image_path: heroImagePath,
     representative_image_path: representativeImagePath,
   });
 
