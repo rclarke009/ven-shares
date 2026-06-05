@@ -6,7 +6,7 @@ import {
   SIGNUP_ROLE_COOKIE,
   SIGNUP_ROLE_COOKIE_MAX_AGE_SEC,
 } from "@/lib/signup-role-cookie";
-import { getVenRoleFromPublicMetadata, type VenRole } from "@/lib/ven-role";
+import { getVenRolesFromPublicMetadata, type VenRole } from "@/lib/ven-role";
 
 const isSignupRolePath = createRouteMatcher([
   "/auth/signup/inventor(.*)",
@@ -26,9 +26,17 @@ function roleFromSignupPath(pathname: string): VenRole | null {
 }
 
 export default clerkMiddleware(async (auth, req) => {
+  const { userId } = await auth();
+
   if (isSignupRolePath(req)) {
     const role = roleFromSignupPath(req.nextUrl.pathname);
     if (role) {
+      if (userId) {
+        const url = req.nextUrl.clone();
+        url.pathname = `/auth/add-role/${role}`;
+        url.search = "";
+        return NextResponse.redirect(url);
+      }
       const res = NextResponse.next();
       res.cookies.set(SIGNUP_ROLE_COOKIE, role, {
         httpOnly: true,
@@ -45,7 +53,6 @@ export default clerkMiddleware(async (auth, req) => {
     return NextResponse.next();
   }
 
-  const { userId } = await auth();
   if (!userId) {
     return NextResponse.next();
   }
@@ -53,17 +60,17 @@ export default clerkMiddleware(async (auth, req) => {
   const client = await clerkClient();
   const user = await client.users.getUser(userId);
   const meta = user.publicMetadata as Record<string, unknown>;
-  const role = getVenRoleFromPublicMetadata(meta);
-  if (!role) {
+  const roles = getVenRolesFromPublicMetadata(meta);
+  if (roles.length === 0) {
     const url = req.nextUrl.clone();
     url.pathname = "/auth/complete-role";
     url.search = "";
     return NextResponse.redirect(url);
   }
-  if (
-    role === "professional" &&
-    !isProfessionalOnboardingComplete(meta)
-  ) {
+
+  const needsProOnboarding =
+    roles.includes("professional") && !isProfessionalOnboardingComplete(meta);
+  if (needsProOnboarding && !roles.includes("inventor")) {
     const url = req.nextUrl.clone();
     url.pathname = "/onboarding/professional";
     url.search = "";

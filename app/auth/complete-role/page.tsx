@@ -3,7 +3,7 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
 import { setVenRoleFromCompleteRole } from "@/app/auth/complete-role/actions";
-import { getVenRoleFromPublicMetadata } from "@/lib/ven-role";
+import { getVenRolesFromPublicMetadata } from "@/lib/ven-role";
 
 export default async function CompleteRolePage() {
   const { userId } = await auth();
@@ -16,7 +16,11 @@ export default async function CompleteRolePage() {
     redirect("/auth/sign-in");
   }
 
-  if (getVenRoleFromPublicMetadata(user.publicMetadata as Record<string, unknown>)) {
+  if (
+    getVenRolesFromPublicMetadata(
+      user.publicMetadata as Record<string, unknown>,
+    ).length > 0
+  ) {
     redirect("/dashboard");
   }
 
@@ -26,12 +30,12 @@ export default async function CompleteRolePage() {
         Finish setting up your account
       </h1>
       <p className="text-slate-600 mb-10 max-w-md text-center text-sm leading-relaxed">
-        Choose how you&apos;ll use VenShares. You can sign out from the profile
-        menu if you need a different account.
+        Choose how you&apos;ll use VenShares. You can add another role later
+        from your account menu.
       </p>
-      <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
-        <form action={setVenRoleFromCompleteRole} className="flex-1">
-          <input type="hidden" name="venRole" value="inventor" />
+      <div className="flex flex-col gap-4 w-full max-w-md">
+        <form action={setVenRoleFromCompleteRole}>
+          <input type="hidden" name="roleChoice" value="inventor" />
           <button
             type="submit"
             className="ven-cta w-full text-center px-8 py-4 rounded-full font-medium"
@@ -39,13 +43,22 @@ export default async function CompleteRolePage() {
             Inventor
           </button>
         </form>
-        <form action={setVenRoleFromCompleteRole} className="flex-1">
-          <input type="hidden" name="venRole" value="professional" />
+        <form action={setVenRoleFromCompleteRole}>
+          <input type="hidden" name="roleChoice" value="professional" />
           <button
             type="submit"
             className="w-full text-center px-8 py-4 rounded-full font-medium border-2 border-slate-900 text-slate-900 hover:bg-slate-900 hover:text-white transition-colors"
           >
             Skilled professional
+          </button>
+        </form>
+        <form action={setVenRoleFromCompleteRole}>
+          <input type="hidden" name="roleChoice" value="both" />
+          <button
+            type="submit"
+            className="w-full text-center px-8 py-4 rounded-full font-medium border-2 border-[#22c55e] text-[#15803d] hover:bg-[#22c55e] hover:text-white transition-colors"
+          >
+            Both inventor and professional
           </button>
         </form>
       </div>

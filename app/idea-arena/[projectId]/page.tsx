@@ -17,7 +17,7 @@ import {
   normalizeRequiredJobCategoriesFromDb,
 } from "@/lib/skills-match";
 import {
-  getVenRoleForCurrentUser,
+  isCurrentUserProfessional,
   getVenUserButtonProfileMode,
 } from "@/lib/ven-role.server";
 import { getWorkspaceAccessFlags } from "@/lib/workspace-access";
@@ -54,12 +54,12 @@ export default async function IdeaArenaProjectPage({
     requiredForArena,
   );
 
-  const venRole = await getVenRoleForCurrentUser();
+  const isProfessional = await isCurrentUserProfessional();
   const sp = await searchParams;
   const parsedRaw = parseArenaSkillFilterParams(sp);
   const parsed = effectiveArenaSkillFilter(
     parsedRaw,
-    venRole === "professional",
+    isProfessional,
   );
   const returnToArenaQuery = buildIdeaArenaQueryString({
     selected: projectId,
@@ -70,12 +70,12 @@ export default async function IdeaArenaProjectPage({
   const { canAccess: canOpenWorkspace, isOwner: isProjectOwner } =
     await getWorkspaceAccessFlags(projectId, userId);
   const alreadyJoined =
-    venRole === "professional"
+    isProfessional
       ? await getMembershipForCurrentUser(projectId)
       : false;
 
   let joinTeamSkillMessage: string | undefined;
-  if (venRole === "professional" && !alreadyJoined) {
+  if (isProfessional && !alreadyJoined) {
     const required = normalizeRequiredJobCategoriesFromDb(
       project.required_job_categories,
     );
@@ -104,7 +104,7 @@ export default async function IdeaArenaProjectPage({
       <main className="flex-1">
         <ProjectDetailView
           project={project}
-          venRole={venRole}
+          isProfessional={isProfessional}
           canOpenWorkspace={canOpenWorkspace}
           isProjectOwner={isProjectOwner}
           joinTeamSkillMessage={joinTeamSkillMessage}

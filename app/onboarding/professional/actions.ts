@@ -12,7 +12,11 @@ import {
   normalizeProfessionalJobCategories,
 } from "@/lib/professional-onboarding";
 import { readProfilePhotoFromFormData } from "@/lib/profile-photo-upload";
-import { getVenRoleFromPublicMetadata } from "@/lib/ven-role";
+import {
+  getVenRolesFromPublicMetadata,
+  hasProfessionalRole,
+  mergeVenRolesMetadata,
+} from "@/lib/ven-role";
 
 export type ProfessionalOnboardingActionState = {
   error?: string;
@@ -30,8 +34,7 @@ export async function completeProfessionalOnboarding(
   const client = await clerkClient();
   const user = await client.users.getUser(userId);
   const meta = user.publicMetadata as Record<string, unknown>;
-  const role = getVenRoleFromPublicMetadata(meta);
-  if (role !== "professional") {
+  if (!hasProfessionalRole(meta)) {
     return { error: "This onboarding is for skilled professional accounts." };
   }
 
@@ -67,7 +70,7 @@ export async function completeProfessionalOnboarding(
 
   await client.users.updateUser(userId, {
     publicMetadata: {
-      ...user.publicMetadata,
+      ...mergeVenRolesMetadata(meta, getVenRolesFromPublicMetadata(meta)),
       [PROFESSIONAL_JOB_CATEGORIES_KEY]: categories,
       [PROFESSIONAL_HOURS_BAND_KEY]: hoursRaw,
       [PROFESSIONAL_ONBOARDING_COMPLETE_KEY]: true,
@@ -78,5 +81,5 @@ export async function completeProfessionalOnboarding(
   revalidatePath("/idea-arena");
   revalidatePath("/onboarding/professional");
 
-  redirect("/dashboard");
+  redirect("/dashboard?tab=professional");
 }

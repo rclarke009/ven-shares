@@ -12,7 +12,11 @@ import {
   normalizeProfessionalJobCategories,
 } from "@/lib/professional-onboarding";
 import { readProfilePhotoFromFormData } from "@/lib/profile-photo-upload";
-import { getVenRoleFromPublicMetadata } from "@/lib/ven-role";
+import {
+  getVenRolesFromPublicMetadata,
+  hasProfessionalRole,
+  mergeVenRolesMetadata,
+} from "@/lib/ven-role";
 
 export async function updateProfessionalProfileSkills(
   _prev: ProfessionalOnboardingActionState,
@@ -26,8 +30,7 @@ export async function updateProfessionalProfileSkills(
   const client = await clerkClient();
   const user = await client.users.getUser(userId);
   const meta = user.publicMetadata as Record<string, unknown>;
-  const role = getVenRoleFromPublicMetadata(meta);
-  if (role !== "professional") {
+  if (!hasProfessionalRole(meta)) {
     return { error: "Only skilled professional accounts can update this profile." };
   }
 
@@ -63,7 +66,7 @@ export async function updateProfessionalProfileSkills(
 
   await client.users.updateUser(userId, {
     publicMetadata: {
-      ...user.publicMetadata,
+      ...mergeVenRolesMetadata(meta, getVenRolesFromPublicMetadata(meta)),
       [PROFESSIONAL_JOB_CATEGORIES_KEY]: categories,
       [PROFESSIONAL_HOURS_BAND_KEY]: hoursRaw,
     },

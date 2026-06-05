@@ -8,7 +8,6 @@ import type {
 } from "@/lib/arena-team";
 import { arenaTeamMemberRailLabel } from "@/lib/arena-team-display";
 import type { ArenaCategorySlotStatus, ArenaProject } from "@/lib/projects-arena";
-import type { VenRole } from "@/lib/ven-role";
 
 import { ArenaUserAvatar } from "./arena-user-avatar";
 import { SkillTeamRoster } from "./skill-team-roster";
@@ -51,7 +50,7 @@ function categoryStatusBadge(status: ArenaCategorySlotStatus): {
 
 type ProjectDetailViewProps = {
   project: ArenaProject;
-  venRole: VenRole | undefined;
+  isProfessional: boolean;
   canOpenWorkspace: boolean;
   isProjectOwner: boolean;
   /** When set, professional cannot use Join Team (skill gate). */
@@ -64,7 +63,7 @@ type ProjectDetailViewProps = {
 
 export function ProjectDetailView({
   project,
-  venRole,
+  isProfessional,
   canOpenWorkspace,
   isProjectOwner,
   joinTeamSkillMessage,
@@ -233,7 +232,7 @@ export function ProjectDetailView({
                     Open workspace
                   </Link>
                 </div>
-              ) : venRole === "professional" ? (
+              ) : isProfessional ? (
                 joinTeamSkillMessage ? (
                   <p className="text-sm text-slate-600 shrink-0 text-right max-w-xs sm:max-w-sm leading-snug">
                     {joinTeamSkillMessage}

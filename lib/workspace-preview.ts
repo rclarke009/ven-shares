@@ -12,6 +12,11 @@ const IMAGE_EXT = new Set([
   "svg",
   "bmp",
   "ico",
+  "heic",
+  "heif",
+  "avif",
+  "tif",
+  "tiff",
 ]);
 
 const PDF_EXT = new Set(["pdf"]);

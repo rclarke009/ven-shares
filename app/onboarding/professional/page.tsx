@@ -5,7 +5,7 @@ import { completeProfessionalOnboarding } from "@/app/onboarding/professional/ac
 import { VenSharesLogo } from "@/components/venshares-logo";
 import { ProfessionalOnboardingForm } from "@/components/onboarding/professional-onboarding-form";
 import { isProfessionalOnboardingComplete } from "@/lib/professional-onboarding";
-import { getVenRoleFromPublicMetadata } from "@/lib/ven-role";
+import { hasProfessionalRole } from "@/lib/ven-role";
 
 export default async function ProfessionalOnboardingPage() {
   const { userId } = await auth();
@@ -19,8 +19,7 @@ export default async function ProfessionalOnboardingPage() {
   }
 
   const meta = user.publicMetadata as Record<string, unknown>;
-  const role = getVenRoleFromPublicMetadata(meta);
-  if (role !== "professional") {
+  if (!hasProfessionalRole(meta)) {
     redirect("/dashboard");
   }
   if (isProfessionalOnboardingComplete(meta)) {

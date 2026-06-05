@@ -10,10 +10,7 @@ import {
   isProfessionalOnboardingComplete,
 } from "@/lib/professional-onboarding";
 import { getProfessionalJobCategoriesFromMetadata } from "@/lib/skills-match";
-import {
-  getVenRoleFromPublicMetadata,
-  isProfessionalVenRole,
-} from "@/lib/ven-role";
+import { hasProfessionalRole } from "@/lib/ven-role";
 
 export function ProfessionalSkillsProfilePanel() {
   const { user, isLoaded } = useUser();
@@ -25,9 +22,8 @@ export function ProfessionalSkillsProfilePanel() {
   }
 
   const meta = (user?.publicMetadata ?? {}) as Record<string, unknown>;
-  const role = getVenRoleFromPublicMetadata(meta);
 
-  if (!isProfessionalVenRole(role)) {
+  if (!hasProfessionalRole(meta)) {
     return (
       <p className="text-sm text-slate-600 py-4">
         Skills and availability are only for skilled professional accounts.

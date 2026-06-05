@@ -19,7 +19,7 @@ import {
   parseWorkspaceProgressChecklist,
   trimChecklistToRequired,
 } from "@/lib/workspace-progress-checklist";
-import { getVenRoleForCurrentUser } from "@/lib/ven-role.server";
+import { isCurrentUserInventor } from "@/lib/ven-role.server";
 
 import type { RepresentativeImageOk } from "@/lib/representative-image-upload";
 
@@ -128,8 +128,7 @@ export async function listProjectsForCurrentUser(): Promise<ProjectRow[]> {
   const { userId } = await auth();
   if (!userId) return [];
 
-  const venRole = await getVenRoleForCurrentUser();
-  if (venRole !== "inventor") return [];
+  if (!(await isCurrentUserInventor())) return [];
 
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase
@@ -184,8 +183,7 @@ export async function createProject(
     return { ok: false, error: "You must be signed in." };
   }
 
-  const venRole = await getVenRoleForCurrentUser();
-  if (venRole !== "inventor") {
+  if (!(await isCurrentUserInventor())) {
     return { ok: false, error: "Only inventors can add projects." };
   }
 
@@ -276,8 +274,7 @@ export async function updateProjectWithMediaAndSkills(
     return { ok: false, error: "You must be signed in." };
   }
 
-  const venRole = await getVenRoleForCurrentUser();
-  if (venRole !== "inventor") {
+  if (!(await isCurrentUserInventor())) {
     return { ok: false, error: "Only inventors can update projects." };
   }
 

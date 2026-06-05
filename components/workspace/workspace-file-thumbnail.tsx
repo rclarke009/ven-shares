@@ -63,6 +63,12 @@ export function WorkspaceFileThumbnail({
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    setSrc(null);
+    setFailed(false);
+    if (!eager) setVisible(false);
+  }, [projectId, fileId, filename, content_type, eager]);
+
+  useEffect(() => {
     if (eager || visible) return;
     const el = rootRef.current;
     if (!el) return;
@@ -148,6 +154,8 @@ export function WorkspaceFileThumbnail({
       src={src}
       alt=""
       aria-hidden
+      loading="lazy"
+      decoding="async"
       className={`${THUMB_BOX} object-cover ${onThumbClick ? "cursor-pointer" : ""}`}
       onError={() => setFailed(true)}
     />

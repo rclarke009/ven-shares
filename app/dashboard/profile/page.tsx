@@ -10,7 +10,7 @@ import {
   getProfessionalHoursBandFromMetadata,
 } from "@/lib/professional-onboarding";
 import { getProfessionalJobCategoriesFromMetadata } from "@/lib/skills-match";
-import { getVenRoleFromPublicMetadata } from "@/lib/ven-role";
+import { hasProfessionalRole } from "@/lib/ven-role";
 
 export default async function ProfessionalProfilePage() {
   const { userId } = await auth();
@@ -24,8 +24,7 @@ export default async function ProfessionalProfilePage() {
   }
 
   const meta = user.publicMetadata as Record<string, unknown>;
-  const role = getVenRoleFromPublicMetadata(meta);
-  if (role !== "professional") {
+  if (!hasProfessionalRole(meta)) {
     redirect("/dashboard");
   }
 

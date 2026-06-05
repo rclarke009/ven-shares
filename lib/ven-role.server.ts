@@ -2,41 +2,50 @@ import "server-only";
 
 import { currentUser } from "@clerk/nextjs/server";
 
+import { isProfessionalOnboardingComplete } from "./professional-onboarding";
 import {
-  isProfessionalOnboardingComplete,
-} from "./professional-onboarding";
-import {
-  getVenRoleFromPublicMetadata,
-  isProfessionalVenRole,
+  getVenRolesFromPublicMetadata,
+  hasInventorRole,
+  hasProfessionalRole,
   type VenRole,
   type VenUserButtonProfileMode,
 } from "./ven-role";
 
 /**
- * Server-only: read `venRole` from the signed-in Clerk user.
+ * Server-only: read all roles from the signed-in Clerk user.
  */
-export async function getVenRoleForCurrentUser(): Promise<VenRole | undefined> {
+export async function getVenRolesForCurrentUser(): Promise<VenRole[]> {
   const user = await currentUser();
-  if (!user) return undefined;
-  return getVenRoleFromPublicMetadata(
+  if (!user) return [];
+  return getVenRolesFromPublicMetadata(
     user.publicMetadata as Record<string, unknown>,
   );
+}
+
+/**
+ * @deprecated Use `getVenRolesForCurrentUser`. Returns first role only.
+ */
+export async function getVenRoleForCurrentUser(): Promise<VenRole | undefined> {
+  const roles = await getVenRolesForCurrentUser();
+  return roles[0];
 }
 
 /**
  * Server-only: true if the current user may sign up for Idea Arena tasks (professionals).
  */
 export async function isCurrentUserProfessional(): Promise<boolean> {
-  const role = await getVenRoleForCurrentUser();
-  return isProfessionalVenRole(role);
+  const user = await currentUser();
+  if (!user) return false;
+  return hasProfessionalRole(user.publicMetadata as Record<string, unknown>);
 }
 
 /**
  * Server-only: true if the current user is an inventor (e.g. may create projects).
  */
 export async function isCurrentUserInventor(): Promise<boolean> {
-  const role = await getVenRoleForCurrentUser();
-  return role === "inventor";
+  const user = await currentUser();
+  if (!user) return false;
+  return hasInventorRole(user.publicMetadata as Record<string, unknown>);
 }
 
 /**
@@ -58,13 +67,13 @@ export async function getVenUserButtonProfileMode(): Promise<VenUserButtonProfil
   if (!user) return "signed-out";
 
   const meta = user.publicMetadata as Record<string, unknown>;
-  const role = getVenRoleFromPublicMetadata(meta);
+  const roles = getVenRolesFromPublicMetadata(meta);
 
-  if (role === "inventor") return "inventor";
-  if (role === "professional") {
+  if (hasProfessionalRole(meta)) {
     return isProfessionalOnboardingComplete(meta)
       ? "professional-complete"
       : "professional-incomplete";
   }
+  if (roles.includes("inventor")) return "inventor";
   return "signed-out";
 }

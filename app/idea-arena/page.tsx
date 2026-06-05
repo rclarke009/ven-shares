@@ -15,7 +15,7 @@ import {
 import { listProjectsForArenaForViewer } from "@/lib/projects-arena";
 import { getProfessionalJobCategoriesFromMetadata } from "@/lib/skills-match";
 import {
-  getVenRoleForCurrentUser,
+  isCurrentUserProfessional,
   getVenUserButtonProfileMode,
 } from "@/lib/ven-role.server";
 
@@ -35,8 +35,7 @@ export default async function IdeaArenaPage({
 
   const allProjects = await listProjectsForArenaForViewer();
   const sp = await searchParams;
-  const venRole = await getVenRoleForCurrentUser();
-  const isProfessional = venRole === "professional";
+  const isProfessional = await isCurrentUserProfessional();
   const clerkUser = isProfessional ? await currentUser() : null;
   const professionalCategories = getProfessionalJobCategoriesFromMetadata(
     clerkUser?.publicMetadata as Record<string, unknown> | undefined,

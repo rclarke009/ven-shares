@@ -11,7 +11,7 @@ import {
   professionalCanJoinProject,
 } from "@/lib/skills-match";
 import {
-  getVenRoleForCurrentUser,
+  isCurrentUserProfessional,
   isCurrentUserProfessionalOnboardingComplete,
 } from "@/lib/ven-role.server";
 
@@ -53,8 +53,7 @@ export async function listJoinedProjectsForCurrentUser(): Promise<
   const { userId } = await auth();
   if (!userId) return [];
 
-  const venRole = await getVenRoleForCurrentUser();
-  if (venRole !== "professional") return [];
+  if (!(await isCurrentUserProfessional())) return [];
 
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase
@@ -95,8 +94,7 @@ export async function joinProjectAsProfessional(
     return { ok: false, error: "You must be signed in." };
   }
 
-  const role = await getVenRoleForCurrentUser();
-  if (role !== "professional") {
+  if (!(await isCurrentUserProfessional())) {
     return { ok: false, error: "Only skilled professionals can join a team." };
   }
 

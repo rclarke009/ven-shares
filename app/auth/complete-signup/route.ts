@@ -2,7 +2,13 @@ import { auth, clerkClient } from "@clerk/nextjs/server";
 import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { VEN_ROLE_METADATA_KEY, getVenRoleFromPublicMetadata, isVenRole, type VenRole } from "@/lib/ven-role";
+import { isProfessionalOnboardingComplete } from "@/lib/professional-onboarding";
+import {
+  getVenRolesFromPublicMetadata,
+  isVenRole,
+  mergeVenRolesMetadata,
+  type VenRole,
+} from "@/lib/ven-role";
 import { SIGNUP_ROLE_COOKIE } from "@/lib/signup-role-cookie";
 
 function redirect(request: NextRequest, pathname: string) {
@@ -24,27 +30,28 @@ export async function GET(request: NextRequest) {
 
   const client = await clerkClient();
   const user = await client.users.getUser(userId);
-  const existing = user.publicMetadata[VEN_ROLE_METADATA_KEY];
-  const hasExisting = typeof existing === "string" && existing.length > 0;
+  const meta = user.publicMetadata as Record<string, unknown>;
+  const existing = getVenRolesFromPublicMetadata(meta);
 
-  if (!hasExisting && fromCookie && isVenRole(fromCookie)) {
+  if (fromCookie && isVenRole(fromCookie) && !existing.includes(fromCookie)) {
+    const next = [...existing, fromCookie];
     await client.users.updateUser(userId, {
-      publicMetadata: {
-        ...user.publicMetadata,
-        [VEN_ROLE_METADATA_KEY]: fromCookie,
-      },
+      publicMetadata: mergeVenRolesMetadata(meta, next),
     });
   }
 
   const refreshed = await client.users.getUser(userId);
-  const venRoleForRedirect = getVenRoleFromPublicMetadata(
-    refreshed.publicMetadata as Record<string, unknown>,
-  );
+  const nextMeta = refreshed.publicMetadata as Record<string, unknown>;
+  const roles = getVenRolesFromPublicMetadata(nextMeta);
 
-  const destination =
-    venRoleForRedirect === "professional"
-      ? "/onboarding/professional"
-      : "/dashboard";
+  let destination = "/dashboard";
+  if (roles.includes("professional") && !isProfessionalOnboardingComplete(nextMeta)) {
+    destination = "/onboarding/professional";
+  } else if (roles.length > 1) {
+    destination = "/dashboard?tab=inventor";
+  } else if (roles.includes("professional")) {
+    destination = "/dashboard?tab=professional";
+  }
 
   const res = redirect(request, destination);
   res.cookies.set(SIGNUP_ROLE_COOKIE, "", {
