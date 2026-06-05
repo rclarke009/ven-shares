@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { startTransition, useActionState, useEffect, useRef, useState } from "react";
 
 import {
@@ -28,6 +29,10 @@ export function AddProjectForm({
   const [selected, setSelected] = useState<string[]>([]);
   const [skillRowsKey, setSkillRowsKey] = useState(0);
   const [imageFileName, setImageFileName] = useState<string | null>(null);
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [imagePreviewBlobUrl, setImagePreviewBlobUrl] = useState<string | null>(
+    null,
+  );
   const [state, formAction, isPending] = useActionState(
     createProject,
     initialState,
@@ -35,11 +40,22 @@ export function AddProjectForm({
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
+    if (!selectedImageFile) {
+      setImagePreviewBlobUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(selectedImageFile);
+    setImagePreviewBlobUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [selectedImageFile]);
+
+  useEffect(() => {
     if (state.ok && formRef.current) {
       formRef.current.reset();
       startTransition(() => {
         setSelected([]);
         setImageFileName(null);
+        setSelectedImageFile(null);
         setSkillRowsKey((k) => k + 1);
       });
       onSuccess?.();
@@ -123,6 +139,18 @@ export function AddProjectForm({
             Representative image{" "}
             <span className="font-normal text-slate-500">(optional)</span>
           </span>
+          {imagePreviewBlobUrl ? (
+            <div className="relative h-24 w-24 rounded-lg overflow-hidden border border-slate-200 mb-2">
+              <Image
+                src={imagePreviewBlobUrl}
+                alt=""
+                fill
+                className="object-cover"
+                sizes="96px"
+                unoptimized
+              />
+            </div>
+          ) : null}
           <div className="flex flex-wrap items-center gap-2">
             <div className="rounded-lg has-[input:focus-visible]:ring-2 has-[input:focus-visible]:ring-[#22c55e] has-[input:focus-visible]:ring-offset-2">
               <input
@@ -131,9 +159,11 @@ export function AddProjectForm({
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
                 className="sr-only"
-                onChange={(e) =>
-                  setImageFileName(e.target.files?.[0]?.name ?? null)
-                }
+                onChange={(e) => {
+                  const file = e.target.files?.[0] ?? null;
+                  setSelectedImageFile(file);
+                  setImageFileName(file?.name ?? null);
+                }}
               />
               <label
                 htmlFor="representative_image"

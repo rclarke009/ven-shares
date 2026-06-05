@@ -119,6 +119,8 @@ export function EditProjectForm({
 
   const workspaceDisplayPreviewUrl =
     imagePreviewBlobUrl ?? arenaCardPreviewUrl;
+  const dashboardDisplayPreviewUrl =
+    imagePreviewBlobUrl ?? savedPreviewUrl;
 
   const imageField = (
     <div>
@@ -142,15 +144,15 @@ export function EditProjectForm({
             This is how your cover appears on Idea Arena cards (4:3 crop).
           </p>
         </>
-      ) : savedPreviewUrl ? (
+      ) : dashboardDisplayPreviewUrl ? (
         <div className="relative h-24 w-24 rounded-lg overflow-hidden border border-slate-200 mb-2">
           <Image
-            src={savedPreviewUrl}
+            src={dashboardDisplayPreviewUrl}
             alt=""
             fill
             className="object-cover"
             sizes="96px"
-            unoptimized
+            unoptimized={!!imagePreviewBlobUrl}
           />
         </div>
       ) : null}

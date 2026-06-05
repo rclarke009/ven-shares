@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 
 import type { ProfessionalOnboardingActionState } from "@/app/onboarding/professional/actions";
 import {
@@ -42,11 +42,30 @@ export function ProfessionalOnboardingForm({
   const [selected, setSelected] = useState<string[]>(() => [
     ...initialCategories,
   ]);
+  const [selectedProfilePhoto, setSelectedProfilePhoto] = useState<File | null>(
+    null,
+  );
+  const [profilePhotoPreviewUrl, setProfilePhotoPreviewUrl] = useState<
+    string | null
+  >(null);
   const initialState = useMemo<ProfessionalOnboardingActionState>(() => ({}), []);
   const [state, submitAction, pending] = useActionState(
     formAction,
     initialState,
   );
+
+  useEffect(() => {
+    if (!selectedProfilePhoto) {
+      setProfilePhotoPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(selectedProfilePhoto);
+    setProfilePhotoPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [selectedProfilePhoto]);
+
+  const displayProfileImageUrl =
+    profilePhotoPreviewUrl ?? initialProfileImageUrl;
 
   function toggleCategory(value: string) {
     setSelected((prev) => {
@@ -90,13 +109,14 @@ export function ProfessionalOnboardingForm({
             (JPEG, PNG, or WebP, up to 5 MB).
           </p>
           <div className="flex flex-wrap items-center gap-4">
-            {initialProfileImageUrl ? (
+            {displayProfileImageUrl ? (
               <Image
-                src={initialProfileImageUrl}
+                src={displayProfileImageUrl}
                 alt=""
                 width={72}
                 height={72}
                 className="rounded-full object-cover border-2 border-white shadow-sm"
+                unoptimized={!!profilePhotoPreviewUrl}
               />
             ) : (
               <div
@@ -119,6 +139,9 @@ export function ProfessionalOnboardingForm({
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
                 className="block w-full max-w-xs text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-xs file:font-medium file:text-slate-800 hover:file:bg-slate-200"
+                onChange={(e) =>
+                  setSelectedProfilePhoto(e.target.files?.[0] ?? null)
+                }
               />
             </div>
           </div>
