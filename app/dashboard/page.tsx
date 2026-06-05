@@ -2,6 +2,7 @@ import Link from "next/link";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
+import { AddOppositeRolePrompt } from "@/components/dashboard/add-opposite-role-prompt";
 import { DashboardAddProjectHeader } from "@/components/dashboard/dashboard-add-project-header";
 import { DashboardProfessionalHeader } from "@/components/dashboard/dashboard-professional-header";
 import { DashboardProjectProgressStack } from "@/components/dashboard/dashboard-project-progress-stack";
@@ -82,6 +83,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const showProfessionalPanel = showTabs
     ? activeTab === "professional"
     : hasProfessional;
+  const showAddOppositeRole = hasInventor !== hasProfessional;
+  const missingRole = hasInventor ? "professional" : "inventor";
 
   return (
     <div className="min-h-screen bg-[#f8fafc]">
@@ -160,6 +163,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               </span>
             </p>
           </>
+        ) : null}
+
+        {showAddOppositeRole ? (
+          <AddOppositeRolePrompt missingRole={missingRole} />
         ) : null}
 
         <Link

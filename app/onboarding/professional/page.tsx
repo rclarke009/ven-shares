@@ -2,10 +2,11 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
 import { completeProfessionalOnboarding } from "@/app/onboarding/professional/actions";
+import { AddOppositeRolePrompt } from "@/components/dashboard/add-opposite-role-prompt";
 import { VenSharesLogo } from "@/components/venshares-logo";
 import { ProfessionalOnboardingForm } from "@/components/onboarding/professional-onboarding-form";
 import { isProfessionalOnboardingComplete } from "@/lib/professional-onboarding";
-import { hasProfessionalRole } from "@/lib/ven-role";
+import { hasInventorRole, hasProfessionalRole } from "@/lib/ven-role";
 
 export default async function ProfessionalOnboardingPage() {
   const { userId } = await auth();
@@ -51,6 +52,9 @@ export default async function ProfessionalOnboardingPage() {
             showOnboardingCopy
           />
         </div>
+        {!hasInventorRole(meta) ? (
+          <AddOppositeRolePrompt missingRole="inventor" />
+        ) : null}
       </main>
     </div>
   );

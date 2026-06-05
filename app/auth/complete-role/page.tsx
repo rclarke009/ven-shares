@@ -30,8 +30,8 @@ export default async function CompleteRolePage() {
         Finish setting up your account
       </h1>
       <p className="text-slate-600 mb-10 max-w-md text-center text-sm leading-relaxed">
-        Choose how you&apos;ll use VenShares. You can add another role later
-        from your account menu.
+        Choose how you&apos;ll use VenShares. You can add the other role
+        anytime from your dashboard.
       </p>
       <div className="flex flex-col gap-4 w-full max-w-md">
         <form action={setVenRoleFromCompleteRole}>

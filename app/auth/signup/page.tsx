@@ -8,7 +8,7 @@ export default function SignUpHubPage() {
       </h1>
       <p className="text-slate-600 mb-10 max-w-md text-center">
         Choose how you&apos;ll use VenShares so we can tailor your experience.
-        You can add the other role later from your account menu.
+        You can add the other role anytime from your dashboard.
       </p>
       <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
         <Link

@@ -43,7 +43,7 @@ Optional: In the Clerk Dashboard, confirm **`publicMetadata.venRoles`** includes
 
 ## Dual-role account (inventor + professional)
 
-1. At **`/auth/complete-role`** (if prompted), choose **Both inventor and professional**, or sign up as one role and add the second later from the account menu (**Add inventor profile** / **Add professional profile**).
+1. At **`/auth/complete-role`** (if prompted), choose **Both inventor and professional**, or sign up as one role and add the second later from the dashboard **Add … profile** card (also available in the account avatar menu, and on professional onboarding for adding inventor).
 2. Complete professional onboarding if the professional role was added.
 3. **Verify:** On **`/dashboard`**, **Inventor** and **Professional** tabs appear. Switch tabs with **`?tab=inventor`** and **`?tab=professional`**.
 4. **Inventor tab:** create and manage your own projects.
