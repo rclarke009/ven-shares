@@ -19,11 +19,13 @@ import {
   parseWorkspaceProgressChecklist,
   trimChecklistToRequired,
 } from "@/lib/workspace-progress-checklist";
+import {
+  PROJECT_IMAGES_BUCKET,
+  versionedProjectImageStoragePath,
+} from "@/lib/project-image-url";
 import { isCurrentUserInventor } from "@/lib/ven-role.server";
 
 import type { RepresentativeImageOk } from "@/lib/representative-image-upload";
-
-const STORAGE_BUCKET = "project-images";
 
 export type ProjectRow = {
   id: string;
@@ -71,16 +73,30 @@ function normalizeSkillRows(
   return out.sort((a, b) => a.sort_order - b.sort_order);
 }
 
+async function removeStoredProjectImage(
+  path: string | null | undefined,
+): Promise<void> {
+  if (!path?.trim()) return;
+  const supabase = createServerSupabaseClient();
+  const { error } = await supabase.storage
+    .from(PROJECT_IMAGES_BUCKET)
+    .remove([path.replace(/^\/+/, "")]);
+  if (error) {
+    console.log("MYDEBUG →", error.message);
+  }
+}
+
 async function uploadProjectImage(
   projectId: string,
   image: Extract<RepresentativeImageOk, { skip: false }>,
 ): Promise<{ ok: true; path: string } | { ok: false; message: string }> {
   const supabase = createServerSupabaseClient();
-  const path = `${projectId}/${image.fileName}`;
-  const { error } = await supabase.storage.from(STORAGE_BUCKET).upload(path, image.buffer, {
-    contentType: image.contentType,
-    upsert: true,
-  });
+  const path = versionedProjectImageStoragePath(projectId, image.fileName);
+  const { error } = await supabase.storage
+    .from(PROJECT_IMAGES_BUCKET)
+    .upload(path, image.buffer, {
+      contentType: image.contentType,
+    });
   if (error) {
     console.log("MYDEBUG →", error.message);
     return { ok: false, message: "Could not upload image. Try again." };
@@ -365,7 +381,9 @@ export async function updateProjectWithMediaAndSkills(
 
   const primary = await supabase
     .from("projects")
-    .select("id, completed_job_categories, workspace_progress_checklist")
+    .select(
+      "id, completed_job_categories, workspace_progress_checklist, representative_image_path, hero_image_path",
+    )
     .eq("id", projectId)
     .eq("clerk_user_id", userId)
     .maybeSingle();
@@ -377,7 +395,9 @@ export async function updateProjectWithMediaAndSkills(
     checklistColumnAvailable = false;
     const legacy = await supabase
       .from("projects")
-      .select("id, completed_job_categories")
+      .select(
+        "id, completed_job_categories, representative_image_path, hero_image_path",
+      )
       .eq("id", projectId)
       .eq("clerk_user_id", userId)
       .maybeSingle();
@@ -396,6 +416,13 @@ export async function updateProjectWithMediaAndSkills(
   if (!row) {
     return { ok: false, error: "Project not found." };
   }
+
+  const previousRepresentativePath =
+    typeof row.representative_image_path === "string"
+      ? row.representative_image_path
+      : null;
+  const previousHeroPath =
+    typeof row.hero_image_path === "string" ? row.hero_image_path : null;
 
   const prevCompleted = normalizeRequiredJobCategoriesFromDb(
     row.completed_job_categories,
@@ -460,6 +487,7 @@ export async function updateProjectWithMediaAndSkills(
       console.log("MYDEBUG →", pathErr.message);
       return { ok: false, error: "Could not save image. Try again." };
     }
+    await removeStoredProjectImage(previousRepresentativePath);
   }
 
   if (!heroImageRead.skip) {
@@ -485,6 +513,7 @@ export async function updateProjectWithMediaAndSkills(
       console.log("MYDEBUG →", pathErr.message);
       return { ok: false, error: "Could not save hero image. Try again." };
     }
+    await removeStoredProjectImage(previousHeroPath);
   }
 
   const skillsOk = await replaceSkillsForProject(projectId, skillsParse.skills);
