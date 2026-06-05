@@ -1,28 +1,38 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
 
 import { workspaceHrefFromStorage } from "@/lib/workspace-last-view";
 
+const linkClass =
+  "text-sm font-medium text-slate-700 hover:text-[#22c55e] transition-colors";
+
 export function WorkspaceNavLink() {
+  const pathname = usePathname();
   const { userId, isLoaded } = useAuth();
-  const [href, setHref] = useState("/workspace");
+  const [workspaceHref, setWorkspaceHref] = useState("/workspace");
 
   useEffect(() => {
     if (!isLoaded || !userId) {
-      setHref("/workspace");
+      setWorkspaceHref("/workspace");
       return;
     }
-    setHref(workspaceHrefFromStorage(userId));
+    setWorkspaceHref(workspaceHrefFromStorage(userId));
   }, [isLoaded, userId]);
 
+  if (pathname.startsWith("/workspace")) {
+    return (
+      <Link href="/idea-arena" className={linkClass}>
+        Idea Arena
+      </Link>
+    );
+  }
+
   return (
-    <Link
-      href={href}
-      className="text-sm font-medium text-slate-700 hover:text-[#22c55e] transition-colors"
-    >
+    <Link href={workspaceHref} className={linkClass}>
       Workspace
     </Link>
   );

@@ -345,25 +345,35 @@ function FileRow({
             }
           />
           <div className="min-w-0">
+            {file.description ? (
+              <p className="text-sm font-medium text-slate-900 line-clamp-2">
+                {file.description}
+              </p>
+            ) : null}
             {previewable ? (
               <button
                 type="button"
                 onClick={() => void onPreview(file)}
-                className="text-sm font-medium text-slate-900 truncate text-left hover:underline cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#22c55e] rounded max-w-full"
+                className={`truncate text-left hover:underline cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#22c55e] rounded max-w-full ${
+                  file.description
+                    ? "mt-0.5 text-xs font-medium text-slate-500"
+                    : "text-sm font-medium text-slate-900"
+                }`}
                 aria-label={`Preview ${file.filename}`}
               >
                 {file.filename}
               </button>
             ) : (
-              <p className="text-sm font-medium text-slate-900 truncate">
+              <p
+                className={`truncate ${
+                  file.description
+                    ? "mt-0.5 text-xs font-medium text-slate-500"
+                    : "text-sm font-medium text-slate-900"
+                }`}
+              >
                 {file.filename}
               </p>
             )}
-            {file.description ? (
-              <p className="text-xs text-slate-600 mt-0.5 line-clamp-2">
-                {file.description}
-              </p>
-            ) : null}
             <p className="text-xs text-slate-500 mt-0.5">
               {nameMap[file.uploaded_by_clerk_user_id] ?? "Someone"} ·{" "}
               {formatBytes(file.byte_size)} · {formatTime(file.created_at)}
