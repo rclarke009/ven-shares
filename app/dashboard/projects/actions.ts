@@ -379,33 +379,89 @@ export async function updateProjectWithMediaAndSkills(
     );
   }
 
+  function isMissingHeroImagePathColumn(error: {
+    code?: string;
+    message: string;
+  }): boolean {
+    return (
+      error.code === "42703" && error.message.includes("hero_image_path")
+    );
+  }
+
+  const projectSelectFull =
+    "id, completed_job_categories, workspace_progress_checklist, representative_image_path, hero_image_path";
+  const projectSelectWithoutHero =
+    "id, completed_job_categories, workspace_progress_checklist, representative_image_path";
+  const projectSelectWithoutChecklist =
+    "id, completed_job_categories, representative_image_path, hero_image_path";
+  const projectSelectLegacy =
+    "id, completed_job_categories, representative_image_path";
+
   const primary = await supabase
     .from("projects")
-    .select(
-      "id, completed_job_categories, workspace_progress_checklist, representative_image_path, hero_image_path",
-    )
+    .select(projectSelectFull)
     .eq("id", projectId)
     .eq("clerk_user_id", userId)
     .maybeSingle();
 
   let row: Record<string, unknown> | null = null;
   let checklistColumnAvailable = true;
+  let heroColumnAvailable = true;
 
-  if (primary.error && isMissingWorkspaceProgressColumn(primary.error)) {
-    checklistColumnAvailable = false;
-    const legacy = await supabase
+  if (primary.error && isMissingHeroImagePathColumn(primary.error)) {
+    heroColumnAvailable = false;
+    const fallback = await supabase
       .from("projects")
-      .select(
-        "id, completed_job_categories, representative_image_path, hero_image_path",
-      )
+      .select(projectSelectWithoutHero)
       .eq("id", projectId)
       .eq("clerk_user_id", userId)
       .maybeSingle();
-    if (legacy.error) {
+    if (fallback.error && isMissingWorkspaceProgressColumn(fallback.error)) {
+      checklistColumnAvailable = false;
+      const legacy = await supabase
+        .from("projects")
+        .select(projectSelectLegacy)
+        .eq("id", projectId)
+        .eq("clerk_user_id", userId)
+        .maybeSingle();
+      if (legacy.error) {
+        console.log("MYDEBUG →", legacy.error.message);
+        return { ok: false, error: "Could not update project. Try again." };
+      }
+      row = (legacy.data as Record<string, unknown> | null) ?? null;
+    } else if (fallback.error) {
+      console.log("MYDEBUG →", fallback.error.message);
+      return { ok: false, error: "Could not update project. Try again." };
+    } else {
+      row = (fallback.data as Record<string, unknown> | null) ?? null;
+    }
+  } else if (primary.error && isMissingWorkspaceProgressColumn(primary.error)) {
+    checklistColumnAvailable = false;
+    const legacy = await supabase
+      .from("projects")
+      .select(projectSelectWithoutChecklist)
+      .eq("id", projectId)
+      .eq("clerk_user_id", userId)
+      .maybeSingle();
+    if (legacy.error && isMissingHeroImagePathColumn(legacy.error)) {
+      heroColumnAvailable = false;
+      const legacyNoHero = await supabase
+        .from("projects")
+        .select(projectSelectLegacy)
+        .eq("id", projectId)
+        .eq("clerk_user_id", userId)
+        .maybeSingle();
+      if (legacyNoHero.error) {
+        console.log("MYDEBUG →", legacyNoHero.error.message);
+        return { ok: false, error: "Could not update project. Try again." };
+      }
+      row = (legacyNoHero.data as Record<string, unknown> | null) ?? null;
+    } else if (legacy.error) {
       console.log("MYDEBUG →", legacy.error.message);
       return { ok: false, error: "Could not update project. Try again." };
+    } else {
+      row = (legacy.data as Record<string, unknown> | null) ?? null;
     }
-    row = (legacy.data as Record<string, unknown> | null) ?? null;
   } else if (primary.error) {
     console.log("MYDEBUG →", primary.error.message);
     return { ok: false, error: "Could not update project. Try again." };
@@ -491,6 +547,13 @@ export async function updateProjectWithMediaAndSkills(
   }
 
   if (!heroImageRead.skip) {
+    if (!heroColumnAvailable) {
+      return {
+        ok: false,
+        error:
+          "Hero image is not available yet. Apply the latest database migration.",
+      };
+    }
     const up = await uploadProjectImage(projectId, heroImageRead);
     if (!up.ok) {
       return { ok: false, error: up.message };
