@@ -21,7 +21,7 @@ export default async function CompleteRolePage() {
       user.publicMetadata as Record<string, unknown>,
     ).length > 0
   ) {
-    redirect("/dashboard");
+    redirect("/workspace");
   }
 
   return (

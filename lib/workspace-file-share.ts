@@ -18,7 +18,7 @@ export function buildWorkspaceFileShareInvite(opts: {
   } = opts;
   const base = origin.replace(/\/$/, "");
   const params = new URLSearchParams({ tab: "organizer", file: fileId });
-  const shareUrl = `${base}/idea-arena/${projectId}/workspace?${params.toString()}`;
+  const shareUrl = `${base}/workspace/${projectId}?${params.toString()}`;
 
   const subject = `VenShares — file on “${projectTitle}”: ${filename}`;
   const bodyLines = [

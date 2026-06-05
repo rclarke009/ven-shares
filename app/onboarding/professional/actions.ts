@@ -77,9 +77,9 @@ export async function completeProfessionalOnboarding(
     },
   });
 
-  revalidatePath("/dashboard");
+  revalidatePath("/workspace");
   revalidatePath("/idea-arena");
   revalidatePath("/onboarding/professional");
 
-  redirect("/dashboard?tab=professional");
+  redirect("/workspace?tab=professional");
 }

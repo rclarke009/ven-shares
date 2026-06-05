@@ -72,9 +72,9 @@ export async function updateProfessionalProfileSkills(
     },
   });
 
-  revalidatePath("/dashboard");
+  revalidatePath("/workspace");
   revalidatePath("/dashboard/profile");
   revalidatePath("/idea-arena");
   revalidatePath("/onboarding/professional");
-  redirect("/dashboard");
+  redirect("/workspace");
 }

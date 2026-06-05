@@ -16,14 +16,14 @@ export function DashboardRoleTabs({ activeTab }: DashboardRoleTabsProps) {
       aria-label="Dashboard role"
     >
       <Link
-        href="/dashboard?tab=inventor"
+        href="/workspace?tab=inventor"
         className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${tabClass("inventor")}`}
         aria-current={activeTab === "inventor" ? "page" : undefined}
       >
         Inventor
       </Link>
       <Link
-        href="/dashboard?tab=professional"
+        href="/workspace?tab=professional"
         className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${tabClass("professional")}`}
         aria-current={activeTab === "professional" ? "page" : undefined}
       >

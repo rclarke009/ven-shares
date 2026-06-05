@@ -260,7 +260,7 @@ export async function createProject(
     return { ok: false, error: skillsOk.message };
   }
 
-  revalidatePath("/dashboard");
+  revalidatePath("/workspace");
   revalidatePath("/idea-arena");
   return { ok: true, error: "" };
 }
@@ -428,9 +428,10 @@ export async function updateProjectWithMediaAndSkills(
     return { ok: false, error: skillsOk.message };
   }
 
-  revalidatePath("/dashboard");
+  revalidatePath("/workspace");
   revalidatePath("/idea-arena");
   revalidatePath(`/idea-arena/${projectId}`);
+  revalidatePath(`/workspace/${projectId}`);
   revalidatePath(`/idea-arena/${projectId}/workspace`);
   return { ok: true, error: "" };
 }

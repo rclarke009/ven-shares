@@ -39,14 +39,15 @@ import {
 } from "@/lib/workspace";
 
 function workspacePath(projectId: string) {
-  return `/idea-arena/${projectId}/workspace`;
+  return `/workspace/${projectId}`;
 }
 
 function revalidateArenaAndWorkspace(projectId: string) {
   revalidatePath("/idea-arena");
   revalidatePath(`/idea-arena/${projectId}`);
   revalidatePath(workspacePath(projectId));
-  revalidatePath("/dashboard");
+  revalidatePath("/workspace");
+  revalidatePath(`/idea-arena/${projectId}/workspace`);
 }
 
 function isMissingWorkspaceProgressColumn(error: {

@@ -105,8 +105,8 @@ export default function LandingPage() {
               <Link href="/idea-arena" className="text-sm font-medium text-slate-700 hover:text-[#22c55e] transition-colors">
                 Idea Arena
               </Link>
-              <Link href="/dashboard" className="ven-cta text-sm px-6 lg:px-8 py-3">
-                Dashboard
+              <Link href="/workspace" className="ven-cta text-sm px-6 lg:px-8 py-3">
+                Workspace
               </Link>
               <VenUserButtonFromServer />
             </Show>
@@ -133,8 +133,8 @@ export default function LandingPage() {
                   <Link href="/idea-arena" className="rounded-lg px-3 py-2 font-medium text-slate-700 hover:bg-slate-50 hover:text-[#22c55e]">
                     Idea Arena
                   </Link>
-                  <Link href="/dashboard" className="ven-cta block text-center text-sm px-4 py-2.5">
-                    Dashboard
+                  <Link href="/workspace" className="ven-cta block text-center text-sm px-4 py-2.5">
+                    Workspace
                   </Link>
                   <div className="flex justify-center pt-1">
                     <VenUserButtonFromServer />

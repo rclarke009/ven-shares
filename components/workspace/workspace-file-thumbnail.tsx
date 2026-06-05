@@ -1,7 +1,7 @@
 "use client";
 
 import { File, FileImage, FileText } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { actionGetWorkspaceFileDownloadUrl } from "@/app/idea-arena/[projectId]/workspace/actions";
 import { renderPdfFirstPageDataUrl } from "@/lib/workspace-pdf-thumbnail.client";
@@ -42,6 +42,60 @@ function ThumbnailSkeleton() {
       className={`${THUMB_BOX} animate-pulse bg-slate-200`}
       aria-hidden
     />
+  );
+}
+
+const thumbButtonClass =
+  "rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#22c55e]";
+
+function ThumbnailButton({
+  filename,
+  onClick,
+  children,
+}: {
+  filename: string;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={thumbButtonClass}
+      aria-label={`Preview ${filename}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function ThumbnailWrap({
+  rootRef,
+  wrapperClass,
+  filename,
+  onThumbClick,
+  children,
+}: {
+  rootRef: React.RefObject<HTMLDivElement | null>;
+  wrapperClass: string;
+  filename: string;
+  onThumbClick?: () => void;
+  children: ReactNode;
+}) {
+  if (onThumbClick) {
+    return (
+      <div ref={rootRef} className={wrapperClass}>
+        <ThumbnailButton filename={filename} onClick={onThumbClick}>
+          {children}
+        </ThumbnailButton>
+      </div>
+    );
+  }
+
+  return (
+    <div ref={rootRef} className={wrapperClass}>
+      {children}
+    </div>
   );
 }
 
@@ -135,17 +189,27 @@ export function WorkspaceFileThumbnail({
     const placeholderKind =
       kind === "pdf" ? "pdf" : kind === "image" ? "image" : "file";
     return (
-      <div ref={rootRef} className={wrapperClass}>
+      <ThumbnailWrap
+        rootRef={rootRef}
+        wrapperClass={wrapperClass}
+        filename={filename}
+        onThumbClick={onThumbClick}
+      >
         <ThumbnailPlaceholder kind={placeholderKind} />
-      </div>
+      </ThumbnailWrap>
     );
   }
 
   if (!visible || !src) {
     return (
-      <div ref={rootRef} className={wrapperClass}>
+      <ThumbnailWrap
+        rootRef={rootRef}
+        wrapperClass={wrapperClass}
+        filename={filename}
+        onThumbClick={onThumbClick}
+      >
         <ThumbnailSkeleton />
-      </div>
+      </ThumbnailWrap>
     );
   }
 
@@ -161,24 +225,14 @@ export function WorkspaceFileThumbnail({
     />
   );
 
-  if (onThumbClick) {
-    return (
-      <div ref={rootRef} className={wrapperClass}>
-        <button
-          type="button"
-          onClick={onThumbClick}
-          className="rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#22c55e]"
-          aria-label={`Preview ${filename}`}
-        >
-          {img}
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div ref={rootRef} className={wrapperClass}>
+    <ThumbnailWrap
+      rootRef={rootRef}
+      wrapperClass={wrapperClass}
+      filename={filename}
+      onThumbClick={onThumbClick}
+    >
       {img}
-    </div>
+    </ThumbnailWrap>
   );
 }

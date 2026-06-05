@@ -52,6 +52,7 @@ type ArchivedFileRowProps = {
   nameMap: Record<string, string>;
   downloadBusy: string | null;
   onDownload: (fileId: string) => void;
+  onPreview: (file: WorkspaceFileDTO) => void;
 };
 
 function ArchivedFileRow({
@@ -60,7 +61,10 @@ function ArchivedFileRow({
   nameMap,
   downloadBusy,
   onDownload,
+  onPreview,
 }: ArchivedFileRowProps) {
+  const previewable = getWorkspacePreviewKind(file) !== null;
+
   return (
     <li className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-slate-50/30">
       <div className="flex min-w-0 items-start gap-3">
@@ -70,12 +74,26 @@ function ArchivedFileRow({
           filename={file.filename}
           content_type={file.content_type}
           dimmed
+          onThumbClick={
+            previewable ? () => void onPreview(file) : undefined
+          }
         />
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="text-xs font-medium text-slate-500 truncate">
-              {file.filename}
-            </p>
+            {previewable ? (
+              <button
+                type="button"
+                onClick={() => void onPreview(file)}
+                className="text-xs font-medium text-slate-500 truncate text-left hover:underline cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#22c55e] rounded"
+                aria-label={`Preview ${file.filename}`}
+              >
+                {file.filename}
+              </button>
+            ) : (
+              <p className="text-xs font-medium text-slate-500 truncate">
+                {file.filename}
+              </p>
+            )}
             <span className="rounded-full bg-slate-200/80 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-500">
               Archived
             </span>
@@ -327,9 +345,20 @@ function FileRow({
             }
           />
           <div className="min-w-0">
-            <p className="text-sm font-medium text-slate-900 truncate">
-              {file.filename}
-            </p>
+            {previewable ? (
+              <button
+                type="button"
+                onClick={() => void onPreview(file)}
+                className="text-sm font-medium text-slate-900 truncate text-left hover:underline cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#22c55e] rounded max-w-full"
+                aria-label={`Preview ${file.filename}`}
+              >
+                {file.filename}
+              </button>
+            ) : (
+              <p className="text-sm font-medium text-slate-900 truncate">
+                {file.filename}
+              </p>
+            )}
             {file.description ? (
               <p className="text-xs text-slate-600 mt-0.5 line-clamp-2">
                 {file.description}
@@ -566,6 +595,7 @@ export function OrganizerSkillFiles({
                   nameMap={nameMap}
                   downloadBusy={actions.downloadBusy}
                   onDownload={actions.onDownload}
+                  onPreview={actions.openPreview}
                 />
               ))}
             </ul>
@@ -640,7 +670,7 @@ export function OrganizerUncategorizedFiles({
     onRequestArchive: actions.onRequestArchive,
     onCancelArchive: actions.onCancelArchive,
     onConfirmArchive: actions.onConfirmArchive,
-    allowPreview: false,
+    allowPreview: true,
   };
 
   return (
@@ -695,6 +725,7 @@ export function OrganizerUncategorizedFiles({
                   nameMap={nameMap}
                   downloadBusy={actions.downloadBusy}
                   onDownload={actions.onDownload}
+                  onPreview={actions.openPreview}
                 />
               ))}
             </ul>

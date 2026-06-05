@@ -33,7 +33,7 @@ export async function setVenRoleFromCompleteRole(formData: FormData) {
   const user = await client.users.getUser(userId);
   const meta = user.publicMetadata as Record<string, unknown>;
   if (getVenRolesFromPublicMetadata(meta).length > 0) {
-    redirect("/dashboard");
+    redirect("/workspace");
   }
 
   await client.users.updateUser(userId, {
@@ -48,7 +48,7 @@ export async function setVenRoleFromCompleteRole(formData: FormData) {
   }
 
   redirect(
-    nextRoles.length > 1 ? "/dashboard?tab=inventor" : "/dashboard",
+    nextRoles.length > 1 ? "/workspace?tab=inventor" : "/workspace",
   );
 }
 
@@ -59,7 +59,7 @@ export async function addVenRole(role: VenRole) {
   }
 
   if (!isVenRole(role)) {
-    redirect("/dashboard");
+    redirect("/workspace");
   }
 
   const client = await clerkClient();
@@ -70,8 +70,8 @@ export async function addVenRole(role: VenRole) {
   if (existing.includes(role)) {
     redirect(
       role === "professional"
-        ? "/dashboard?tab=professional"
-        : "/dashboard?tab=inventor",
+        ? "/workspace?tab=professional"
+        : "/workspace?tab=inventor",
     );
   }
 
@@ -86,8 +86,8 @@ export async function addVenRole(role: VenRole) {
     if (!isProfessionalOnboardingComplete(nextMeta)) {
       redirect("/onboarding/professional");
     }
-    redirect("/dashboard?tab=professional");
+    redirect("/workspace?tab=professional");
   }
 
-  redirect("/dashboard?tab=inventor");
+  redirect("/workspace?tab=inventor");
 }

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 
+import { WorkspaceNavLink } from "@/components/workspace/workspace-nav-link";
 import { VenSharesLogo } from "@/components/venshares-logo";
 import { VenUserButton } from "@/components/ven-user-button";
 import type { VenUserButtonProfileMode } from "@/lib/ven-role";
@@ -34,12 +35,7 @@ export function ArenaHeader({ profileMode }: ArenaHeaderProps) {
           ))}
         </nav>
         <div className="flex items-center gap-4 shrink-0">
-          <Link
-            href="/dashboard"
-            className="text-sm font-medium text-slate-700 hover:text-[#22c55e] transition-colors"
-          >
-            Dashboard
-          </Link>
+          <WorkspaceNavLink />
           <VenUserButton profileMode={profileMode} />
         </div>
       </div>

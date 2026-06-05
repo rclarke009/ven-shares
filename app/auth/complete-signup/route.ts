@@ -44,13 +44,13 @@ export async function GET(request: NextRequest) {
   const nextMeta = refreshed.publicMetadata as Record<string, unknown>;
   const roles = getVenRolesFromPublicMetadata(nextMeta);
 
-  let destination = "/dashboard";
+  let destination = "/workspace";
   if (roles.includes("professional") && !isProfessionalOnboardingComplete(nextMeta)) {
     destination = "/onboarding/professional";
   } else if (roles.length > 1) {
-    destination = "/dashboard?tab=inventor";
+    destination = "/workspace?tab=inventor";
   } else if (roles.includes("professional")) {
-    destination = "/dashboard?tab=professional";
+    destination = "/workspace?tab=professional";
   }
 
   const res = redirect(request, destination);

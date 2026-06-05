@@ -44,6 +44,7 @@ export async function getMembershipForCurrentUser(
 export type JoinedProjectRow = {
   id: string;
   title: string;
+  representative_image_path: string | null;
   joinedAt: string;
 };
 
@@ -58,7 +59,7 @@ export async function listJoinedProjectsForCurrentUser(): Promise<
   const supabase = createServerSupabaseClient();
   const { data, error } = await supabase
     .from("project_members")
-    .select("created_at, projects ( id, title )")
+    .select("created_at, projects ( id, title, representative_image_path )")
     .eq("clerk_user_id", userId)
     .order("created_at", { ascending: false });
 
@@ -70,8 +71,8 @@ export async function listJoinedProjectsForCurrentUser(): Promise<
   const rows: JoinedProjectRow[] = [];
   for (const row of data ?? []) {
     const project = row.projects as
-      | { id: string; title: string }
-      | { id: string; title: string }[]
+      | { id: string; title: string; representative_image_path: string | null }
+      | { id: string; title: string; representative_image_path: string | null }[]
       | null;
     const p = Array.isArray(project) ? project[0] : project;
     if (!p?.id || typeof p.title !== "string") continue;
@@ -79,6 +80,10 @@ export async function listJoinedProjectsForCurrentUser(): Promise<
     rows.push({
       id: p.id,
       title: p.title,
+      representative_image_path:
+        typeof p.representative_image_path === "string"
+          ? p.representative_image_path
+          : null,
       joinedAt: row.created_at as string,
     });
   }

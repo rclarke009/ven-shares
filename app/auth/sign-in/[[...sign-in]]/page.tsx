@@ -9,7 +9,7 @@ export default function SignInPage() {
         path="/auth/sign-in"
         routing="path"
         signUpUrl="/auth/signup"
-        forceRedirectUrl="/dashboard"
+        forceRedirectUrl="/workspace"
       />
     </div>
   );

@@ -101,7 +101,7 @@ export function DashboardMiniProjectStrip({
             const skillsSummary = summarizeCategoryStatuses(
               project.categoryStatuses,
             );
-            const workspaceHref = `/idea-arena/${project.projectId}/workspace?tab=organizer`;
+            const workspaceHref = `/workspace/${project.projectId}?tab=organizer`;
             const ariaLabel = `${project.projectTitle}. ${overallStatusLabel(overall)}. ${skillsSummary}. Open workspace.`;
 
             return (

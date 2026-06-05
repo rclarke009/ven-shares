@@ -21,10 +21,10 @@ export default async function ProfessionalOnboardingPage() {
 
   const meta = user.publicMetadata as Record<string, unknown>;
   if (!hasProfessionalRole(meta)) {
-    redirect("/dashboard");
+    redirect("/workspace");
   }
   if (isProfessionalOnboardingComplete(meta)) {
-    redirect("/dashboard");
+    redirect("/workspace");
   }
 
   return (

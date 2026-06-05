@@ -80,8 +80,8 @@ export default async function IdeaArenaPage({
         {allProjects.length === 0 ? (
           <p className="text-slate-600 text-sm max-w-lg">
             No projects yet. Inventors can add projects from the{" "}
-            <Link href="/dashboard" className="text-[#22c55e] font-medium hover:underline">
-              dashboard
+            <Link href="/workspace" className="text-[#22c55e] font-medium hover:underline">
+              workspace
             </Link>
             .
           </p>
@@ -117,7 +117,7 @@ export default async function IdeaArenaPage({
             )}
           </div>
         ) : (
-          <div className="flex gap-6 overflow-x-auto pb-4 pt-1 snap-x snap-mandatory">
+          <div className="flex gap-6 overflow-x-auto pb-4 pt-2 px-2 snap-x snap-mandatory scroll-pl-2 scroll-pr-2">
             {filteredProjects.map((p) => (
               <ProjectCard
                 key={p.id}

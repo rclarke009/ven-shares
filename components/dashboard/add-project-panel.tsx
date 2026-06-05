@@ -74,7 +74,7 @@ export function AddProjectPanel({ projects }: AddProjectPanelProps) {
               </p>
               <p className="mt-2">
                 <Link
-                  href={`/idea-arena/${p.id}/workspace`}
+                  href={`/workspace/${p.id}`}
                   className="text-sm font-semibold text-[#15803d] hover:underline"
                 >
                   Open workspace

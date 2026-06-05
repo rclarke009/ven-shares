@@ -25,7 +25,7 @@ export default async function ProfessionalProfilePage() {
 
   const meta = user.publicMetadata as Record<string, unknown>;
   if (!hasProfessionalRole(meta)) {
-    redirect("/dashboard");
+    redirect("/workspace");
   }
 
   const initialCategories = getProfessionalJobCategoriesFromMetadata(meta);
@@ -38,10 +38,10 @@ export default async function ProfessionalProfilePage() {
           <VenSharesLogo />
           <div className="flex items-center gap-4">
             <Link
-              href="/dashboard"
+              href="/workspace"
               className="text-sm font-medium text-slate-700 hover:text-[#22c55e]"
             >
-              Dashboard
+              Workspace
             </Link>
             <Link
               href="/idea-arena"

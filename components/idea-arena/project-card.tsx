@@ -130,7 +130,7 @@ export function ProjectCard({
         <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-400 text-center mb-2">
           Team
         </p>
-        <div className="flex-1 min-h-0 max-h-[200px] overflow-y-auto flex flex-col items-center gap-3 px-0.5">
+        <div className="flex-1 min-h-0 max-h-[200px] overflow-y-auto flex flex-col items-center gap-3 px-0.5 pt-1 pb-1">
           {teamPreview.length === 0 ? (
             <p className="text-[10px] text-slate-400 text-center leading-snug">
               No team yet
@@ -148,7 +148,7 @@ export function ProjectCard({
                       displayName={m.displayName}
                       imageUrl={m.imageUrl}
                       size={32}
-                      className="ring-1 ring-slate-500/80"
+                      className="border border-slate-500/80"
                     />
                     <span
                       className="text-[9px] text-slate-200 text-center leading-tight font-medium line-clamp-2 w-full"

@@ -28,8 +28,8 @@ export function DashboardProjectProgressCard({
   isProjectOwner = true,
 }: DashboardProjectProgressCardProps) {
   const { done, total } = countChecklistLeaves(bundle.checklist);
-  const workspaceHref = `/idea-arena/${bundle.projectId}/workspace?tab=organizer`;
-  const settingsHref = `/idea-arena/${bundle.projectId}/workspace?tab=settings`;
+  const workspaceHref = `/workspace/${bundle.projectId}?tab=organizer`;
+  const settingsHref = `/workspace/${bundle.projectId}?tab=settings`;
 
   return (
     <article className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">

@@ -14,7 +14,7 @@ export async function GET(
 ) {
   const { role: raw } = await params;
   if (!isVenRole(raw)) {
-    redirect("/dashboard");
+    redirect("/workspace");
   }
   await addVenRole(raw as VenRole);
 }

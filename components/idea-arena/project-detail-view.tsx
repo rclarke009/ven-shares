@@ -226,7 +226,7 @@ export function ProjectDetailView({
                       : "You’re on this team."}
                   </p>
                   <Link
-                    href={`/idea-arena/${project.id}/workspace`}
+                    href={`/workspace/${project.id}`}
                     className="inline-flex text-sm font-semibold text-white bg-[#15803d] hover:bg-[#166534] rounded-lg px-4 py-2 transition-colors"
                   >
                     Open workspace
@@ -266,7 +266,7 @@ export function ProjectDetailView({
                   </p>
                   {canOpenWorkspace ? (
                     <Link
-                      href={`/idea-arena/${project.id}/workspace`}
+                      href={`/workspace/${project.id}`}
                       className="inline-block text-[10px] font-semibold text-sky-300 hover:text-sky-200 hover:underline"
                     >
                       Open workspace
