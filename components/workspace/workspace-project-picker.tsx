@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronUp, LayoutGrid } from "lucide-react";
+import { ChevronDown, LayoutGrid } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -21,28 +21,6 @@ type WorkspaceProjectPickerProps = {
   activeProjectId: string | null;
   currentUserId: string;
 };
-
-function pickerCollapsedStorageKey(userId: string): string {
-  return `ven-shares:workspace-picker-collapsed:${userId}`;
-}
-
-function readPickerCollapsed(key: string): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    return window.localStorage.getItem(key) === "true";
-  } catch {
-    return false;
-  }
-}
-
-function writePickerCollapsed(key: string, collapsed: boolean): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(key, collapsed ? "true" : "false");
-  } catch {
-    // Quota or private browsing — ignore
-  }
-}
 
 function ProjectThumb({ project }: { project: WorkspacePickerProject }) {
   const src = arenaProjectImageUrl(project);
@@ -120,16 +98,8 @@ export function WorkspaceProjectPicker({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const collapseKey = pickerCollapsedStorageKey(currentUserId);
-  const [sectionCollapsed, setSectionCollapsed] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
 
   const isAllProjects = activeProjectId === null;
-
-  useEffect(() => {
-    setSectionCollapsed(readPickerCollapsed(collapseKey));
-    setHydrated(true);
-  }, [collapseKey]);
 
   const closeMenu = useCallback(() => {
     setMenuOpen(false);
@@ -173,110 +143,75 @@ export function WorkspaceProjectPicker({
     router.push(`/workspace/${id}`);
   }
 
-  const toggleSectionCollapsed = useCallback(() => {
-    setSectionCollapsed((prev) => {
-      const next = !prev;
-      writePickerCollapsed(collapseKey, next);
-      if (next) closeMenu();
-      return next;
-    });
-  }, [collapseKey, closeMenu]);
-
-  const isSectionCollapsed = hydrated ? sectionCollapsed : false;
-
   return (
     <div
       ref={rootRef}
       className="border-b border-slate-600/80 p-3 pb-4"
     >
-      <div className="flex items-center justify-between gap-2 mb-2 px-1">
-        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
-          Projects
-        </p>
-        <button
-          type="button"
-          onClick={toggleSectionCollapsed}
-          className="inline-flex items-center rounded-md p-1 text-slate-400 hover:bg-slate-600/60 hover:text-slate-200 transition-colors"
-          aria-expanded={!isSectionCollapsed}
-          aria-controls="workspace-project-picker-body"
-          aria-label={isSectionCollapsed ? "Show projects" : "Hide projects"}
-        >
-          {isSectionCollapsed ? (
-            <ChevronDown className="h-4 w-4" aria-hidden />
-          ) : (
-            <ChevronUp className="h-4 w-4" aria-hidden />
-          )}
-        </button>
-      </div>
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => setMenuOpen((prev) => !prev)}
+        className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm transition-colors ${
+          menuOpen
+            ? "bg-slate-500/80 text-white"
+            : "bg-slate-600/50 text-slate-100 hover:bg-slate-600/80"
+        }`}
+        aria-haspopup="menu"
+        aria-expanded={menuOpen}
+        aria-controls="workspace-project-picker-menu"
+        aria-label="Choose project"
+      >
+        <LayoutGrid className="h-5 w-5 shrink-0 opacity-90" aria-hidden />
+        <span className="truncate flex-1 font-medium">Choose Project</span>
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 opacity-80 transition-transform ${
+            menuOpen ? "rotate-180" : ""
+          }`}
+          aria-hidden
+        />
+      </button>
 
-      {isSectionCollapsed ? null : (
-        <div id="workspace-project-picker-body">
+      <AnchoredMenuPanel
+        open={menuOpen}
+        triggerRef={triggerRef}
+        menuRef={menuRef}
+        className="min-w-[14rem] max-w-[min(18rem,calc(100vw-1rem))] py-1"
+      >
+        <div
+          id="workspace-project-picker-menu"
+          className="max-h-64 overflow-y-auto"
+        >
           <button
-            ref={triggerRef}
             type="button"
-            onClick={() => setMenuOpen((prev) => !prev)}
-            className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm transition-colors ${
-              menuOpen
-                ? "bg-slate-500/80 text-white"
-                : "bg-slate-600/50 text-slate-100 hover:bg-slate-600/80"
+            role="menuitem"
+            onClick={selectAll}
+            className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
+              isAllProjects
+                ? "bg-slate-100 font-medium text-slate-900"
+                : "text-slate-700 hover:bg-slate-50"
             }`}
-            aria-haspopup="menu"
-            aria-expanded={menuOpen}
-            aria-controls="workspace-project-picker-menu"
-            aria-label="Choose project"
           >
-            <LayoutGrid className="h-5 w-5 shrink-0 opacity-90" aria-hidden />
-            <span className="truncate flex-1 font-medium">Choose Project</span>
-            <ChevronDown
-              className={`h-4 w-4 shrink-0 opacity-80 transition-transform ${
-                menuOpen ? "rotate-180" : ""
-              }`}
+            <LayoutGrid
+              className="h-5 w-5 shrink-0 text-slate-500"
               aria-hidden
             />
+            <span>All Projects</span>
           </button>
-
-          <AnchoredMenuPanel
-            open={menuOpen}
-            triggerRef={triggerRef}
-            menuRef={menuRef}
-            className="min-w-[14rem] max-w-[min(18rem,calc(100vw-1rem))] py-1"
-          >
-            <div
-              id="workspace-project-picker-menu"
-              className="max-h-64 overflow-y-auto"
-            >
-              <button
-                type="button"
-                role="menuitem"
-                onClick={selectAll}
-                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
-                  isAllProjects
-                    ? "bg-slate-100 font-medium text-slate-900"
-                    : "text-slate-700 hover:bg-slate-50"
-                }`}
-              >
-                <LayoutGrid
-                  className="h-5 w-5 shrink-0 text-slate-500"
-                  aria-hidden
-                />
-                <span>All Projects</span>
-              </button>
-              <DropdownGroup
-                label="My projects"
-                projects={owned}
-                activeProjectId={activeProjectId}
-                onSelect={selectProject}
-              />
-              <DropdownGroup
-                label="Teams I'm on"
-                projects={joined}
-                activeProjectId={activeProjectId}
-                onSelect={selectProject}
-              />
-            </div>
-          </AnchoredMenuPanel>
+          <DropdownGroup
+            label="My projects"
+            projects={owned}
+            activeProjectId={activeProjectId}
+            onSelect={selectProject}
+          />
+          <DropdownGroup
+            label="Teams I'm on"
+            projects={joined}
+            activeProjectId={activeProjectId}
+            onSelect={selectProject}
+          />
         </div>
-      )}
+      </AnchoredMenuPanel>
     </div>
   );
 }
