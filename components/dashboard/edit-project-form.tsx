@@ -390,8 +390,8 @@ export function EditProjectForm({
       <div className="space-y-3 mb-4">
         {isWorkspace ? (
           <>
-            {heroImageField}
             {arenaImageField}
+            {heroImageField}
             {titleAndDescriptionFields}
           </>
         ) : (

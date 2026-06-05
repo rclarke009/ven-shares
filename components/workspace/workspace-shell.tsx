@@ -521,7 +521,7 @@ export function WorkspaceShell({
               Arena Card Details
             </h2>
             <p className="text-sm text-slate-600 mb-4">
-              Set your workspace banner and Idea Arena card image, plus title,
+              Set your Idea Arena card image and workspace banner, plus title,
               summary, and the team skills professionals need to join.
             </p>
             <EditProjectForm
