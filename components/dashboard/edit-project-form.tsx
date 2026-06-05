@@ -443,6 +443,17 @@ export function EditProjectForm({
         );
         if (selectedImageFile) {
           fd.set("representative_image_original", selectedImageFile);
+        } else if (
+          !project.representative_image_original_path?.trim() &&
+          arenaCropImageSrc
+        ) {
+          const originalFile = await fetchImageAsFile(
+            arenaCropImageSrc,
+            "cover-original.webp",
+          );
+          if (originalFile) {
+            fd.set("representative_image_original", originalFile);
+          }
         }
       }
 
