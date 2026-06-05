@@ -23,6 +23,7 @@ import type { ProfessionalJobCategory } from "@/lib/professional-onboarding";
 import type { ArenaCategorySlot } from "@/lib/projects-arena";
 import type { ArenaCategoryCoverage } from "@/lib/arena-team-display";
 import type { ProjectRequiredSkill } from "@/lib/project-required-skills";
+import type { ProjectImageCropMeta } from "@/lib/project-image-crop";
 import type { WorkspaceProgressChecklist } from "@/lib/workspace-progress-checklist";
 import {
   boardParamFromCategory,
@@ -76,7 +77,11 @@ export type WorkspaceEditableProject = {
   description: string | null;
   required_job_categories: string[];
   representative_image_path: string | null;
+  representative_image_original_path: string | null;
+  representative_image_crop: ProjectImageCropMeta | null;
   hero_image_path: string | null;
+  hero_image_original_path: string | null;
+  hero_image_crop: ProjectImageCropMeta | null;
   project_required_skills: ProjectRequiredSkill[];
 };
 
@@ -525,7 +530,7 @@ export function WorkspaceShell({
               summary, and the team skills professionals need to join.
             </p>
             <EditProjectForm
-              key={`${editableProject.id}-${editableProject.hero_image_path ?? ""}-${editableProject.representative_image_path ?? ""}-${editableProject.project_required_skills.map((s) => `${s.skill_name}:${s.skill_description}`).join("|")}-${editableProject.title}`}
+              key={`${editableProject.id}-${editableProject.hero_image_path ?? ""}-${editableProject.hero_image_original_path ?? ""}-${editableProject.representative_image_path ?? ""}-${editableProject.representative_image_original_path ?? ""}-${JSON.stringify(editableProject.representative_image_crop)}-${JSON.stringify(editableProject.hero_image_crop)}-${editableProject.project_required_skills.map((s) => `${s.skill_name}:${s.skill_description}`).join("|")}-${editableProject.title}`}
               project={editableProject}
               variant="workspace"
             />

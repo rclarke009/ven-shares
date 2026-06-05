@@ -7,6 +7,8 @@ import { normalizeRequiredJobCategoriesFromDb } from "@/lib/skills-match";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 
 import type { ProjectRequiredSkill } from "@/lib/project-required-skills";
+import { parseProjectImageCrop } from "@/lib/project-image-crop";
+import type { ProjectImageCropMeta } from "@/lib/project-image-crop";
 import {
   getArenaTeamPreviewForProjects,
   isMissingCoveredJobCategoriesColumn,
@@ -37,7 +39,11 @@ export type ArenaProject = {
   required_job_categories: ProfessionalJobCategory[];
   completed_job_categories: ProfessionalJobCategory[];
   representative_image_path: string | null;
+  representative_image_original_path: string | null;
+  representative_image_crop: ProjectImageCropMeta | null;
   hero_image_path: string | null;
+  hero_image_original_path: string | null;
+  hero_image_crop: ProjectImageCropMeta | null;
   project_required_skills: ProjectRequiredSkill[];
   created_at: string;
   category_statuses: ArenaCategorySlot[];
@@ -184,8 +190,18 @@ function mapArenaRow(
       typeof row.representative_image_path === "string"
         ? row.representative_image_path
         : null,
+    representative_image_original_path:
+      typeof row.representative_image_original_path === "string"
+        ? row.representative_image_original_path
+        : null,
+    representative_image_crop: parseProjectImageCrop(row.representative_image_crop),
     hero_image_path:
       typeof row.hero_image_path === "string" ? row.hero_image_path : null,
+    hero_image_original_path:
+      typeof row.hero_image_original_path === "string"
+        ? row.hero_image_original_path
+        : null,
+    hero_image_crop: parseProjectImageCrop(row.hero_image_crop),
     project_required_skills: normalizeSkillRows(row.project_required_skills),
     created_at: row.created_at as string,
     category_statuses,
@@ -200,7 +216,11 @@ const ARENA_PROJECT_SELECT = `
       completed_job_categories,
       workspace_progress_checklist,
       representative_image_path,
+      representative_image_original_path,
+      representative_image_crop,
       hero_image_path,
+      hero_image_original_path,
+      hero_image_crop,
       created_at,
       project_required_skills ( skill_name, skill_description, sort_order )
     `;
@@ -237,6 +257,22 @@ const ARENA_PROJECT_SELECT_WITHOUT_HERO_IMAGE = `
       completed_job_categories,
       workspace_progress_checklist,
       representative_image_path,
+      representative_image_original_path,
+      representative_image_crop,
+      created_at,
+      project_required_skills ( skill_name, skill_description, sort_order )
+    `;
+
+/** DBs that have not applied migration 015 omit crop metadata columns. */
+const ARENA_PROJECT_SELECT_WITHOUT_CROP = `
+      id,
+      title,
+      description,
+      required_job_categories,
+      completed_job_categories,
+      workspace_progress_checklist,
+      representative_image_path,
+      hero_image_path,
       created_at,
       project_required_skills ( skill_name, skill_description, sort_order )
     `;
@@ -267,6 +303,19 @@ function isMissingHeroImagePathColumn(error: {
 }): boolean {
   return (
     error.code === "42703" && error.message.includes("hero_image_path")
+  );
+}
+
+function isMissingCropMetadataColumn(error: {
+  code?: string;
+  message: string;
+}): boolean {
+  return (
+    error.code === "42703" &&
+    (error.message.includes("representative_image_original_path") ||
+      error.message.includes("representative_image_crop") ||
+      error.message.includes("hero_image_original_path") ||
+      error.message.includes("hero_image_crop"))
   );
 }
 
@@ -413,7 +462,30 @@ export async function getProjectByIdForArena(
 
   let data: Record<string, unknown> | null;
 
-  if (primary.error && isMissingHeroImagePathColumn(primary.error)) {
+  if (primary.error && isMissingCropMetadataColumn(primary.error)) {
+    const fallback = await supabase
+      .from("projects")
+      .select(ARENA_PROJECT_SELECT_WITHOUT_CROP)
+      .eq("id", id)
+      .maybeSingle();
+    if (fallback.error && isMissingHeroImagePathColumn(fallback.error)) {
+      const noHero = await supabase
+        .from("projects")
+        .select(ARENA_PROJECT_SELECT_WITHOUT_HERO_IMAGE)
+        .eq("id", id)
+        .maybeSingle();
+      if (noHero.error) {
+        console.log("MYDEBUG →", noHero.error.message);
+        return null;
+      }
+      data = (noHero.data as Record<string, unknown> | null) ?? null;
+    } else if (fallback.error) {
+      console.log("MYDEBUG →", fallback.error.message);
+      return null;
+    } else {
+      data = (fallback.data as Record<string, unknown> | null) ?? null;
+    }
+  } else if (primary.error && isMissingHeroImagePathColumn(primary.error)) {
     const fallback = await supabase
       .from("projects")
       .select(ARENA_PROJECT_SELECT_WITHOUT_HERO_IMAGE)

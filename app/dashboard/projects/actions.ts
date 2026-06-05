@@ -9,6 +9,8 @@ import {
   type ProjectRequiredSkill,
 } from "@/lib/project-required-skills";
 import { readRepresentativeImageFromFormData } from "@/lib/representative-image-upload";
+import { parseProjectImageCropFromFormData, parseProjectImageCrop } from "@/lib/project-image-crop";
+import type { ProjectImageCropMeta } from "@/lib/project-image-crop";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { normalizeProjectRequiredJobCategories } from "@/lib/professional-onboarding";
 import { isProjectUuid } from "@/lib/projects-arena";
@@ -34,7 +36,11 @@ export type ProjectRow = {
   clerk_user_id: string;
   required_job_categories: string[];
   representative_image_path: string | null;
+  representative_image_original_path: string | null;
+  representative_image_crop: ProjectImageCropMeta | null;
   hero_image_path: string | null;
+  hero_image_original_path: string | null;
+  hero_image_crop: ProjectImageCropMeta | null;
   project_required_skills: ProjectRequiredSkill[];
   created_at: string;
 };
@@ -71,6 +77,37 @@ function normalizeSkillRows(
     });
   }
   return out.sort((a, b) => a.sort_order - b.sort_order);
+}
+
+function mapProjectRowFromDb(row: Record<string, unknown>): ProjectRow {
+  const cats = row.required_job_categories;
+  return {
+    id: row.id as string,
+    title: row.title as string,
+    description: (row.description as string | null) ?? null,
+    clerk_user_id: row.clerk_user_id as string,
+    required_job_categories: Array.isArray(cats)
+      ? cats.filter((x): x is string => typeof x === "string")
+      : [],
+    representative_image_path:
+      typeof row.representative_image_path === "string"
+        ? row.representative_image_path
+        : null,
+    representative_image_original_path:
+      typeof row.representative_image_original_path === "string"
+        ? row.representative_image_original_path
+        : null,
+    representative_image_crop: parseProjectImageCrop(row.representative_image_crop),
+    hero_image_path:
+      typeof row.hero_image_path === "string" ? row.hero_image_path : null,
+    hero_image_original_path:
+      typeof row.hero_image_original_path === "string"
+        ? row.hero_image_original_path
+        : null,
+    hero_image_crop: parseProjectImageCrop(row.hero_image_crop),
+    project_required_skills: normalizeSkillRows(row.project_required_skills),
+    created_at: row.created_at as string,
+  };
 }
 
 async function removeStoredProjectImage(
@@ -155,11 +192,27 @@ export async function listProjectsForCurrentUser(): Promise<ProjectRow[]> {
       clerk_user_id,
       required_job_categories,
       representative_image_path,
+      representative_image_original_path,
+      representative_image_crop,
       hero_image_path,
+      hero_image_original_path,
+      hero_image_crop,
       created_at,
       project_required_skills ( skill_name, skill_description, sort_order )
     `;
   const projectSelectWithoutHero = `
+      id,
+      title,
+      description,
+      clerk_user_id,
+      required_job_categories,
+      representative_image_path,
+      representative_image_original_path,
+      representative_image_crop,
+      created_at,
+      project_required_skills ( skill_name, skill_description, sort_order )
+    `;
+  const projectSelectLegacyList = `
       id,
       title,
       description,
@@ -182,6 +235,19 @@ export async function listProjectsForCurrentUser(): Promise<ProjectRow[]> {
 
   if (
     error?.code === "42703" &&
+    (error.message.includes("hero_image_path") ||
+      error.message.includes("representative_image_original_path") ||
+      error.message.includes("representative_image_crop"))
+  ) {
+    const fallback = await supabase
+      .from("projects")
+      .select(projectSelectLegacyList)
+      .eq("clerk_user_id", userId)
+      .order("created_at", { ascending: false });
+    data = (fallback.data as Record<string, unknown>[] | null) ?? null;
+    error = fallback.error;
+  } else if (
+    error?.code === "42703" &&
     error.message.includes("hero_image_path")
   ) {
     const fallback = await supabase
@@ -198,27 +264,7 @@ export async function listProjectsForCurrentUser(): Promise<ProjectRow[]> {
     return [];
   }
 
-  return (data ?? []).map((row) => {
-    const r = row as Record<string, unknown>;
-    const cats = r.required_job_categories;
-    return {
-      id: r.id as string,
-      title: r.title as string,
-      description: (r.description as string | null) ?? null,
-      clerk_user_id: r.clerk_user_id as string,
-      required_job_categories: Array.isArray(cats)
-        ? cats.filter((x): x is string => typeof x === "string")
-        : [],
-      representative_image_path:
-        typeof r.representative_image_path === "string"
-          ? r.representative_image_path
-          : null,
-      hero_image_path:
-        typeof r.hero_image_path === "string" ? r.hero_image_path : null,
-      project_required_skills: normalizeSkillRows(r.project_required_skills),
-      created_at: r.created_at as string,
-    };
-  });
+  return (data ?? []).map((row) => mapProjectRowFromDb(row as Record<string, unknown>));
 }
 
 export async function createProject(
@@ -362,6 +408,31 @@ export async function updateProjectWithMediaAndSkills(
     return { ok: false, error: heroImageRead.error };
   }
 
+  const arenaOriginalRead = await readRepresentativeImageFromFormData(formData, {
+    fieldName: "representative_image_original",
+    baseName: "cover-original",
+  });
+  if (!arenaOriginalRead.ok) {
+    return { ok: false, error: arenaOriginalRead.error };
+  }
+
+  const heroOriginalRead = await readRepresentativeImageFromFormData(formData, {
+    fieldName: "hero_image_original",
+    baseName: "hero-original",
+  });
+  if (!heroOriginalRead.ok) {
+    return { ok: false, error: heroOriginalRead.error };
+  }
+
+  const arenaCropMeta = parseProjectImageCropFromFormData(
+    formData,
+    "representative_image_crop",
+  );
+  const heroCropMeta = parseProjectImageCropFromFormData(
+    formData,
+    "hero_image_crop",
+  );
+
   const skillsParse = parseRequiredSkillsFromFormData(formData);
   if (!skillsParse.ok) {
     return { ok: false, error: skillsParse.error };
@@ -388,12 +459,27 @@ export async function updateProjectWithMediaAndSkills(
     );
   }
 
+  function isMissingCropMetadataColumn(error: {
+    code?: string;
+    message: string;
+  }): boolean {
+    return (
+      error.code === "42703" &&
+      (error.message.includes("representative_image_original_path") ||
+        error.message.includes("representative_image_crop") ||
+        error.message.includes("hero_image_original_path") ||
+        error.message.includes("hero_image_crop"))
+    );
+  }
+
   const projectSelectFull =
+    "id, completed_job_categories, workspace_progress_checklist, representative_image_path, representative_image_original_path, representative_image_crop, hero_image_path, hero_image_original_path, hero_image_crop";
+  const projectSelectWithoutCrop =
     "id, completed_job_categories, workspace_progress_checklist, representative_image_path, hero_image_path";
   const projectSelectWithoutHero =
-    "id, completed_job_categories, workspace_progress_checklist, representative_image_path";
+    "id, completed_job_categories, workspace_progress_checklist, representative_image_path, representative_image_original_path, representative_image_crop";
   const projectSelectWithoutChecklist =
-    "id, completed_job_categories, representative_image_path, hero_image_path";
+    "id, completed_job_categories, representative_image_path, representative_image_original_path, representative_image_crop, hero_image_path, hero_image_original_path, hero_image_crop";
   const projectSelectLegacy =
     "id, completed_job_categories, representative_image_path";
 
@@ -407,8 +493,65 @@ export async function updateProjectWithMediaAndSkills(
   let row: Record<string, unknown> | null = null;
   let checklistColumnAvailable = true;
   let heroColumnAvailable = true;
+  let cropColumnsAvailable = true;
 
-  if (primary.error && isMissingHeroImagePathColumn(primary.error)) {
+  if (primary.error && isMissingCropMetadataColumn(primary.error)) {
+    cropColumnsAvailable = false;
+    const fallback = await supabase
+      .from("projects")
+      .select(projectSelectWithoutCrop)
+      .eq("id", projectId)
+      .eq("clerk_user_id", userId)
+      .maybeSingle();
+    if (fallback.error && isMissingHeroImagePathColumn(fallback.error)) {
+      heroColumnAvailable = false;
+      const noHero = await supabase
+        .from("projects")
+        .select(projectSelectWithoutHero)
+        .eq("id", projectId)
+        .eq("clerk_user_id", userId)
+        .maybeSingle();
+      if (noHero.error && isMissingWorkspaceProgressColumn(noHero.error)) {
+        checklistColumnAvailable = false;
+        const legacy = await supabase
+          .from("projects")
+          .select(projectSelectLegacy)
+          .eq("id", projectId)
+          .eq("clerk_user_id", userId)
+          .maybeSingle();
+        if (legacy.error) {
+          console.log("MYDEBUG →", legacy.error.message);
+          return { ok: false, error: "Could not update project. Try again." };
+        }
+        row = (legacy.data as Record<string, unknown> | null) ?? null;
+      } else if (noHero.error) {
+        console.log("MYDEBUG →", noHero.error.message);
+        return { ok: false, error: "Could not update project. Try again." };
+      } else {
+        row = (noHero.data as Record<string, unknown> | null) ?? null;
+      }
+    } else if (fallback.error && isMissingWorkspaceProgressColumn(fallback.error)) {
+      checklistColumnAvailable = false;
+      const legacy = await supabase
+        .from("projects")
+        .select(
+          "id, completed_job_categories, representative_image_path, hero_image_path",
+        )
+        .eq("id", projectId)
+        .eq("clerk_user_id", userId)
+        .maybeSingle();
+      if (legacy.error) {
+        console.log("MYDEBUG →", legacy.error.message);
+        return { ok: false, error: "Could not update project. Try again." };
+      }
+      row = (legacy.data as Record<string, unknown> | null) ?? null;
+    } else if (fallback.error) {
+      console.log("MYDEBUG →", fallback.error.message);
+      return { ok: false, error: "Could not update project. Try again." };
+    } else {
+      row = (fallback.data as Record<string, unknown> | null) ?? null;
+    }
+  } else if (primary.error && isMissingHeroImagePathColumn(primary.error)) {
     heroColumnAvailable = false;
     const fallback = await supabase
       .from("projects")
@@ -477,8 +620,16 @@ export async function updateProjectWithMediaAndSkills(
     typeof row.representative_image_path === "string"
       ? row.representative_image_path
       : null;
+  const previousRepresentativeOriginalPath =
+    typeof row.representative_image_original_path === "string"
+      ? row.representative_image_original_path
+      : null;
   const previousHeroPath =
     typeof row.hero_image_path === "string" ? row.hero_image_path : null;
+  const previousHeroOriginalPath =
+    typeof row.hero_image_original_path === "string"
+      ? row.hero_image_original_path
+      : null;
 
   const prevCompleted = normalizeRequiredJobCategoriesFromDb(
     row.completed_job_categories,
@@ -529,14 +680,44 @@ export async function updateProjectWithMediaAndSkills(
     return { ok: false, error: "Could not update project. Try again." };
   }
 
+  if (!arenaOriginalRead.skip) {
+    if (!cropColumnsAvailable) {
+      return {
+        ok: false,
+        error:
+          "Image crop metadata is not available yet. Apply the latest database migration.",
+      };
+    }
+    const up = await uploadProjectImage(projectId, arenaOriginalRead);
+    if (!up.ok) {
+      return { ok: false, error: up.message };
+    }
+    const { error: originalErr } = await supabase
+      .from("projects")
+      .update({ representative_image_original_path: up.path })
+      .eq("id", projectId)
+      .eq("clerk_user_id", userId);
+    if (originalErr) {
+      console.log("MYDEBUG →", originalErr.message);
+      return { ok: false, error: "Could not save original image. Try again." };
+    }
+    await removeStoredProjectImage(previousRepresentativeOriginalPath);
+  }
+
   if (!imageRead.skip) {
     const up = await uploadProjectImage(projectId, imageRead);
     if (!up.ok) {
       return { ok: false, error: up.message };
     }
+    const imageUpdate: Record<string, unknown> = {
+      representative_image_path: up.path,
+    };
+    if (cropColumnsAvailable && arenaCropMeta) {
+      imageUpdate.representative_image_crop = arenaCropMeta;
+    }
     const { error: pathErr } = await supabase
       .from("projects")
-      .update({ representative_image_path: up.path })
+      .update(imageUpdate)
       .eq("id", projectId)
       .eq("clerk_user_id", userId);
     if (pathErr) {
@@ -544,6 +725,33 @@ export async function updateProjectWithMediaAndSkills(
       return { ok: false, error: "Could not save image. Try again." };
     }
     await removeStoredProjectImage(previousRepresentativePath);
+  }
+
+  if (!heroOriginalRead.skip) {
+    if (!heroColumnAvailable || !cropColumnsAvailable) {
+      return {
+        ok: false,
+        error:
+          "Hero image is not available yet. Apply the latest database migration.",
+      };
+    }
+    const up = await uploadProjectImage(projectId, heroOriginalRead);
+    if (!up.ok) {
+      return { ok: false, error: up.message };
+    }
+    const { error: originalErr } = await supabase
+      .from("projects")
+      .update({ hero_image_original_path: up.path })
+      .eq("id", projectId)
+      .eq("clerk_user_id", userId);
+    if (originalErr) {
+      console.log("MYDEBUG →", originalErr.message);
+      return {
+        ok: false,
+        error: "Could not save hero original image. Try again.",
+      };
+    }
+    await removeStoredProjectImage(previousHeroOriginalPath);
   }
 
   if (!heroImageRead.skip) {
@@ -558,9 +766,15 @@ export async function updateProjectWithMediaAndSkills(
     if (!up.ok) {
       return { ok: false, error: up.message };
     }
+    const heroUpdate: Record<string, unknown> = {
+      hero_image_path: up.path,
+    };
+    if (cropColumnsAvailable && heroCropMeta) {
+      heroUpdate.hero_image_crop = heroCropMeta;
+    }
     const { error: pathErr } = await supabase
       .from("projects")
-      .update({ hero_image_path: up.path })
+      .update(heroUpdate)
       .eq("id", projectId)
       .eq("clerk_user_id", userId);
     if (

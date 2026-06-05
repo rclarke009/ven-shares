@@ -212,7 +212,12 @@ async function WorkspaceProjectContent({
               description: arenaProject.description,
               required_job_categories: arenaProject.required_job_categories,
               representative_image_path: arenaProject.representative_image_path,
+              representative_image_original_path:
+                arenaProject.representative_image_original_path,
+              representative_image_crop: arenaProject.representative_image_crop,
               hero_image_path: arenaProject.hero_image_path,
+              hero_image_original_path: arenaProject.hero_image_original_path,
+              hero_image_crop: arenaProject.hero_image_crop,
               project_required_skills: arenaProject.project_required_skills,
             }
           : null

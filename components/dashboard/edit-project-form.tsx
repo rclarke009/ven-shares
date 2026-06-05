@@ -9,6 +9,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type FormEvent,
 } from "react";
 
 import {
@@ -20,9 +21,19 @@ import {
   arenaProjectImageUrl,
   workspaceHeroImageUrl,
 } from "@/components/idea-arena/utils";
+import { getCroppedImageBlob } from "@/lib/crop-image.client";
 import { publicProjectImageUrl } from "@/lib/project-image-url";
+import {
+  DEFAULT_PROJECT_IMAGE_CROP,
+  serializeProjectImageCrop,
+  type ProjectImageCropMeta,
+} from "@/lib/project-image-crop";
 import { PROFESSIONAL_JOB_CATEGORY_OPTIONS } from "@/lib/professional-onboarding";
 
+import {
+  ProjectImageCropField,
+  type ProjectImageCropFieldState,
+} from "./project-image-crop-field";
 import { ProjectDescriptionField } from "./project-description-field";
 import { ProjectRequiredSkillRows } from "./project-required-skill-rows";
 
@@ -34,11 +45,18 @@ type EditProjectFormProps = {
     | "description"
     | "required_job_categories"
     | "representative_image_path"
+    | "representative_image_original_path"
+    | "representative_image_crop"
     | "hero_image_path"
+    | "hero_image_original_path"
+    | "hero_image_crop"
     | "project_required_skills"
   >;
   variant?: "dashboard" | "workspace";
 };
+
+const ARENA_CROP_ASPECT = 4 / 3;
+const HERO_CROP_ASPECT = 5 / 1;
 
 const fileFieldButtonClass =
   "inline-flex cursor-pointer items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 active:bg-slate-100";
@@ -52,6 +70,22 @@ function fileButtonLabel(
 ): string {
   const hasCustomImage = !!(savedPath?.trim() || selectedFile);
   return hasCustomImage ? "Change file" : "Add a file";
+}
+
+async function fetchImageAsFile(
+  url: string,
+  filename: string,
+): Promise<File | null> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return new File([blob], filename, {
+      type: blob.type || "image/webp",
+    });
+  } catch {
+    return null;
+  }
 }
 
 type ProjectImageUploadFieldProps = {
@@ -72,6 +106,12 @@ type ProjectImageUploadFieldProps = {
   fileName: string | null;
   inputRef: React.RefObject<HTMLInputElement | null>;
   onFileChange: (file: File | undefined) => void;
+  enableCrop?: boolean;
+  cropImageSrc?: string | null;
+  cropAspect?: number;
+  initialCrop?: ProjectImageCropMeta | null;
+  cropResetKey?: string;
+  onCropStateChange?: (state: ProjectImageCropFieldState) => void;
 };
 
 function ProjectImageUploadField({
@@ -92,29 +132,50 @@ function ProjectImageUploadField({
   fileName,
   inputRef,
   onFileChange,
+  enableCrop = false,
+  cropImageSrc,
+  cropAspect,
+  initialCrop,
+  cropResetKey,
+  onCropStateChange,
 }: ProjectImageUploadFieldProps) {
+  const hasCustomImage = !!(savedPath?.trim() || selectedFile);
+  const showCropper =
+    enableCrop && hasCustomImage && cropImageSrc && onCropStateChange;
+
   return (
     <div>
       <span className={`${labelClass} mb-1`}>
         {label}{" "}
         <span className="font-normal text-slate-500">(optional)</span>
       </span>
-      <div className={previewClassName}>
-        <Image
-          src={previewUrl}
-          alt=""
-          fill
-          className="object-cover"
-          sizes={
-            isWorkspace
-              ? "(max-width: 896px) 36rem, 50vw"
-              : "96px"
-          }
-          unoptimized={previewUnoptimized}
+      {showCropper ? (
+        <ProjectImageCropField
+          key={cropResetKey}
+          imageSrc={cropImageSrc}
+          aspect={cropAspect ?? ARENA_CROP_ASPECT}
+          initialCrop={initialCrop}
+          containerClassName={previewClassName.replace(/\s*mb-2\s*/, " mb-0 ")}
+          onCropStateChange={onCropStateChange}
         />
-      </div>
+      ) : (
+        <div className={previewClassName}>
+          <Image
+            src={previewUrl}
+            alt=""
+            fill
+            className="object-cover"
+            sizes={
+              isWorkspace
+                ? "(max-width: 896px) 36rem, 50vw"
+                : "96px"
+            }
+            unoptimized={previewUnoptimized}
+          />
+        </div>
+      )}
       {helperBelowPreview ? (
-        <p className={`${helperTextClass} mt-0 mb-1 text-center`}>
+        <p className={`${helperTextClass} mt-2 mb-1 text-center`}>
           {helperBelowPreview}
         </p>
       ) : null}
@@ -194,6 +255,20 @@ export function EditProjectForm({
   const [heroPreviewBlobUrl, setHeroPreviewBlobUrl] = useState<string | null>(
     null,
   );
+  const [arenaCropState, setArenaCropState] =
+    useState<ProjectImageCropFieldState>({
+      meta: project.representative_image_crop ?? DEFAULT_PROJECT_IMAGE_CROP,
+      croppedAreaPixels: null,
+      dirty: false,
+    });
+  const [heroCropState, setHeroCropState] = useState<ProjectImageCropFieldState>(
+    {
+      meta: project.hero_image_crop ?? DEFAULT_PROJECT_IMAGE_CROP,
+      croppedAreaPixels: null,
+      dirty: false,
+    },
+  );
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const heroInputRef = useRef<HTMLInputElement>(null);
   const initialState = useMemo<UpdateProjectMediaState>(
@@ -208,9 +283,40 @@ export function EditProjectForm({
   const savedArenaPreviewUrl = publicProjectImageUrl(
     project.representative_image_path,
   );
+  const savedArenaOriginalUrl = publicProjectImageUrl(
+    project.representative_image_original_path,
+  );
   const savedHeroPreviewUrl = publicProjectImageUrl(project.hero_image_path);
+  const savedHeroOriginalUrl = publicProjectImageUrl(
+    project.hero_image_original_path,
+  );
   const arenaCardPreviewUrl = arenaProjectImageUrl(project);
   const heroFallbackPreviewUrl = workspaceHeroImageUrl(project);
+
+  const arenaCropImageSrc =
+    imagePreviewBlobUrl ??
+    savedArenaOriginalUrl ??
+    savedArenaPreviewUrl ??
+    null;
+
+  const heroUsesArenaFallback =
+    isWorkspace &&
+    !heroPreviewBlobUrl &&
+    !savedHeroPreviewUrl &&
+    !!savedArenaPreviewUrl;
+
+  const heroCropImageSrc =
+    heroPreviewBlobUrl ??
+    savedHeroOriginalUrl ??
+    savedHeroPreviewUrl ??
+    savedArenaOriginalUrl ??
+    savedArenaPreviewUrl ??
+    null;
+
+  const hasHeroCropSource =
+    !!selectedHeroFile ||
+    !!savedHeroPreviewUrl ||
+    (heroUsesArenaFallback && !!savedArenaPreviewUrl);
 
   useEffect(() => {
     if (!selectedImageFile) {
@@ -241,9 +347,20 @@ export function EditProjectForm({
       setSelectedImageFile(null);
       setHeroFileName(null);
       setSelectedHeroFile(null);
+      setArenaCropState({
+        meta: project.representative_image_crop ?? DEFAULT_PROJECT_IMAGE_CROP,
+        croppedAreaPixels: null,
+        dirty: false,
+      });
+      setHeroCropState({
+        meta: project.hero_image_crop ?? DEFAULT_PROJECT_IMAGE_CROP,
+        croppedAreaPixels: null,
+        dirty: false,
+      });
+      setSubmitError(null);
     });
     router.refresh();
-  }, [state.ok, router]);
+  }, [state.ok, router, project.representative_image_crop, project.hero_image_crop]);
 
   function toggleCategory(value: string) {
     setSelected((prev) =>
@@ -256,11 +373,21 @@ export function EditProjectForm({
   function handleImageChange(file: File | undefined) {
     setImageFileName(file?.name ?? null);
     setSelectedImageFile(file ?? null);
+    setArenaCropState({
+      meta: DEFAULT_PROJECT_IMAGE_CROP,
+      croppedAreaPixels: null,
+      dirty: false,
+    });
   }
 
   function handleHeroChange(file: File | undefined) {
     setHeroFileName(file?.name ?? null);
     setSelectedHeroFile(file ?? null);
+    setHeroCropState({
+      meta: DEFAULT_PROJECT_IMAGE_CROP,
+      croppedAreaPixels: null,
+      dirty: false,
+    });
   }
 
   const workspaceArenaDisplayPreviewUrl =
@@ -268,16 +395,102 @@ export function EditProjectForm({
   const dashboardDisplayPreviewUrl =
     imagePreviewBlobUrl ?? savedArenaPreviewUrl;
 
-  const heroUsesArenaFallback =
-    isWorkspace &&
-    !heroPreviewBlobUrl &&
-    !savedHeroPreviewUrl &&
-    !!savedArenaPreviewUrl;
-
   const workspaceHeroDisplayPreviewUrl =
     heroPreviewBlobUrl ??
     savedHeroPreviewUrl ??
     (savedArenaPreviewUrl ? savedArenaPreviewUrl : heroFallbackPreviewUrl);
+
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    if (!isWorkspace) return;
+
+    e.preventDefault();
+    setSubmitError(null);
+
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+
+    fd.delete("representative_image");
+    fd.delete("hero_image");
+    fd.delete("representative_image_original");
+    fd.delete("hero_image_original");
+
+    try {
+      const arenaHasCustomImage =
+        !!project.representative_image_path?.trim() || selectedImageFile !== null;
+      const arenaNeedsExport =
+        arenaHasCustomImage &&
+        arenaCropImageSrc &&
+        (selectedImageFile !== null || arenaCropState.dirty);
+
+      if (arenaNeedsExport) {
+        if (!arenaCropState.croppedAreaPixels) {
+          setSubmitError(
+            "Wait for the arena card image preview to finish loading, then try again.",
+          );
+          return;
+        }
+        const blob = await getCroppedImageBlob(
+          arenaCropImageSrc,
+          arenaCropState.croppedAreaPixels,
+        );
+        fd.set(
+          "representative_image",
+          new File([blob], "cover.webp", { type: "image/webp" }),
+        );
+        fd.set(
+          "representative_image_crop",
+          serializeProjectImageCrop(arenaCropState.meta),
+        );
+        if (selectedImageFile) {
+          fd.set("representative_image_original", selectedImageFile);
+        }
+      }
+
+      const heroNeedsExport =
+        hasHeroCropSource &&
+        heroCropImageSrc &&
+        (selectedHeroFile !== null || heroCropState.dirty);
+
+      if (heroNeedsExport) {
+        if (!heroCropState.croppedAreaPixels) {
+          setSubmitError(
+            "Wait for the hero image preview to finish loading, then try again.",
+          );
+          return;
+        }
+        const blob = await getCroppedImageBlob(
+          heroCropImageSrc,
+          heroCropState.croppedAreaPixels,
+        );
+        fd.set(
+          "hero_image",
+          new File([blob], "hero.webp", { type: "image/webp" }),
+        );
+        fd.set(
+          "hero_image_crop",
+          serializeProjectImageCrop(heroCropState.meta),
+        );
+        if (selectedHeroFile) {
+          fd.set("hero_image_original", selectedHeroFile);
+        } else if (
+          !project.hero_image_original_path?.trim() &&
+          heroCropImageSrc
+        ) {
+          const originalFile = await fetchImageAsFile(
+            heroCropImageSrc,
+            "hero-original.webp",
+          );
+          if (originalFile) {
+            fd.set("hero_image_original", originalFile);
+          }
+        }
+      }
+
+      startTransition(() => formAction(fd));
+    } catch {
+      setSubmitError("Could not prepare images. Try again.");
+    }
+  }
 
   const heroImageField = isWorkspace ? (
     <ProjectImageUploadField
@@ -302,6 +515,12 @@ export function EditProjectForm({
       fileName={heroFileName}
       inputRef={heroInputRef}
       onFileChange={handleHeroChange}
+      enableCrop={hasHeroCropSource}
+      cropImageSrc={heroCropImageSrc}
+      cropAspect={HERO_CROP_ASPECT}
+      initialCrop={project.hero_image_crop}
+      cropResetKey={`hero-${project.id}-${selectedHeroFile?.name ?? project.hero_image_path ?? "fallback"}-${heroCropImageSrc ?? "none"}`}
+      onCropStateChange={setHeroCropState}
     />
   ) : null;
 
@@ -341,6 +560,12 @@ export function EditProjectForm({
       fileName={imageFileName}
       inputRef={imageInputRef}
       onFileChange={handleImageChange}
+      enableCrop={isWorkspace}
+      cropImageSrc={isWorkspace ? arenaCropImageSrc : null}
+      cropAspect={ARENA_CROP_ASPECT}
+      initialCrop={project.representative_image_crop}
+      cropResetKey={`arena-${project.id}-${selectedImageFile?.name ?? project.representative_image_path ?? "none"}-${arenaCropImageSrc ?? "none"}`}
+      onCropStateChange={setArenaCropState}
     />
   );
 
@@ -364,9 +589,12 @@ export function EditProjectForm({
     </>
   );
 
+  const displayError = submitError ?? state.error;
+
   return (
     <form
-      action={formAction}
+      action={isWorkspace ? undefined : formAction}
+      onSubmit={isWorkspace ? handleSubmit : undefined}
       className={
         isWorkspace ? undefined : "mt-4 pt-4 border-t border-slate-100"
       }
@@ -375,12 +603,12 @@ export function EditProjectForm({
       {!isWorkspace ? (
         <p className="text-sm font-medium text-slate-800 mb-3">Edit project</p>
       ) : null}
-      {state.error ? (
+      {displayError ? (
         <p
           className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 mb-3"
           role="alert"
         >
-          {state.error}
+          {displayError}
         </p>
       ) : null}
       {state.ok ? (
