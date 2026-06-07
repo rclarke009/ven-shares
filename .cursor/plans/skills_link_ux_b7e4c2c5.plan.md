@@ -4,16 +4,16 @@ overview: Increase the professional dashboard subtitle size and replace breadcru
 todos:
   - id: skills-link-component
     content: Create OpenSkillsAvailabilityLink client component with openUserProfile + onboarding fallback
-    status: in_progress
+    status: completed
   - id: professional-header
     content: Bump subtitle to text-base and replace breadcrumb with link in dashboard-professional-header.tsx
-    status: pending
+    status: completed
   - id: idea-arena-copy
     content: Replace breadcrumb in app/idea-arena/page.tsx empty-skills CTA with OpenSkillsAvailabilityLink
-    status: pending
+    status: completed
   - id: profile-page-copy
     content: Replace breadcrumb in app/dashboard/profile/page.tsx intro with OpenSkillsAvailabilityLink
-    status: pending
+    status: completed
 isProject: false
 ---
 

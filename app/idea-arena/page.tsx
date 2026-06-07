@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { ArenaHeader } from "@/components/idea-arena/arena-header";
+import { OpenSkillsAvailabilityLink } from "@/components/profile/open-skills-availability-link";
 import { ArenaSkillFilter } from "@/components/idea-arena/arena-skill-filter";
 import { ProjectCard } from "@/components/idea-arena/project-card";
 import {
@@ -88,11 +89,8 @@ export default async function IdeaArenaPage({
         ) : emptyMineNoProfile ? (
           <p className="text-slate-600 text-sm max-w-lg">
             Add your job categories to your profile to see jobs that match your
-            skills. Open your account menu (top right) → Manage account →{" "}
-            <span className="font-medium text-slate-800">
-              Skills &amp; availability
-            </span>
-            , or{" "}
+            skills. Add your job categories from{" "}
+            <OpenSkillsAvailabilityLink /> in your account menu, or{" "}
             <Link
               href="/dashboard/profile"
               className="text-[#22c55e] font-medium hover:underline"

@@ -3,6 +3,7 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
 import { AdminNavLink } from "@/components/admin/admin-nav-link";
+import { OpenSkillsAvailabilityLink } from "@/components/profile/open-skills-availability-link";
 import { VenSharesLogo } from "@/components/venshares-logo";
 import { VenUserButtonFromServer } from "@/components/ven-user-button-from-server";
 import { updateProfessionalProfileSkills } from "@/app/dashboard/profile/actions";
@@ -61,8 +62,8 @@ export default async function ProfessionalProfilePage() {
         </h1>
         <p className="text-slate-600 mb-8 text-sm leading-relaxed">
           Update your job categories, weekly availability, and profile photo.
-          You can also edit categories and hours from your account menu (top
-          right) → Manage account → Skills &amp; availability.
+          You can also edit categories and hours in{" "}
+          <OpenSkillsAvailabilityLink /> from your account menu.
         </p>
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <ProfessionalOnboardingForm
