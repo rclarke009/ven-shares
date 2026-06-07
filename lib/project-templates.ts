@@ -399,12 +399,15 @@ export function collectLeafDefsFromChecklistDefinition(
     const lists =
       getTaskListDefForCategory(definition, category) ??
       WORKSPACE_PROGRESS_STANDARD_TEMPLATE[category];
+    if (!lists?.length) continue;
     for (let li = 0; li < lists.length; li++) {
       const tList = lists[li];
-      for (let ti = 0; ti < tList.tasks.length; ti++) {
-        const task = tList.tasks[ti];
+      const tasks = tList.tasks ?? [];
+      for (let ti = 0; ti < tasks.length; ti++) {
+        const task = tasks[ti];
+        const rawSubtasks = task.subtasks ?? [];
         const subs =
-          task.subtasks.length > 0 ? task.subtasks : [{ title: task.title }];
+          rawSubtasks.length > 0 ? rawSubtasks : [{ title: task.title }];
         for (let si = 0; si < subs.length; si++) {
           const subtaskTitle = subs[si].title;
           const title = effectiveChecklistLeafTitle(

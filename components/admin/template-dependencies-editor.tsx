@@ -21,6 +21,11 @@ const MILESTONE_OPTIONS = [
 
 const SUMMARY_CHIP_LIMIT = 3;
 
+function normalizeDepIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((d): d is string => typeof d === "string" && !!d);
+}
+
 type TemplateDependenciesEditorProps = {
   categories: string[];
   checklistDefinition: ChecklistDefinition;
@@ -107,7 +112,7 @@ export function TemplateDependenciesEditor({
   }
 
   function toggleDep(nodeId: string, depId: string) {
-    const current = nodeDependencies[nodeId] ?? [];
+    const current = normalizeDepIds(nodeDependencies[nodeId]);
     const next = current.includes(depId)
       ? current.filter((d) => d !== depId)
       : [...current, depId];
@@ -176,14 +181,17 @@ export function TemplateDependenciesEditor({
               key={category}
               className="rounded-xl border border-slate-200 bg-white shadow-sm"
               open={!!openCategories[category]}
-              onToggle={(e) =>
-                setOpenCategories((prev) => ({
-                  ...prev,
-                  [category]: e.currentTarget.open,
-                }))
-              }
             >
-              <summary className="cursor-pointer px-4 py-3 font-medium text-slate-900">
+              <summary
+                className="cursor-pointer px-4 py-3 font-medium text-slate-900"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setOpenCategories((prev) => ({
+                    ...prev,
+                    [category]: !prev[category],
+                  }));
+                }}
+              >
                 {category}
                 <span className="ml-2 text-xs font-normal text-slate-500">
                   {categoryLeaves.length} task
@@ -192,7 +200,7 @@ export function TemplateDependenciesEditor({
               </summary>
               <div className="space-y-2 border-t border-slate-100 px-4 py-4">
                 {categoryLeaves.map((leaf) => {
-                  const selected = nodeDependencies[leaf.id] ?? [];
+                  const selected = normalizeDepIds(nodeDependencies[leaf.id]);
                   const taskMeta =
                     leaf.taskListTitle &&
                     leaf.taskListTitle !== leaf.title &&
