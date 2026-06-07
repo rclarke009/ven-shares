@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 
+import { AdminNavLink } from "@/components/admin/admin-nav-link";
 import { WorkspaceNavLink } from "@/components/workspace/workspace-nav-link";
 import { VenSharesLogo } from "@/components/venshares-logo";
 import { VenUserButton } from "@/components/ven-user-button";
@@ -35,6 +36,7 @@ export function ArenaHeader({ profileMode }: ArenaHeaderProps) {
           ))}
         </nav>
         <div className="flex items-center gap-4 shrink-0">
+          <AdminNavLink />
           <WorkspaceNavLink />
           <VenUserButton profileMode={profileMode} />
         </div>

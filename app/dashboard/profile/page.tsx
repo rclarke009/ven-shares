@@ -2,6 +2,7 @@ import Link from "next/link";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
+import { AdminNavLink } from "@/components/admin/admin-nav-link";
 import { VenSharesLogo } from "@/components/venshares-logo";
 import { VenUserButtonFromServer } from "@/components/ven-user-button-from-server";
 import { updateProfessionalProfileSkills } from "@/app/dashboard/profile/actions";
@@ -37,6 +38,7 @@ export default async function ProfessionalProfilePage() {
         <div className="max-w-3xl mx-auto px-6 py-5 flex items-center justify-between gap-6">
           <VenSharesLogo />
           <div className="flex items-center gap-4">
+            <AdminNavLink />
             <Link
               href="/workspace"
               className="text-sm font-medium text-slate-700 hover:text-[#22c55e]"

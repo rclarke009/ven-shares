@@ -2,6 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Show, SignInButton } from '@clerk/nextjs';
 
+import { AdminNavLink } from '@/components/admin/admin-nav-link';
 import { VenSharesLogo } from '@/components/venshares-logo';
 import { VenUserButtonFromServer } from '@/components/ven-user-button-from-server';
 
@@ -102,6 +103,7 @@ export default function LandingPage() {
               </Link>
             </Show>
             <Show when="signed-in">
+              <AdminNavLink />
               <Link href="/idea-arena" className="text-sm font-medium text-slate-700 hover:text-[#22c55e] transition-colors">
                 Idea Arena
               </Link>
@@ -130,6 +132,7 @@ export default function LandingPage() {
                   </Link>
                 </Show>
                 <Show when="signed-in">
+                  <AdminNavLink className="rounded-lg px-3 py-2 font-medium text-slate-700 hover:bg-slate-50 hover:text-[#22c55e]" />
                   <Link href="/idea-arena" className="rounded-lg px-3 py-2 font-medium text-slate-700 hover:bg-slate-50 hover:text-[#22c55e]">
                     Idea Arena
                   </Link>

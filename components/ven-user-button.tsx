@@ -1,9 +1,16 @@
 "use client";
 
 import { UserButton, useUser } from "@clerk/nextjs";
-import { Briefcase, ClipboardList, Lightbulb, UserPlus } from "lucide-react";
+import {
+  Briefcase,
+  ClipboardList,
+  Lightbulb,
+  ShieldCheck,
+  UserPlus,
+} from "lucide-react";
 
 import { ProfessionalSkillsProfilePanel } from "@/components/profile/professional-skills-profile-panel";
+import { isSiteAdminFromPublicMetadata } from "@/lib/site-admin";
 import { isProfessionalOnboardingComplete } from "@/lib/professional-onboarding";
 import {
   getVenRolesFromPublicMetadata,
@@ -52,6 +59,8 @@ export function VenUserButton({ profileMode: profileModeProp }: VenUserButtonPro
   const showAddInventor = isLoaded && !hasInventorRole(meta);
   const showAddProfessional = isLoaded && !hasProfessionalRole(meta);
   const showAddRoleLinks = showAddInventor || showAddProfessional;
+  const showAdminLink =
+    isLoaded && isSiteAdminFromPublicMetadata(meta);
 
   return (
     <div className="flex flex-col items-center gap-0.5 shrink-0">
@@ -108,6 +117,15 @@ export function VenUserButton({ profileMode: profileModeProp }: VenUserButtonPro
                 labelIcon={<UserPlus className="size-4" aria-hidden />}
               />
             ) : null}
+          </UserButton.MenuItems>
+        ) : null}
+        {showAdminLink ? (
+          <UserButton.MenuItems>
+            <UserButton.Link
+              href="/admin/templates"
+              label="Admin"
+              labelIcon={<ShieldCheck className="size-4" aria-hidden />}
+            />
           </UserButton.MenuItems>
         ) : null}
       </UserButton>
