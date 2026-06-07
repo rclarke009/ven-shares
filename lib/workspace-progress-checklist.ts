@@ -772,6 +772,7 @@ export function mergeChecklistWithTemplates(
   required: ProfessionalJobCategory[],
   rawFromDb: unknown,
   completedJobCategories: ProfessionalJobCategory[],
+  templateDefinition?: import("@/lib/project-templates").ChecklistDefinition | null,
 ): WorkspaceProgressChecklist {
   const parsed = parseWorkspaceProgressChecklist(rawFromDb);
   const completedSet = new Set(completedJobCategories);
@@ -783,7 +784,16 @@ export function mergeChecklistWithTemplates(
     const persisted = categoryHadPersistedData(rawFromDb, category);
     const templateSubtaskIds = collectTemplateSubtaskIds(category);
     const templateTaskIds = collectTemplateTaskIds(category);
-    const template = WORKSPACE_PROGRESS_STANDARD_TEMPLATE[category];
+    const customLists =
+      templateDefinition?.[category]?.taskLists?.map((tl) => ({
+        title: tl.title,
+        tasks: tl.tasks.map((t) => ({
+          title: t.title,
+          subtasks: t.subtasks.map((s) => ({ title: s.title })),
+        })),
+      })) ?? null;
+    const template =
+      customLists ?? WORKSPACE_PROGRESS_STANDARD_TEMPLATE[category];
 
     const mergedTaskLists: WorkspaceProgressTaskList[] = [];
 

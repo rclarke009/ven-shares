@@ -5,6 +5,7 @@ import { DashboardAddProjectHeader } from "@/components/dashboard/dashboard-add-
 import { DashboardProfessionalHeader } from "@/components/dashboard/dashboard-professional-header";
 import { DashboardProjectProgressStack } from "@/components/dashboard/dashboard-project-progress-stack";
 import { DashboardRoleTabs } from "@/components/dashboard/dashboard-role-tabs";
+import type { PublishedTemplatePickerItem } from "@/lib/project-templates";
 import type { WorkspaceOrganizerBundle } from "@/lib/workspace-organizer-bundle.server";
 import type { VenRole } from "@/lib/ven-role";
 
@@ -19,6 +20,7 @@ type WorkspaceDashboardPanelProps = {
   bundles: WorkspaceOrganizerBundle[];
   professionalBundles: WorkspaceOrganizerBundle[];
   projectsCount: number;
+  projectTemplates: PublishedTemplatePickerItem[];
 };
 
 export function WorkspaceDashboardPanel({
@@ -32,6 +34,7 @@ export function WorkspaceDashboardPanel({
   bundles,
   professionalBundles,
   projectsCount,
+  projectTemplates,
 }: WorkspaceDashboardPanelProps) {
   const showTabs = hasInventor && hasProfessional;
   const showInventorPanel = showTabs ? activeTab === "inventor" : hasInventor;
@@ -78,7 +81,7 @@ export function WorkspaceDashboardPanel({
 
         {showInventorPanel ? (
           <>
-            <DashboardAddProjectHeader />
+            <DashboardAddProjectHeader templates={projectTemplates} />
             {projectsCount === 0 ? (
               <p className="text-slate-600 text-sm mb-10">
                 No projects yet. Click Add new project to get started.

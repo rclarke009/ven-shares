@@ -25,6 +25,12 @@ import {
   PROJECT_IMAGES_BUCKET,
   versionedProjectImageStoragePath,
 } from "@/lib/project-image-url";
+import { buildInitialChecklistFromDefinition } from "@/lib/project-templates";
+import { loadPublishedTemplateById } from "@/lib/project-templates.server";
+import {
+  dependenciesStateToJson,
+  mergeMilestoneState,
+} from "@/lib/workspace-progress-graph";
 import { isCurrentUserInventor } from "@/lib/ven-role.server";
 
 import type { RepresentativeImageOk } from "@/lib/representative-image-upload";
@@ -309,15 +315,41 @@ export async function createProject(
     return { ok: false, error: skillsParse.error };
   }
 
+  const templateIdRaw = (formData.get("templateId") as string)?.trim() ?? "";
+  let templateId: string | null = null;
+  let template = null;
+  if (templateIdRaw) {
+    template = await loadPublishedTemplateById(templateIdRaw);
+    if (!template) {
+      return { ok: false, error: "Invalid project template." };
+    }
+    templateId = template.id;
+  }
+
+  const insertPayload: Record<string, unknown> = {
+    title,
+    description,
+    clerk_user_id: userId,
+    required_job_categories,
+    template_id: templateId,
+  };
+
+  if (template) {
+    insertPayload.workspace_progress_checklist =
+      buildInitialChecklistFromDefinition(
+        required_job_categories,
+        template.checklist_definition,
+      );
+    insertPayload.workspace_progress_dependencies = dependenciesStateToJson({
+      milestoneState: mergeMilestoneState({}, true),
+      nodeDependencies: template.dependency_overrides.nodeDependencies ?? {},
+    });
+  }
+
   const supabase = createServerSupabaseClient();
   const { data: inserted, error: insertError } = await supabase
     .from("projects")
-    .insert({
-      title,
-      description,
-      clerk_user_id: userId,
-      required_job_categories,
-    })
+    .insert(insertPayload)
     .select("id")
     .single();
 

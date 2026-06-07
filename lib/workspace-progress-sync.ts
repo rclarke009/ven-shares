@@ -5,6 +5,7 @@ import { isProjectUuid } from "@/lib/projects-arena";
 import { normalizeRequiredJobCategoriesFromDb } from "@/lib/skills-match";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 
+import { loadProjectTemplateForProject } from "@/lib/project-templates.server";
 import {
   type WorkspaceProgressChecklist,
   checklistsEqual,
@@ -86,10 +87,12 @@ export async function ensureWorkspaceProgressChecklistSynced(
     row.completed_job_categories,
   );
 
+  const templateBundle = await loadProjectTemplateForProject(projectId);
   const merged = mergeChecklistWithTemplates(
     required,
     rawChecklistUnknown,
     completedDb,
+    templateBundle?.checklistDefinition,
   );
   const computed = completedCategoriesFromChecklist(required, merged);
   const rawParsed = parseWorkspaceProgressChecklist(rawChecklistUnknown);

@@ -2,6 +2,7 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
 import { listProjectsForCurrentUser } from "@/app/dashboard/projects/actions";
+import { listPublishedTemplatesForPicker } from "@/lib/project-templates.server";
 import { WorkspaceDashboardShell } from "@/components/workspace/workspace-dashboard-shell";
 import { WorkspacePageChrome } from "@/components/workspace/workspace-page-chrome";
 import { listJoinedProjectsForCurrentUser } from "@/lib/project-members";
@@ -73,6 +74,9 @@ export default async function WorkspacePage({ searchParams }: WorkspacePageProps
 
   const { owned, joined } = await loadWorkspaceProjectPickerForUser(userId);
   const profileMode = await getVenUserButtonProfileMode();
+  const projectTemplates = hasInventor
+    ? await listPublishedTemplatesForPicker()
+    : [];
 
   return (
     <WorkspacePageChrome profileMode={profileMode}>
@@ -89,6 +93,7 @@ export default async function WorkspacePage({ searchParams }: WorkspacePageProps
         bundles={bundles}
         professionalBundles={professionalBundles}
         projectsCount={projects.length}
+        projectTemplates={projectTemplates}
       />
     </WorkspacePageChrome>
   );

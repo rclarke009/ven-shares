@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import { WorkspaceAppShell } from "@/components/workspace/workspace-app-shell";
 import { WorkspaceDashboardPanel } from "@/components/workspace/workspace-dashboard-panel";
 import { writeWorkspaceLastView } from "@/lib/workspace-last-view";
+import type { PublishedTemplatePickerItem } from "@/lib/project-templates";
 import type { WorkspaceOrganizerBundle } from "@/lib/workspace-organizer-bundle.server";
 import type { WorkspacePickerProject } from "@/lib/workspace-project-picker.server";
 import type { VenRole } from "@/lib/ven-role";
@@ -22,6 +23,7 @@ type WorkspaceDashboardShellProps = {
   bundles: WorkspaceOrganizerBundle[];
   professionalBundles: WorkspaceOrganizerBundle[];
   projectsCount: number;
+  projectTemplates: PublishedTemplatePickerItem[];
 };
 
 export function WorkspaceDashboardShell(props: WorkspaceDashboardShellProps) {

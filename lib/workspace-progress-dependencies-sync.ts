@@ -1,5 +1,6 @@
 import "server-only";
 
+import { loadProjectTemplateForProject } from "@/lib/project-templates.server";
 import { isProjectUuid } from "@/lib/projects-arena";
 import { normalizeRequiredJobCategoriesFromDb } from "@/lib/skills-match";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
@@ -119,11 +120,16 @@ export async function buildProgressGraphForProject(
     depsSync ?? parseProjectDependenciesState({}, true);
   const { milestoneState, nodeDependencies } = depsState;
 
+  const templateBundle = await loadProjectTemplateForProject(projectId);
+  const templateBaseOverrides =
+    templateBundle?.dependencyOverrides?.nodeDependencies;
+
   const graph = buildProgressGraph(
     progressBundle.checklist,
     milestoneState,
     required,
     nodeDependencies,
+    templateBaseOverrides,
   );
 
   return {

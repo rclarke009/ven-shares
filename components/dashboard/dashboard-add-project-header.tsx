@@ -2,9 +2,17 @@
 
 import { useState } from "react";
 
+import type { PublishedTemplatePickerItem } from "@/lib/project-templates";
+
 import { AddProjectForm } from "./add-project-form";
 
-export function DashboardAddProjectHeader() {
+type DashboardAddProjectHeaderProps = {
+  templates: PublishedTemplatePickerItem[];
+};
+
+export function DashboardAddProjectHeader({
+  templates,
+}: DashboardAddProjectHeaderProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   function closeForm() {
@@ -33,7 +41,11 @@ export function DashboardAddProjectHeader() {
 
       {isOpen ? (
         <div className="mt-4">
-          <AddProjectForm onSuccess={closeForm} onCancel={closeForm} />
+          <AddProjectForm
+            templates={templates}
+            onSuccess={closeForm}
+            onCancel={closeForm}
+          />
         </div>
       ) : null}
     </div>

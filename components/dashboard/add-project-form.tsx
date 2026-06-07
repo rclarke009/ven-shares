@@ -8,6 +8,7 @@ import {
   type CreateProjectState,
 } from "@/app/dashboard/projects/actions";
 import { PROFESSIONAL_JOB_CATEGORY_OPTIONS } from "@/lib/professional-onboarding";
+import type { PublishedTemplatePickerItem } from "@/lib/project-templates";
 
 import { ProjectDescriptionField } from "./project-description-field";
 import { ProjectRequiredSkillRows } from "./project-required-skill-rows";
@@ -18,16 +19,23 @@ const fileFieldButtonClass =
   "inline-flex cursor-pointer items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 active:bg-slate-100";
 
 type AddProjectFormProps = {
+  templates?: PublishedTemplatePickerItem[];
   onSuccess?: () => void;
   onCancel?: () => void;
 };
 
 export function AddProjectForm({
+  templates = [],
   onSuccess,
   onCancel,
 }: AddProjectFormProps = {}) {
+  const defaultTemplateId = templates[0]?.id ?? "";
+  const [templateId, setTemplateId] = useState(defaultTemplateId);
   const [selected, setSelected] = useState<string[]>([]);
   const [skillRowsKey, setSkillRowsKey] = useState(0);
+  const [skillInitialRows, setSkillInitialRows] = useState<
+    { skill_name: string; skill_description: string }[]
+  >([]);
   const [imageFileName, setImageFileName] = useState<string | null>(null);
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const [imagePreviewBlobUrl, setImagePreviewBlobUrl] = useState<string | null>(
@@ -54,13 +62,24 @@ export function AddProjectForm({
       formRef.current.reset();
       startTransition(() => {
         setSelected([]);
+        setTemplateId(defaultTemplateId);
+        setSkillInitialRows([]);
         setImageFileName(null);
         setSelectedImageFile(null);
         setSkillRowsKey((k) => k + 1);
       });
       onSuccess?.();
     }
-  }, [state.ok, onSuccess]);
+  }, [state.ok, onSuccess, defaultTemplateId]);
+
+  useEffect(() => {
+    if (!templateId) return;
+    const template = templates.find((t) => t.id === templateId);
+    if (!template) return;
+    setSelected(template.required_job_categories);
+    setSkillInitialRows(template.suggested_skills);
+    setSkillRowsKey((k) => k + 1);
+  }, [templateId, templates]);
 
   function toggleCategory(value: string) {
     setSelected((prev) =>
@@ -80,6 +99,52 @@ export function AddProjectForm({
         Add a project
       </h2>
       <div className="space-y-4">
+        {templates.length > 0 ? (
+          <fieldset className="space-y-2">
+            <legend className="block text-sm font-medium text-slate-700">
+              Project template
+            </legend>
+            <p className="text-xs text-slate-500">
+              Choose a starting template with tasks and dependencies. You can
+              still adjust team skills before saving.
+            </p>
+            <ul className="grid gap-2 mt-2">
+              {templates.map((t) => {
+                const isSelected = templateId === t.id;
+                return (
+                  <li key={t.id}>
+                    <label
+                      className={`flex items-start gap-3 rounded-lg border px-3 py-3 cursor-pointer text-sm ${
+                        isSelected
+                          ? "border-[#22c55e] bg-green-50/50"
+                          : "border-slate-200 bg-white hover:border-slate-300"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="templatePicker"
+                        checked={isSelected}
+                        onChange={() => setTemplateId(t.id)}
+                        className="mt-1 size-4 border-slate-300 text-[#22c55e] focus:ring-[#22c55e]"
+                      />
+                      <span>
+                        <span className="font-medium text-slate-900 block">
+                          {t.name}
+                        </span>
+                        {t.description ? (
+                          <span className="text-slate-600 text-xs mt-0.5 block">
+                            {t.description}
+                          </span>
+                        ) : null}
+                      </span>
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+            <input type="hidden" name="templateId" value={templateId} />
+          </fieldset>
+        ) : null}
         <div>
           <label
             htmlFor="project-title"
@@ -182,7 +247,10 @@ export function AddProjectForm({
             JPEG, PNG, or WebP, up to 5MB.
           </p>
         </div>
-        <ProjectRequiredSkillRows key={skillRowsKey} />
+        <ProjectRequiredSkillRows
+          key={skillRowsKey}
+          initialRows={skillInitialRows}
+        />
       </div>
       {state.error ? (
         <p className="mt-3 text-sm text-red-600" role="alert">

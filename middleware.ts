@@ -6,6 +6,7 @@ import {
   SIGNUP_ROLE_COOKIE,
   SIGNUP_ROLE_COOKIE_MAX_AGE_SEC,
 } from "@/lib/signup-role-cookie";
+import { isSiteAdminFromPublicMetadata } from "@/lib/site-admin";
 import { getVenRolesFromPublicMetadata, type VenRole } from "@/lib/ven-role";
 
 const isSignupRolePath = createRouteMatcher([
@@ -18,6 +19,7 @@ const isProfessionalOnboardingPath = createRouteMatcher([
   "/onboarding/professional(.*)",
 ]);
 const isApiPath = createRouteMatcher(["/api(.*)", "/trpc(.*)"]);
+const isAdminPath = createRouteMatcher(["/admin(.*)"]);
 
 function roleFromSignupPath(pathname: string): VenRole | null {
   if (pathname.startsWith("/auth/signup/inventor")) return "inventor";
@@ -73,6 +75,13 @@ export default clerkMiddleware(async (auth, req) => {
   if (needsProOnboarding && !roles.includes("inventor")) {
     const url = req.nextUrl.clone();
     url.pathname = "/onboarding/professional";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+
+  if (isAdminPath(req) && !isSiteAdminFromPublicMetadata(meta)) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/workspace";
     url.search = "";
     return NextResponse.redirect(url);
   }

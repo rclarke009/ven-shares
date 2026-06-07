@@ -253,18 +253,28 @@ export function dependenciesStateToJson(
   return json;
 }
 
-export function getDefaultDependsOn(nodeId: string): string[] {
+export function getDefaultDependsOn(
+  nodeId: string,
+  templateBaseOverrides?: NodeDependenciesOverrides,
+): string[] {
+  if (
+    templateBaseOverrides &&
+    Object.prototype.hasOwnProperty.call(templateBaseOverrides, nodeId)
+  ) {
+    return [...(templateBaseOverrides[nodeId] ?? [])];
+  }
   return templateById.get(nodeId)?.dependsOn ?? [];
 }
 
 export function resolveDependsOn(
   nodeId: string,
   overrides: NodeDependenciesOverrides,
+  templateBaseOverrides?: NodeDependenciesOverrides,
 ): string[] {
   if (Object.prototype.hasOwnProperty.call(overrides, nodeId)) {
     return [...(overrides[nodeId] ?? [])];
   }
-  return getDefaultDependsOn(nodeId);
+  return getDefaultDependsOn(nodeId, templateBaseOverrides);
 }
 
 export function hasNodeDependencyOverride(
@@ -395,6 +405,7 @@ export function buildProgressGraph(
   milestoneState: ProjectMilestoneState,
   required: ProfessionalJobCategory[],
   nodeDependencies: NodeDependenciesOverrides = {},
+  templateBaseOverrides?: NodeDependenciesOverrides,
 ): ProgressGraphView {
   const nodeMap = new Map<string, ResolvedProgressNode>();
 
@@ -405,7 +416,11 @@ export function buildProgressGraph(
       title: def.title,
       description: def.description,
       completed: milestoneCompleted(milestoneState, def.id),
-      dependsOn: resolveDependsOn(def.id, nodeDependencies),
+      dependsOn: resolveDependsOn(
+        def.id,
+        nodeDependencies,
+        templateBaseOverrides,
+      ),
       locked: false,
       blockers: [],
     });
@@ -423,7 +438,11 @@ export function buildProgressGraph(
         description: tmpl?.description,
         category,
         completed: leaf.completed,
-        dependsOn: resolveDependsOn(leaf.id, nodeDependencies),
+        dependsOn: resolveDependsOn(
+          leaf.id,
+          nodeDependencies,
+          templateBaseOverrides,
+        ),
         locked: false,
         blockers: [],
       });
