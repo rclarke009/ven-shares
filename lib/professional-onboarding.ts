@@ -9,7 +9,8 @@ export const PROFESSIONAL_JOB_CATEGORIES_KEY =
 export const PROFESSIONAL_HOURS_BAND_KEY = "professionalHoursBand" as const;
 
 export const PROFESSIONAL_JOB_CATEGORY_OPTIONS = [
-  "Patent / IP (intellectual property) law",
+  "IP - Trademarks, Patents",
+  "Viability",
   "Engineering / product",
   "Finance",
   "Accounting",
@@ -30,7 +31,8 @@ export const LEGACY_JOB_CATEGORY_ALIASES: Record<
   string,
   ProfessionalJobCategory
 > = {
-  "Patent / IP law": "Patent / IP (intellectual property) law",
+  "Patent / IP law": "IP - Trademarks, Patents",
+  "Patent / IP (intellectual property) law": "IP - Trademarks, Patents",
   "Design / UX": "Design / UX (user experience)",
 };
 

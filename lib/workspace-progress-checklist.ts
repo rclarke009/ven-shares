@@ -94,16 +94,28 @@ export const WORKSPACE_PROGRESS_STANDARD_TEMPLATE: Record<
   ProfessionalJobCategory,
   TemplateTaskList[]
 > = {
-  "Patent / IP (intellectual property) law": [
+  "IP - Trademarks, Patents": [
     taskListFromMajor("Discovery & strategy", [
       "Review invention disclosure and prior art snapshot",
       "Confirm freedom-to-operate goals",
-      "Outline IP (intellectual property) strategy (patents, trade secrets, timing)",
+      "Outline IP strategy (patents, trademarks, trade secrets, timing)",
     ]),
     taskListFromMajor("Filing & prosecution", [
       "Draft and file patent application materials",
+      "Prepare trademark search and filing plan",
       "Respond to office actions / examiner updates",
       "Finalize claims aligned with product roadmap",
+    ]),
+  ],
+  Viability: [
+    taskListFromMajor("Feasibility assessment", [
+      "Evaluate technical feasibility and resource requirements",
+      "Assess market demand and competitive landscape",
+      "Check whether similar solutions already exist",
+    ]),
+    taskListFromMajor("Recommendation", [
+      "Document go/no-go recommendation with key risks",
+      "Align inventor and team on scope and assumptions",
     ]),
   ],
   "Engineering / product": [
