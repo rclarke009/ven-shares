@@ -29,6 +29,7 @@ import {
 
 import type { ProfessionalJobCategory } from "@/lib/professional-onboarding";
 import { useWorkspaceSkillExpand } from "@/lib/use-workspace-skill-expand";
+import { organizerSkillDomId } from "@/lib/workspace-progress-flowchart-layout";
 
 import {
   actionProgressAddCustomSubtask,
@@ -664,6 +665,7 @@ export function WorkspaceOrganizerPanel({
   const router = useRouter();
   const searchParams = useSearchParams();
   const highlightFileId = searchParams.get("file");
+  const highlightSkill = searchParams.get("skill");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [localChecklist, setLocalChecklist] =
@@ -686,6 +688,16 @@ export function WorkspaceOrganizerPanel({
     if (!target?.job_category) return;
     expandSkill(target.job_category);
   }, [highlightFileId, files, expandSkill]);
+
+  useEffect(() => {
+    if (!highlightSkill) return;
+    if (!categoryStatuses.some((s) => s.category === highlightSkill)) return;
+    expandSkill(highlightSkill);
+    requestAnimationFrame(() => {
+      const el = document.getElementById(organizerSkillDomId(highlightSkill));
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }, [highlightSkill, categoryStatuses, expandSkill]);
   const [expandedTaskLists, setExpandedTaskLists] = useState<Set<string>>(
     () => new Set(),
   );
@@ -881,6 +893,7 @@ export function WorkspaceOrganizerPanel({
           return (
             <li
               key={slot.category}
+              id={organizerSkillDomId(slot.category)}
               className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden"
             >
               <div className="flex items-center gap-2 px-4 py-3 hover:bg-slate-50/80 transition-colors">

@@ -34,7 +34,7 @@ import {
 
 type PageProps = {
   params: Promise<{ projectId: string }>;
-  searchParams: Promise<{ tab?: string; m?: string; board?: string; file?: string }>;
+  searchParams: Promise<{ tab?: string; m?: string; board?: string; file?: string; node?: string; skill?: string }>;
 };
 
 function WorkspaceFallback() {

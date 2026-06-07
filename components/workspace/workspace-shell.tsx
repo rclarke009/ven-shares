@@ -3,6 +3,7 @@
 import {
   Image,
   LayoutList,
+  Map,
   MessageCircle,
   Route,
   Video,
@@ -41,6 +42,7 @@ import { WorkspaceAppShell } from "@/components/workspace/workspace-app-shell";
 import { WorkspaceMessagesPanel } from "@/components/workspace/workspace-messages-panel";
 import { WorkspaceOrganizerPanel } from "@/components/workspace/workspace-progress-panel";
 import { ProjectJourneyPanel } from "@/components/workspace/project-journey-panel";
+import { ProjectRoadmapPanel } from "@/components/workspace/project-roadmap-panel";
 import { WorkspaceProjectHero } from "@/components/workspace/workspace-project-hero";
 import { WorkspaceTeamRoster } from "@/components/workspace/workspace-team-roster";
 
@@ -59,6 +61,7 @@ export type WorkspaceFileDTO = {
 
 const TABS = [
   { id: "journey" as const, label: "Journey", icon: Route },
+  { id: "roadmap" as const, label: "Roadmap", icon: Map },
   { id: "messages" as const, label: "Messages", icon: MessageCircle },
   { id: "organizer" as const, label: "Organizer", icon: LayoutList },
   { id: "meeting" as const, label: "Meeting", icon: Video },
@@ -367,6 +370,18 @@ export function WorkspaceShell({
             milestoneState={progressMilestoneState}
             nodeDependencies={progressNodeDependencies}
             requiredCategories={requiredJobCategories}
+          />
+        ) : null}
+
+        {tab === "roadmap" ? (
+          <ProjectRoadmapPanel
+            projectId={projectId}
+            checklist={progressChecklist}
+            milestoneState={progressMilestoneState}
+            nodeDependencies={progressNodeDependencies}
+            requiredCategories={requiredJobCategories}
+            categoryCoverage={categoryCoverage}
+            roster={roster}
           />
         ) : null}
 

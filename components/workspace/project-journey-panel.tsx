@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 
 import {
@@ -26,6 +26,7 @@ import {
 } from "@/lib/workspace-progress-graph";
 import type { WorkspaceProgressChecklist } from "@/lib/workspace-progress-checklist";
 import type { ProfessionalJobCategory } from "@/lib/professional-onboarding";
+import { journeyNodeDomId } from "@/lib/workspace-progress-flowchart-layout";
 
 type ProjectJourneyPanelProps = {
   projectId: string;
@@ -187,6 +188,7 @@ type MilestoneRowProps = {
   view: ProgressGraphView;
   nodeDependencies: NodeDependenciesOverrides;
   expanded: boolean;
+  highlighted: boolean;
   pending: boolean;
   onToggleExpand: (nodeId: string) => void;
   onToggle: (nodeId: string, completed: boolean) => void;
@@ -200,6 +202,7 @@ function MilestoneRow({
   view,
   nodeDependencies,
   expanded,
+  highlighted,
   pending,
   onToggleExpand,
   onToggle,
@@ -211,7 +214,10 @@ function MilestoneRow({
 
   return (
     <li
-      className={`rounded-lg border ${
+      id={journeyNodeDomId(node.id)}
+      className={`rounded-lg border transition-shadow ${
+        highlighted ? "ring-2 ring-[#15803d]/50 ring-offset-2" : ""
+      } ${
         node.locked
           ? "border-slate-100 bg-slate-50/80 opacity-75"
           : "border-slate-200 bg-white"
@@ -304,8 +310,10 @@ export function ProjectJourneyPanel({
   requiredCategories,
 }: ProjectJourneyPanelProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [highlightNodeId, setHighlightNodeId] = useState<string | null>(null);
   const [localChecklist, setLocalChecklist] = useState(checklist);
   const [localMilestones, setLocalMilestones] = useState(milestoneState);
   const [localNodeDependencies, setLocalNodeDependencies] =
@@ -335,6 +343,34 @@ export function ProjectJourneyPanel({
       localNodeDependencies,
     ],
   );
+
+  const highlightParam = searchParams.get("node");
+
+  useEffect(() => {
+    if (!highlightParam) return;
+
+    const node = view.nodes.find((n) => n.id === highlightParam);
+    if (!node) return;
+
+    const setupTimer = window.setTimeout(() => {
+      setExpandedNodes((prev) => new Set(prev).add(highlightParam));
+      setHighlightNodeId(highlightParam);
+
+      requestAnimationFrame(() => {
+        const el = document.getElementById(journeyNodeDomId(highlightParam));
+        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    }, 0);
+
+    const fadeTimer = window.setTimeout(() => {
+      setHighlightNodeId(null);
+    }, 3000);
+
+    return () => {
+      window.clearTimeout(setupTimer);
+      window.clearTimeout(fadeTimer);
+    };
+  }, [highlightParam, view.nodes]);
 
   const counts = useMemo(() => countProgressGraph(view), [view]);
 
@@ -508,6 +544,7 @@ export function ProjectJourneyPanel({
                   view={view}
                   nodeDependencies={localNodeDependencies}
                   expanded={expandedNodes.has(node.id)}
+                  highlighted={highlightNodeId === node.id}
                   pending={pending}
                   onToggleExpand={toggleExpand}
                   onToggle={toggleNode}
