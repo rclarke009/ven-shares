@@ -22,11 +22,16 @@ import {
 import { persistWorkspaceProgress } from "@/lib/workspace-progress-sync";
 import {
   applyGraphNodeCompleted,
+  applyNodeDependencies,
   blockersMessage,
   buildProgressGraph,
+  resetNodeDependenciesOverride,
+  stripNodeFromDependencies,
+  validateNodeDependencies,
 } from "@/lib/workspace-progress-graph";
 import {
   loadMergedProgressForToggle,
+  persistNodeDependencies,
   persistWorkspaceProgressGraphToggle,
 } from "@/lib/workspace-progress-dependencies-sync";
 import { normalizeRequiredJobCategoriesFromDb } from "@/lib/skills-match";
@@ -135,6 +140,7 @@ export async function actionProgressToggleGraphNode(
     loaded.checklist,
     loaded.milestoneState,
     loaded.required,
+    loaded.nodeDependencies,
   );
   const node = view.nodes.find((n) => n.id === nodeId);
   if (!node) return { ok: false, error: "Task not found." };
@@ -151,6 +157,7 @@ export async function actionProgressToggleGraphNode(
     loaded.required,
     nodeId,
     completed,
+    loaded.nodeDependencies,
   );
   if (!result) {
     return {
@@ -163,6 +170,96 @@ export async function actionProgressToggleGraphNode(
     projectId,
     result.checklist,
     result.milestoneState,
+    loaded.nodeDependencies,
+  );
+  if (!persist.ok) return persist;
+
+  revalidateArenaAndWorkspace(projectId);
+  revalidatePath("/dashboard");
+  return { ok: true };
+}
+
+export async function actionProgressSetNodeDependencies(
+  projectId: string,
+  nodeId: string,
+  dependsOn: string[],
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { userId } = await auth();
+  if (!userId || !isProjectUuid(projectId)) {
+    return { ok: false, error: "Unauthorized." };
+  }
+  const allowed = await canAccessWorkspace(projectId, userId);
+  if (!allowed) return { ok: false, error: "Unauthorized." };
+
+  const loaded = await loadMergedProgressForToggle(projectId);
+  if (!loaded) return { ok: false, error: "Could not load project." };
+
+  const view = buildProgressGraph(
+    loaded.checklist,
+    loaded.milestoneState,
+    loaded.required,
+    loaded.nodeDependencies,
+  );
+
+  const validation = validateNodeDependencies(
+    view,
+    nodeId,
+    dependsOn,
+    loaded.nodeDependencies,
+  );
+  if (!validation.ok) return validation;
+
+  const nextDependencies = applyNodeDependencies(
+    loaded.nodeDependencies,
+    nodeId,
+    dependsOn,
+  );
+
+  const persist = await persistNodeDependencies(
+    projectId,
+    loaded.milestoneState,
+    nextDependencies,
+  );
+  if (!persist.ok) return persist;
+
+  revalidateArenaAndWorkspace(projectId);
+  revalidatePath("/dashboard");
+  return { ok: true };
+}
+
+export async function actionProgressResetNodeDependencies(
+  projectId: string,
+  nodeId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { userId } = await auth();
+  if (!userId || !isProjectUuid(projectId)) {
+    return { ok: false, error: "Unauthorized." };
+  }
+  const allowed = await canAccessWorkspace(projectId, userId);
+  if (!allowed) return { ok: false, error: "Unauthorized." };
+
+  const loaded = await loadMergedProgressForToggle(projectId);
+  if (!loaded) return { ok: false, error: "Could not load project." };
+
+  const view = buildProgressGraph(
+    loaded.checklist,
+    loaded.milestoneState,
+    loaded.required,
+    loaded.nodeDependencies,
+  );
+  if (!view.nodes.some((n) => n.id === nodeId)) {
+    return { ok: false, error: "Task not found." };
+  }
+
+  const nextDependencies = resetNodeDependenciesOverride(
+    loaded.nodeDependencies,
+    nodeId,
+  );
+
+  const persist = await persistNodeDependencies(
+    projectId,
+    loaded.milestoneState,
+    nextDependencies,
   );
   if (!persist.ok) return persist;
 
@@ -421,6 +518,30 @@ export async function actionProgressArchiveCustomItem(
 
   const persist = await persistWorkspaceProgress(projectId, next);
   if (!persist.ok) return persist;
+
+  const progressLoaded = await loadMergedProgressForToggle(projectId);
+  if (progressLoaded) {
+    const hadDependencyRefs =
+      Object.prototype.hasOwnProperty.call(
+        progressLoaded.nodeDependencies,
+        itemId,
+      ) ||
+      Object.values(progressLoaded.nodeDependencies).some((deps) =>
+        deps.includes(itemId),
+      );
+    if (hadDependencyRefs) {
+      const stripped = stripNodeFromDependencies(
+        progressLoaded.nodeDependencies,
+        itemId,
+      );
+      const depsPersist = await persistNodeDependencies(
+        projectId,
+        progressLoaded.milestoneState,
+        stripped,
+      );
+      if (!depsPersist.ok) return depsPersist;
+    }
+  }
 
   revalidateArenaAndWorkspace(projectId);
   return { ok: true };

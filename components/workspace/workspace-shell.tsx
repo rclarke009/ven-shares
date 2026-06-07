@@ -1,8 +1,6 @@
 "use client";
 
-import Link from "next/link";
 import {
-  Activity,
   Image,
   LayoutList,
   MessageCircle,
@@ -26,10 +24,10 @@ import type { ArenaCategoryCoverage } from "@/lib/arena-team-display";
 import type { ProjectRequiredSkill } from "@/lib/project-required-skills";
 import type { ProjectImageCropMeta } from "@/lib/project-image-crop";
 import type { ProjectMilestoneState } from "@/lib/workspace-progress-graph";
+import type { NodeDependenciesOverrides } from "@/lib/workspace-progress-graph";
 import type { WorkspaceProgressChecklist } from "@/lib/workspace-progress-checklist";
 import {
   boardParamFromCategory,
-  messageActivityBoardSuffix,
   messageBoardLabel,
   resolveBoardCategory,
   TEAM_BOARD_PARAM,
@@ -38,6 +36,7 @@ import { writeWorkspaceLastView } from "@/lib/workspace-last-view";
 import type { WorkspacePickerProject } from "@/lib/workspace-project-picker.server";
 
 import { EditProjectForm } from "@/components/dashboard/edit-project-form";
+import { WorkspaceActivityLog } from "@/components/workspace/workspace-activity-log";
 import { WorkspaceAppShell } from "@/components/workspace/workspace-app-shell";
 import { WorkspaceMessagesPanel } from "@/components/workspace/workspace-messages-panel";
 import { WorkspaceOrganizerPanel } from "@/components/workspace/workspace-progress-panel";
@@ -60,7 +59,6 @@ export type WorkspaceFileDTO = {
 
 const TABS = [
   { id: "journey" as const, label: "Journey", icon: Route },
-  { id: "activity" as const, label: "Activity", icon: Activity },
   { id: "messages" as const, label: "Messages", icon: MessageCircle },
   { id: "organizer" as const, label: "Organizer", icon: LayoutList },
   { id: "meeting" as const, label: "Meeting", icon: Video },
@@ -140,98 +138,13 @@ type WorkspaceShellProps = {
   nameMap: Record<string, string>;
   progressChecklist: WorkspaceProgressChecklist;
   progressMilestoneState: ProjectMilestoneState;
+  progressNodeDependencies: NodeDependenciesOverrides;
   progressCategoryStatuses: ArenaCategorySlot[];
   categoryCoverage: ArenaCategoryCoverage[];
   viewerCoveredCategories: ProfessionalJobCategory[];
   isProjectOwner: boolean;
   editableProject: WorkspaceEditableProject | null;
 };
-
-function formatTime(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString(undefined, {
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
-}
-
-function activityDescription(
-  kind: string,
-  payload: Record<string, unknown> | null,
-): string {
-  if (kind === "message_posted") {
-    const category =
-      typeof payload?.job_category === "string" ? payload.job_category : null;
-    const suffix = messageActivityBoardSuffix(category);
-    const urgent = payload?.is_urgent === true;
-    return urgent
-      ? `Posted an urgent message${suffix}`
-      : `Posted a message${suffix}`;
-  }
-  if (kind === "message_deleted") {
-    const category =
-      typeof payload?.job_category === "string" ? payload.job_category : null;
-    return `Archived a message${messageActivityBoardSuffix(category)}`;
-  }
-  if (kind === "file_uploaded") {
-    const name =
-      typeof payload?.filename === "string" ? payload.filename : "a file";
-    const category =
-      typeof payload?.job_category === "string" ? payload.job_category : null;
-    return category ? `Uploaded ${name} for ${category}` : `Uploaded ${name}`;
-  }
-  if (kind === "file_deleted") {
-    const name =
-      typeof payload?.filename === "string" ? payload.filename : "a file";
-    const category =
-      typeof payload?.job_category === "string" ? payload.job_category : null;
-    return category ? `Archived ${name} from ${category}` : `Archived ${name}`;
-  }
-  if (kind === "file_updated") {
-    const name =
-      typeof payload?.filename === "string" ? payload.filename : "a file";
-    const category =
-      typeof payload?.job_category === "string" ? payload.job_category : null;
-    return category
-      ? `Updated description for ${name} in ${category}`
-      : `Updated description for ${name}`;
-  }
-  if (kind === "status_updated") {
-    const s =
-      typeof payload?.status_text === "string" ? payload.status_text : "";
-    return s ? `Set status: ${s}` : "Updated status";
-  }
-  return kind.replace(/_/g, " ");
-}
-
-function activityMessagePermalink(
-  payload: Record<string, unknown> | null,
-): string | null {
-  const messageId =
-    typeof payload?.message_id === "string" ? payload.message_id : null;
-  if (!messageId) return null;
-  const category =
-    typeof payload?.job_category === "string" ? payload.job_category : null;
-  const board = boardParamFromCategory(category);
-  const params = new URLSearchParams({
-    tab: "messages",
-    board,
-    m: messageId,
-  });
-  return `?${params.toString()}`;
-}
-
-function isUrgentMessageActivity(
-  kind: string,
-  payload: Record<string, unknown> | null,
-): boolean {
-  return kind === "message_posted" && payload?.is_urgent === true;
-}
 
 function isBaseTabId(v: string): v is BaseTabId {
   return TABS.some((t) => t.id === v);
@@ -246,6 +159,9 @@ function resolveTabId(
   }
   if (v === "progress" || v === "files") {
     return "organizer";
+  }
+  if (v === "activity") {
+    return "messages";
   }
   if (isBaseTabId(v)) return v;
   return "messages";
@@ -271,6 +187,7 @@ export function WorkspaceShell({
   nameMap,
   progressChecklist,
   progressMilestoneState,
+  progressNodeDependencies,
   progressCategoryStatuses,
   categoryCoverage,
   viewerCoveredCategories,
@@ -429,7 +346,12 @@ export function WorkspaceShell({
       activeProjectId={projectId}
       currentUserId={currentUserId}
       projectSidebar={projectSidebar}
-      projectSidebarFooter={<WorkspaceTeamRoster roster={roster} />}
+      projectSidebarFooter={
+        <div className="mt-auto flex flex-col">
+          <WorkspaceActivityLog activities={activities} nameMap={nameMap} />
+          <WorkspaceTeamRoster roster={roster} />
+        </div>
+      }
     >
       <WorkspaceProjectHero
         projectId={projectId}
@@ -443,59 +365,9 @@ export function WorkspaceShell({
             projectId={projectId}
             checklist={progressChecklist}
             milestoneState={progressMilestoneState}
+            nodeDependencies={progressNodeDependencies}
             requiredCategories={requiredJobCategories}
           />
-        ) : null}
-
-        {tab === "activity" ? (
-          <div className="max-w-3xl rounded-2xl border border-slate-200 bg-white shadow-sm p-6">
-            <h2 className="text-base font-semibold text-slate-900 mb-4">
-              Recent activity
-            </h2>
-            {activities.length === 0 ? (
-              <p className="text-sm text-slate-600">No activity yet.</p>
-            ) : (
-              <ul className="space-y-3">
-                {activities.map((a) => {
-                  const urgent = isUrgentMessageActivity(a.kind, a.payload);
-                  const messageLink = activityMessagePermalink(a.payload);
-                  return (
-                    <li
-                      key={a.id}
-                      className={`text-sm border-b border-slate-100 pb-3 last:border-0 ${
-                        urgent
-                          ? "border-l-4 border-l-red-400 pl-3 -ml-3"
-                          : ""
-                      }`}
-                    >
-                      <span className="font-medium text-slate-900">
-                        {nameMap[a.actor_clerk_user_id] ?? "Someone"}
-                      </span>
-                      <span
-                        className={
-                          urgent ? "font-semibold text-red-800" : "text-slate-600"
-                        }
-                      >
-                        {" "}
-                        {activityDescription(a.kind, a.payload)}
-                      </span>
-                      {messageLink ? (
-                        <Link
-                          href={messageLink}
-                          className="block text-xs font-medium text-[#15803d] hover:underline mt-1"
-                        >
-                          View message
-                        </Link>
-                      ) : null}
-                      <p className="text-xs text-slate-400 mt-1">
-                        {formatTime(a.created_at)}
-                      </p>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
         ) : null}
 
         {tab === "messages" ? (

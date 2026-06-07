@@ -201,6 +201,7 @@ async function WorkspaceProjectContent({
       nameMap={nameMapRecord}
       progressChecklist={organizerBundle.checklist}
       progressMilestoneState={organizerBundle.milestoneState}
+      progressNodeDependencies={organizerBundle.nodeDependencies}
       progressCategoryStatuses={organizerBundle.categoryStatuses}
       categoryCoverage={organizerBundle.categoryCoverage}
       viewerCoveredCategories={organizerBundle.viewerCoveredCategories}

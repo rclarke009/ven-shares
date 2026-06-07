@@ -19,8 +19,11 @@ import type { WorkspaceProgressChecklist } from "@/lib/workspace-progress-checkl
 import {
   buildProgressGraphForProject,
 } from "@/lib/workspace-progress-dependencies-sync";
-import type { ProgressGraphView } from "@/lib/workspace-progress-graph";
-import type { ProjectMilestoneState } from "@/lib/workspace-progress-graph";
+import type {
+  NodeDependenciesOverrides,
+  ProgressGraphView,
+  ProjectMilestoneState,
+} from "@/lib/workspace-progress-graph";
 import {
   getWorkspaceProjectMeta,
   listMemberClerkIdsForProject,
@@ -34,6 +37,7 @@ export type WorkspaceOrganizerBundle = {
   checklist: WorkspaceProgressChecklist;
   progressGraph: ProgressGraphView;
   milestoneState: ProjectMilestoneState;
+  nodeDependencies: NodeDependenciesOverrides;
   categoryStatuses: ArenaCategorySlot[];
   categoryCoverage: ArenaCategoryCoverage[];
   files: WorkspaceFileDTO[];
@@ -130,6 +134,7 @@ export async function loadWorkspaceOrganizerBundle(
     checklist: progressBundle.checklist,
     progressGraph: graphBundle.graph,
     milestoneState: graphBundle.milestoneState,
+    nodeDependencies: graphBundle.nodeDependencies,
     categoryStatuses: arenaProject.category_statuses,
     categoryCoverage,
     files: filesDto,

@@ -5,10 +5,13 @@ import { normalizeRequiredJobCategoriesFromDb } from "@/lib/skills-match";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import {
   buildProgressGraph,
+  dependenciesStateToJson,
   mergeMilestoneState,
-  milestoneStateToJson,
+  parseProjectDependenciesState,
   parseWorkspaceProgressDependencies,
+  type NodeDependenciesOverrides,
   type ProgressGraphView,
+  type ProjectDependenciesState,
   type ProjectMilestoneState,
 } from "@/lib/workspace-progress-graph";
 import type { WorkspaceProgressChecklist } from "@/lib/workspace-progress-checklist";
@@ -41,7 +44,7 @@ function isMissingDependenciesColumn(error: {
 
 export async function ensureWorkspaceProgressDependenciesSynced(
   projectId: string,
-): Promise<{ milestoneState: ProjectMilestoneState } | null> {
+): Promise<ProjectDependenciesState | null> {
   if (!isProjectUuid(projectId)) return null;
 
   const supabase = createServerSupabaseClient();
@@ -52,9 +55,7 @@ export async function ensureWorkspaceProgressDependenciesSynced(
     .maybeSingle();
 
   if (error && isMissingDependenciesColumn(error)) {
-    return {
-      milestoneState: mergeMilestoneState({}, true),
-    };
+    return parseProjectDependenciesState({}, true);
   }
 
   if (error || !row) {
@@ -66,14 +67,14 @@ export async function ensureWorkspaceProgressDependenciesSynced(
   const parsed = parseWorkspaceProgressDependencies(raw);
   const hadPersisted = (parsed.milestones?.length ?? 0) > 0;
 
-  const merged = mergeMilestoneState(raw, !hadPersisted);
-  const parsedState = mergeMilestoneState(raw, false);
+  const merged = parseProjectDependenciesState(raw, !hadPersisted);
+  const parsedState = parseProjectDependenciesState(raw, false);
 
-  if (!milestoneStatesEqual(merged, parsedState)) {
+  if (!milestoneStatesEqual(merged.milestoneState, parsedState.milestoneState)) {
     const { error: updateErr } = await supabase
       .from("projects")
       .update({
-        workspace_progress_dependencies: milestoneStateToJson(merged),
+        workspace_progress_dependencies: dependenciesStateToJson(merged),
       })
       .eq("id", projectId);
 
@@ -82,7 +83,7 @@ export async function ensureWorkspaceProgressDependenciesSynced(
     }
   }
 
-  return { milestoneState: merged };
+  return merged;
 }
 
 export async function buildProgressGraphForProject(
@@ -91,6 +92,7 @@ export async function buildProgressGraphForProject(
   graph: ProgressGraphView;
   checklist: WorkspaceProgressChecklist;
   milestoneState: ProjectMilestoneState;
+  nodeDependencies: NodeDependenciesOverrides;
   required: import("@/lib/professional-onboarding").ProfessionalJobCategory[];
 } | null> {
   const progressBundle = await ensureWorkspaceProgressChecklistSynced(projectId);
@@ -113,19 +115,22 @@ export async function buildProgressGraphForProject(
   );
 
   const depsSync = await ensureWorkspaceProgressDependenciesSynced(projectId);
-  const milestoneState =
-    depsSync?.milestoneState ?? mergeMilestoneState({}, true);
+  const depsState =
+    depsSync ?? parseProjectDependenciesState({}, true);
+  const { milestoneState, nodeDependencies } = depsState;
 
   const graph = buildProgressGraph(
     progressBundle.checklist,
     milestoneState,
     required,
+    nodeDependencies,
   );
 
   return {
     graph,
     checklist: progressBundle.checklist,
     milestoneState,
+    nodeDependencies,
     required,
   };
 }
@@ -134,6 +139,7 @@ export async function persistWorkspaceProgressGraphToggle(
   projectId: string,
   checklist: WorkspaceProgressChecklist,
   milestoneState: ProjectMilestoneState,
+  nodeDependencies: NodeDependenciesOverrides = {},
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (!isProjectUuid(projectId)) {
     return { ok: false, error: "Invalid project." };
@@ -142,11 +148,26 @@ export async function persistWorkspaceProgressGraphToggle(
   const checklistPersist = await persistWorkspaceProgress(projectId, checklist);
   if (!checklistPersist.ok) return checklistPersist;
 
+  return persistNodeDependencies(projectId, milestoneState, nodeDependencies);
+}
+
+export async function persistNodeDependencies(
+  projectId: string,
+  milestoneState: ProjectMilestoneState,
+  nodeDependencies: NodeDependenciesOverrides,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!isProjectUuid(projectId)) {
+    return { ok: false, error: "Invalid project." };
+  }
+
   const supabase = createServerSupabaseClient();
   const { error: depsErr } = await supabase
     .from("projects")
     .update({
-      workspace_progress_dependencies: milestoneStateToJson(milestoneState),
+      workspace_progress_dependencies: dependenciesStateToJson({
+        milestoneState,
+        nodeDependencies,
+      }),
     })
     .eq("id", projectId);
 
@@ -155,7 +176,7 @@ export async function persistWorkspaceProgressGraphToggle(
       return { ok: true };
     }
     console.log("MYDEBUG →", depsErr.message);
-    return { ok: false, error: "Could not save milestone progress." };
+    return { ok: false, error: "Could not save progress dependencies." };
   }
 
   return { ok: true };

@@ -19,7 +19,7 @@ type WorkspaceTeamRosterProps = {
 
 export function WorkspaceTeamRoster({ roster }: WorkspaceTeamRosterProps) {
   return (
-    <div className="mt-auto p-3 border-t border-slate-600/80">
+    <div className="p-3 border-t border-slate-600/80">
       <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
         Team
       </p>

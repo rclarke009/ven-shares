@@ -4,12 +4,22 @@ import { ChevronDown } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 
-import { actionProgressToggleGraphNode } from "@/app/idea-arena/[projectId]/workspace/actions";
+import {
+  actionProgressResetNodeDependencies,
+  actionProgressSetNodeDependencies,
+  actionProgressToggleGraphNode,
+} from "@/app/idea-arena/[projectId]/workspace/actions";
 import {
   applyGraphNodeCompleted,
+  applyNodeDependencies,
   blockersMessage,
   buildProgressGraph,
   countProgressGraph,
+  getDefaultDependsOn,
+  hasNodeDependencyOverride,
+  resetNodeDependenciesOverride,
+  type NodeDependenciesOverrides,
+  type ProgressGraphSection,
   type ProgressGraphView,
   type ProjectMilestoneState,
   type ResolvedProgressNode,
@@ -21,25 +31,180 @@ type ProjectJourneyPanelProps = {
   projectId: string;
   checklist: WorkspaceProgressChecklist;
   milestoneState: ProjectMilestoneState;
+  nodeDependencies: NodeDependenciesOverrides;
   requiredCategories: ProfessionalJobCategory[];
 };
+
+type PrerequisitesEditorProps = {
+  node: ResolvedProgressNode;
+  view: ProgressGraphView;
+  nodeDependencies: NodeDependenciesOverrides;
+  pending: boolean;
+  onSetDependencies: (nodeId: string, dependsOn: string[]) => void;
+  onResetDependencies: (nodeId: string) => void;
+};
+
+function PrerequisitesEditor({
+  node,
+  view,
+  nodeDependencies,
+  pending,
+  onSetDependencies,
+  onResetDependencies,
+}: PrerequisitesEditorProps) {
+  const [selectedId, setSelectedId] = useState("");
+  const nodeById = useMemo(
+    () => new Map(view.nodes.map((n) => [n.id, n])),
+    [view.nodes],
+  );
+  const hasOverride = hasNodeDependencyOverride(node.id, nodeDependencies);
+  const defaultDeps = getDefaultDependsOn(node.id);
+  const canReset = hasOverride;
+
+  const candidateSections = useMemo(() => {
+    const currentDeps = new Set(node.dependsOn);
+    return view.sections
+      .map((section) => ({
+        ...section,
+        nodeIds: section.nodeIds.filter(
+          (id) => id !== node.id && !currentDeps.has(id),
+        ),
+      }))
+      .filter((section) => section.nodeIds.length > 0);
+  }, [view.sections, node.id, node.dependsOn]);
+
+  const handleAdd = () => {
+    const id = selectedId.trim();
+    if (!id || node.dependsOn.includes(id)) return;
+    onSetDependencies(node.id, [...node.dependsOn, id]);
+    setSelectedId("");
+  };
+
+  return (
+    <div className="mt-3 border-t border-slate-100 pt-3">
+      <div className="flex flex-wrap items-center gap-2 mb-2">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Prerequisites
+        </p>
+        {hasOverride ? (
+          <span className="text-[10px] font-medium text-amber-700 bg-amber-50 rounded px-1.5 py-0.5">
+            Custom
+          </span>
+        ) : null}
+      </div>
+
+      {node.dependsOn.length === 0 ? (
+        <p className="text-xs text-slate-400 mb-2">None — this item can start anytime.</p>
+      ) : (
+        <ul className="space-y-1 mb-2">
+          {node.dependsOn.map((depId) => {
+            const dep = nodeById.get(depId);
+            return (
+              <li
+                key={depId}
+                className="flex items-center justify-between gap-2 text-xs text-slate-600"
+              >
+                <span className="min-w-0 truncate">
+                  {dep?.title ?? depId}
+                  {dep?.completed ? (
+                    <span className="ml-1 text-emerald-600">(done)</span>
+                  ) : null}
+                </span>
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() =>
+                    onSetDependencies(
+                      node.id,
+                      node.dependsOn.filter((d) => d !== depId),
+                    )
+                  }
+                  className="shrink-0 text-[#15803d] hover:underline disabled:opacity-50"
+                >
+                  Remove
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {candidateSections.length > 0 ? (
+        <div className="flex flex-wrap gap-2 items-center">
+          <select
+            value={selectedId}
+            disabled={pending}
+            onChange={(e) => setSelectedId(e.target.value)}
+            className="min-w-0 flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-xs text-slate-800 bg-white disabled:opacity-50"
+            aria-label="Add prerequisite"
+          >
+            <option value="">Add prerequisite…</option>
+            {candidateSections.map((section) => (
+              <optgroup key={section.id} label={section.title}>
+                {section.nodeIds.map((id) => {
+                  const candidate = nodeById.get(id);
+                  if (!candidate) return null;
+                  return (
+                    <option key={id} value={id}>
+                      {candidate.title}
+                    </option>
+                  );
+                })}
+              </optgroup>
+            ))}
+          </select>
+          <button
+            type="button"
+            disabled={pending || !selectedId}
+            onClick={handleAdd}
+            className="text-xs font-semibold text-[#15803d] hover:underline disabled:opacity-50 shrink-0"
+          >
+            Add
+          </button>
+        </div>
+      ) : null}
+
+      {canReset ? (
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => onResetDependencies(node.id)}
+          className="mt-2 text-xs text-slate-500 hover:text-slate-700 hover:underline disabled:opacity-50"
+        >
+          Reset to defaults
+          {defaultDeps.length > 0
+            ? ` (${defaultDeps.length} built-in)`
+            : " (no built-in prerequisites)"}
+        </button>
+      ) : null}
+    </div>
+  );
+}
 
 type MilestoneRowProps = {
   projectId: string;
   node: ResolvedProgressNode;
+  view: ProgressGraphView;
+  nodeDependencies: NodeDependenciesOverrides;
   expanded: boolean;
   pending: boolean;
   onToggleExpand: (nodeId: string) => void;
   onToggle: (nodeId: string, completed: boolean) => void;
+  onSetDependencies: (nodeId: string, dependsOn: string[]) => void;
+  onResetDependencies: (nodeId: string) => void;
 };
 
 function MilestoneRow({
   projectId,
   node,
+  view,
+  nodeDependencies,
   expanded,
   pending,
   onToggleExpand,
   onToggle,
+  onSetDependencies,
+  onResetDependencies,
 }: MilestoneRowProps) {
   const checkboxId = `${projectId}-graph-${node.id}`;
   const blockerText = blockersMessage(node.blockers);
@@ -117,6 +282,14 @@ function MilestoneRow({
               ))}
             </ul>
           ) : null}
+          <PrerequisitesEditor
+            node={node}
+            view={view}
+            nodeDependencies={nodeDependencies}
+            pending={pending}
+            onSetDependencies={onSetDependencies}
+            onResetDependencies={onResetDependencies}
+          />
         </div>
       ) : null}
     </li>
@@ -127,6 +300,7 @@ export function ProjectJourneyPanel({
   projectId,
   checklist,
   milestoneState,
+  nodeDependencies,
   requiredCategories,
 }: ProjectJourneyPanelProps) {
   const router = useRouter();
@@ -134,6 +308,8 @@ export function ProjectJourneyPanel({
   const [error, setError] = useState<string | null>(null);
   const [localChecklist, setLocalChecklist] = useState(checklist);
   const [localMilestones, setLocalMilestones] = useState(milestoneState);
+  const [localNodeDependencies, setLocalNodeDependencies] =
+    useState(nodeDependencies);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(
     () => new Set(),
   );
@@ -141,12 +317,23 @@ export function ProjectJourneyPanel({
   useEffect(() => {
     setLocalChecklist(checklist);
     setLocalMilestones(milestoneState);
-  }, [checklist, milestoneState]);
+    setLocalNodeDependencies(nodeDependencies);
+  }, [checklist, milestoneState, nodeDependencies]);
 
   const view = useMemo(
     () =>
-      buildProgressGraph(localChecklist, localMilestones, requiredCategories),
-    [localChecklist, localMilestones, requiredCategories],
+      buildProgressGraph(
+        localChecklist,
+        localMilestones,
+        requiredCategories,
+        localNodeDependencies,
+      ),
+    [
+      localChecklist,
+      localMilestones,
+      requiredCategories,
+      localNodeDependencies,
+    ],
   );
 
   const counts = useMemo(() => countProgressGraph(view), [view]);
@@ -177,6 +364,7 @@ export function ProjectJourneyPanel({
         requiredCategories,
         nodeId,
         completed,
+        localNodeDependencies,
       );
       if (!result) {
         const node = view.nodes.find((n) => n.id === nodeId);
@@ -211,11 +399,67 @@ export function ProjectJourneyPanel({
     [
       localChecklist,
       localMilestones,
+      localNodeDependencies,
       requiredCategories,
       projectId,
       router,
       view.nodes,
     ],
+  );
+
+  const setNodeDependencies = useCallback(
+    (nodeId: string, dependsOn: string[]) => {
+      setError(null);
+      const snapshot = localNodeDependencies;
+      const next = applyNodeDependencies(snapshot, nodeId, dependsOn);
+      setLocalNodeDependencies(next);
+
+      startTransition(async () => {
+        const actionResult = await actionProgressSetNodeDependencies(
+          projectId,
+          nodeId,
+          dependsOn,
+        );
+        if (!actionResult.ok) {
+          setLocalNodeDependencies(snapshot);
+          setError(
+            "error" in actionResult && actionResult.error
+              ? actionResult.error
+              : "Something went wrong.",
+          );
+          return;
+        }
+        router.refresh();
+      });
+    },
+    [localNodeDependencies, projectId, router],
+  );
+
+  const resetNodeDependencies = useCallback(
+    (nodeId: string) => {
+      setError(null);
+      const snapshot = localNodeDependencies;
+      const next = resetNodeDependenciesOverride(snapshot, nodeId);
+      setLocalNodeDependencies(next);
+
+      startTransition(async () => {
+        const actionResult = await actionProgressResetNodeDependencies(
+          projectId,
+          nodeId,
+        );
+        if (!actionResult.ok) {
+          setLocalNodeDependencies(snapshot);
+          setError(
+            "error" in actionResult && actionResult.error
+              ? actionResult.error
+              : "Something went wrong.",
+          );
+          return;
+        }
+        router.refresh();
+      });
+    },
+    [localNodeDependencies, projectId, router],
   );
 
   return (
@@ -225,8 +469,9 @@ export function ProjectJourneyPanel({
           VenShares project journey
         </h2>
         <p className="text-sm text-slate-600 mt-1">
-          Track milestones and skill tasks in order. Locked items unlock when
-          their prerequisites are complete.
+          Track milestones and skill tasks in order. Expand any item to set
+          prerequisites. Locked items unlock when their prerequisites are
+          complete.
         </p>
         <p className="text-sm font-medium text-slate-700 mt-2">
           {counts.done} / {counts.total} items complete
@@ -239,7 +484,7 @@ export function ProjectJourneyPanel({
         </p>
       ) : null}
 
-      {view.sections.map((section) => {
+      {view.sections.map((section: ProgressGraphSection) => {
         const sectionNodes = section.nodeIds
           .map((id) => nodeById.get(id))
           .filter((n): n is ResolvedProgressNode => n !== undefined);
@@ -260,10 +505,14 @@ export function ProjectJourneyPanel({
                   key={node.id}
                   projectId={projectId}
                   node={node}
+                  view={view}
+                  nodeDependencies={localNodeDependencies}
                   expanded={expandedNodes.has(node.id)}
                   pending={pending}
                   onToggleExpand={toggleExpand}
                   onToggle={toggleNode}
+                  onSetDependencies={setNodeDependencies}
+                  onResetDependencies={resetNodeDependencies}
                 />
               ))}
             </ul>

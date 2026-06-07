@@ -57,8 +57,17 @@ export type ProjectMilestoneState = {
   milestones: { id: string; completed: boolean }[];
 };
 
+export type NodeDependenciesOverrides = Record<string, string[]>;
+
 export type WorkspaceProgressDependenciesJson = {
   milestones?: { id: string; completed: boolean }[];
+  /** When present for a nodeId, fully replaces template dependsOn for that node. */
+  nodeDependencies?: NodeDependenciesOverrides;
+};
+
+export type ProjectDependenciesState = {
+  milestoneState: ProjectMilestoneState;
+  nodeDependencies: NodeDependenciesOverrides;
 };
 
 const MILESTONE_DEFS: Omit<ProgressGraphNodeDef, "kind">[] = [
@@ -136,6 +145,30 @@ const templateById = new Map(
   PROGRESS_GRAPH_TEMPLATE.map((def) => [def.id, def]),
 );
 
+function parseNodeDependenciesFromRaw(
+  raw: unknown,
+): NodeDependenciesOverrides {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return {};
+  }
+  const result: NodeDependenciesOverrides = {};
+  for (const [nodeId, depsRaw] of Object.entries(
+    raw as Record<string, unknown>,
+  )) {
+    if (!nodeId || !Array.isArray(depsRaw)) continue;
+    const deps: string[] = [];
+    for (const d of depsRaw) {
+      if (typeof d === "string" && d) deps.push(d);
+    }
+    result[nodeId] = deps;
+  }
+  return result;
+}
+
+export function parseNodeDependencies(raw: unknown): NodeDependenciesOverrides {
+  return parseNodeDependenciesFromRaw(raw);
+}
+
 export function parseWorkspaceProgressDependencies(
   raw: unknown,
 ): WorkspaceProgressDependenciesJson {
@@ -143,17 +176,38 @@ export function parseWorkspaceProgressDependencies(
     return {};
   }
   const o = raw as Record<string, unknown>;
+  const result: WorkspaceProgressDependenciesJson = {};
+
   const milestonesRaw = o.milestones;
-  if (!Array.isArray(milestonesRaw)) return {};
-  const milestones: { id: string; completed: boolean }[] = [];
-  for (const m of milestonesRaw) {
-    if (!m || typeof m !== "object") continue;
-    const mo = m as Record<string, unknown>;
-    const id = typeof mo.id === "string" ? mo.id : "";
-    if (!id) continue;
-    milestones.push({ id, completed: mo.completed === true });
+  if (Array.isArray(milestonesRaw)) {
+    const milestones: { id: string; completed: boolean }[] = [];
+    for (const m of milestonesRaw) {
+      if (!m || typeof m !== "object") continue;
+      const mo = m as Record<string, unknown>;
+      const id = typeof mo.id === "string" ? mo.id : "";
+      if (!id) continue;
+      milestones.push({ id, completed: mo.completed === true });
+    }
+    if (milestones.length > 0) result.milestones = milestones;
   }
-  return { milestones };
+
+  const nodeDeps = parseNodeDependenciesFromRaw(o.nodeDependencies);
+  if (Object.keys(nodeDeps).length > 0) {
+    result.nodeDependencies = nodeDeps;
+  }
+
+  return result;
+}
+
+export function parseProjectDependenciesState(
+  raw: unknown,
+  seedIdeaSubmitted: boolean,
+): ProjectDependenciesState {
+  const parsed = parseWorkspaceProgressDependencies(raw);
+  return {
+    milestoneState: mergeMilestoneState(raw, seedIdeaSubmitted),
+    nodeDependencies: parsed.nodeDependencies ?? {},
+  };
 }
 
 export function mergeMilestoneState(
@@ -182,8 +236,129 @@ export function mergeMilestoneState(
 
 export function milestoneStateToJson(
   state: ProjectMilestoneState,
+  nodeDependencies: NodeDependenciesOverrides = {},
 ): WorkspaceProgressDependenciesJson {
-  return { milestones: state.milestones };
+  return dependenciesStateToJson({ milestoneState: state, nodeDependencies });
+}
+
+export function dependenciesStateToJson(
+  state: ProjectDependenciesState,
+): WorkspaceProgressDependenciesJson {
+  const json: WorkspaceProgressDependenciesJson = {
+    milestones: state.milestoneState.milestones,
+  };
+  if (Object.keys(state.nodeDependencies).length > 0) {
+    json.nodeDependencies = state.nodeDependencies;
+  }
+  return json;
+}
+
+export function getDefaultDependsOn(nodeId: string): string[] {
+  return templateById.get(nodeId)?.dependsOn ?? [];
+}
+
+export function resolveDependsOn(
+  nodeId: string,
+  overrides: NodeDependenciesOverrides,
+): string[] {
+  if (Object.prototype.hasOwnProperty.call(overrides, nodeId)) {
+    return [...(overrides[nodeId] ?? [])];
+  }
+  return getDefaultDependsOn(nodeId);
+}
+
+export function hasNodeDependencyOverride(
+  nodeId: string,
+  overrides: NodeDependenciesOverrides,
+): boolean {
+  return Object.prototype.hasOwnProperty.call(overrides, nodeId);
+}
+
+export function applyNodeDependencies(
+  overrides: NodeDependenciesOverrides,
+  nodeId: string,
+  dependsOn: string[],
+): NodeDependenciesOverrides {
+  return { ...overrides, [nodeId]: [...dependsOn] };
+}
+
+export function resetNodeDependenciesOverride(
+  overrides: NodeDependenciesOverrides,
+  nodeId: string,
+): NodeDependenciesOverrides {
+  const next = { ...overrides };
+  delete next[nodeId];
+  return next;
+}
+
+export function stripNodeFromDependencies(
+  overrides: NodeDependenciesOverrides,
+  removedNodeId: string,
+): NodeDependenciesOverrides {
+  const next: NodeDependenciesOverrides = {};
+  for (const [nodeId, deps] of Object.entries(overrides)) {
+    if (nodeId === removedNodeId) continue;
+    const filtered = deps.filter((d) => d !== removedNodeId);
+    next[nodeId] = filtered;
+  }
+  return next;
+}
+
+function wouldCreateDependencyCycle(
+  nodeIds: Set<string>,
+  getDependsOn: (id: string) => string[],
+  nodeId: string,
+  newDependsOn: string[],
+): boolean {
+  for (const dep of newDependsOn) {
+    if (dep === nodeId) return true;
+    const visited = new Set<string>();
+    const stack = [dep];
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+      if (current === nodeId) return true;
+      if (visited.has(current)) continue;
+      visited.add(current);
+      for (const next of getDependsOn(current)) {
+        if (nodeIds.has(next)) stack.push(next);
+      }
+    }
+  }
+  return false;
+}
+
+export function validateNodeDependencies(
+  view: ProgressGraphView,
+  nodeId: string,
+  dependsOn: string[],
+  overrides: NodeDependenciesOverrides,
+): { ok: true } | { ok: false; error: string } {
+  const nodeIds = new Set(view.nodes.map((n) => n.id));
+  if (!nodeIds.has(nodeId)) {
+    return { ok: false, error: "Task not found." };
+  }
+
+  const uniqueDeps = [...new Set(dependsOn)];
+  for (const depId of uniqueDeps) {
+    if (depId === nodeId) {
+      return { ok: false, error: "A task cannot depend on itself." };
+    }
+    if (!nodeIds.has(depId)) {
+      return { ok: false, error: "Prerequisite not found." };
+    }
+  }
+
+  const getDependsOn = (id: string) =>
+    id === nodeId ? uniqueDeps : resolveDependsOn(id, overrides);
+
+  if (wouldCreateDependencyCycle(nodeIds, getDependsOn, nodeId, uniqueDeps)) {
+    return {
+      ok: false,
+      error: "That would create a circular dependency.",
+    };
+  }
+
+  return { ok: true };
 }
 
 function milestoneCompleted(
@@ -191,10 +366,6 @@ function milestoneCompleted(
   id: string,
 ): boolean {
   return state.milestones.find((m) => m.id === id)?.completed ?? false;
-}
-
-function dependsOnForNode(id: string): string[] {
-  return templateById.get(id)?.dependsOn ?? [];
 }
 
 function nodeMetaFromTemplate(id: string): ProgressGraphNodeDef | null {
@@ -223,6 +394,7 @@ export function buildProgressGraph(
   checklist: WorkspaceProgressChecklist,
   milestoneState: ProjectMilestoneState,
   required: ProfessionalJobCategory[],
+  nodeDependencies: NodeDependenciesOverrides = {},
 ): ProgressGraphView {
   const nodeMap = new Map<string, ResolvedProgressNode>();
 
@@ -233,7 +405,7 @@ export function buildProgressGraph(
       title: def.title,
       description: def.description,
       completed: milestoneCompleted(milestoneState, def.id),
-      dependsOn: [...def.dependsOn],
+      dependsOn: resolveDependsOn(def.id, nodeDependencies),
       locked: false,
       blockers: [],
     });
@@ -251,7 +423,7 @@ export function buildProgressGraph(
         description: tmpl?.description,
         category,
         completed: leaf.completed,
-        dependsOn: dependsOnForNode(leaf.id),
+        dependsOn: resolveDependsOn(leaf.id, nodeDependencies),
         locked: false,
         blockers: [],
       });
@@ -351,8 +523,14 @@ export function applyGraphNodeCompleted(
   required: ProfessionalJobCategory[],
   nodeId: string,
   completed: boolean,
+  nodeDependencies: NodeDependenciesOverrides = {},
 ): GraphToggleResult | null {
-  const view = buildProgressGraph(checklist, milestoneState, required);
+  const view = buildProgressGraph(
+    checklist,
+    milestoneState,
+    required,
+    nodeDependencies,
+  );
   const node = getNodeFromGraph(view, nodeId);
   if (!node) return null;
 
@@ -390,6 +568,7 @@ export function applyGraphNodeCompleted(
       nextChecklist,
       { milestones: nextMilestones },
       required,
+      nodeDependencies,
     );
     const dependents = getTransitiveDependents(freshView, nodeId);
     for (const depId of dependents) {
