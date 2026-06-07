@@ -154,7 +154,7 @@ export const WORKSPACE_PROGRESS_STANDARD_TEMPLATE: Record<
       "Support audit and data-room requests",
     ]),
   ],
-  "Marketing / growth": [
+  "Marketing / growth / advertising": [
     taskListFromMajor("Positioning & audience", [
       "Define ICP (ideal customer profile), messaging, and channel mix",
       "Create core assets (site, deck, one-pager)",

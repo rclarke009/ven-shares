@@ -14,7 +14,7 @@ export const PROFESSIONAL_JOB_CATEGORY_OPTIONS = [
   "Engineering / product",
   "Finance",
   "Accounting",
-  "Marketing / growth",
+  "Marketing / growth / advertising",
   "Operations",
   "Design / UX (user experience)",
   "Sales / business development",
@@ -34,6 +34,7 @@ export const LEGACY_JOB_CATEGORY_ALIASES: Record<
   "Patent / IP law": "IP - Trademarks, Patents",
   "Patent / IP (intellectual property) law": "IP - Trademarks, Patents",
   "Design / UX": "Design / UX (user experience)",
+  "Marketing / growth": "Marketing / growth / advertising",
 };
 
 export function resolveProfessionalJobCategory(
