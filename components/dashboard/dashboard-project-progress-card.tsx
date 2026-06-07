@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { WorkspaceOrganizerPanel } from "@/components/workspace/workspace-progress-panel";
-import { countChecklistLeaves } from "@/lib/dashboard-progress-stats";
+import { countProgressGraph } from "@/lib/workspace-progress-graph";
 import type { WorkspaceOrganizerBundle } from "@/lib/workspace-organizer-bundle.server";
 
 function formatDate(iso: string) {
@@ -27,8 +27,9 @@ export function DashboardProjectProgressCard({
   currentUserId,
   isProjectOwner = true,
 }: DashboardProjectProgressCardProps) {
-  const { done, total } = countChecklistLeaves(bundle.checklist);
-  const workspaceHref = `/workspace/${bundle.projectId}?tab=organizer`;
+  const { done, total } = countProgressGraph(bundle.progressGraph);
+  const journeyHref = `/workspace/${bundle.projectId}?tab=journey`;
+  const organizerHref = `/workspace/${bundle.projectId}?tab=organizer`;
   const settingsHref = `/workspace/${bundle.projectId}?tab=settings`;
 
   return (
@@ -47,15 +48,21 @@ export function DashboardProjectProgressCard({
         </div>
         {total > 0 ? (
           <p className="text-sm text-slate-600 mt-1">
-            {done} / {total} tasks complete
+            {done} / {total} items complete
           </p>
         ) : null}
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
           <Link
-            href={workspaceHref}
+            href={journeyHref}
             className="font-semibold text-[#15803d] hover:underline"
           >
-            Open workspace
+            View journey
+          </Link>
+          <Link
+            href={organizerHref}
+            className="font-medium text-slate-600 hover:text-[#22c55e] hover:underline"
+          >
+            Open organizer
           </Link>
           {isProjectOwner ? (
             <Link

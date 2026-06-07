@@ -17,6 +17,11 @@ import { resolveClerkDisplayNames } from "@/lib/workspace-display-names";
 import { ensureWorkspaceProgressChecklistSynced } from "@/lib/workspace-progress-sync";
 import type { WorkspaceProgressChecklist } from "@/lib/workspace-progress-checklist";
 import {
+  buildProgressGraphForProject,
+} from "@/lib/workspace-progress-dependencies-sync";
+import type { ProgressGraphView } from "@/lib/workspace-progress-graph";
+import type { ProjectMilestoneState } from "@/lib/workspace-progress-graph";
+import {
   getWorkspaceProjectMeta,
   listMemberClerkIdsForProject,
   listWorkspaceFiles,
@@ -27,6 +32,8 @@ export type WorkspaceOrganizerBundle = {
   projectTitle: string;
   createdAt: string;
   checklist: WorkspaceProgressChecklist;
+  progressGraph: ProgressGraphView;
+  milestoneState: ProjectMilestoneState;
   categoryStatuses: ArenaCategorySlot[];
   categoryCoverage: ArenaCategoryCoverage[];
   files: WorkspaceFileDTO[];
@@ -62,6 +69,9 @@ export async function loadWorkspaceOrganizerBundle(
 
   const progressBundle = await ensureWorkspaceProgressChecklistSynced(projectId);
   if (!progressBundle) return null;
+
+  const graphBundle = await buildProgressGraphForProject(projectId);
+  if (!graphBundle) return null;
 
   const arenaProject = await getProjectByIdForArena(projectId);
   if (!arenaProject) return null;
@@ -118,6 +128,8 @@ export async function loadWorkspaceOrganizerBundle(
     projectTitle: meta.title,
     createdAt: arenaProject.created_at,
     checklist: progressBundle.checklist,
+    progressGraph: graphBundle.graph,
+    milestoneState: graphBundle.milestoneState,
     categoryStatuses: arenaProject.category_statuses,
     categoryCoverage,
     files: filesDto,

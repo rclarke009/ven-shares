@@ -20,6 +20,15 @@ import {
   type ProgressCustomItemKind,
 } from "@/lib/workspace-progress-checklist";
 import { persistWorkspaceProgress } from "@/lib/workspace-progress-sync";
+import {
+  applyGraphNodeCompleted,
+  blockersMessage,
+  buildProgressGraph,
+} from "@/lib/workspace-progress-graph";
+import {
+  loadMergedProgressForToggle,
+  persistWorkspaceProgressGraphToggle,
+} from "@/lib/workspace-progress-dependencies-sync";
 import { normalizeRequiredJobCategoriesFromDb } from "@/lib/skills-match";
 import { canAccessWorkspace } from "@/lib/workspace-access";
 import {
@@ -105,6 +114,61 @@ async function loadMergedChecklist(projectId: string) {
     completed,
   );
   return { required, merged };
+}
+
+export async function actionProgressToggleGraphNode(
+  projectId: string,
+  nodeId: string,
+  completed: boolean,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { userId } = await auth();
+  if (!userId || !isProjectUuid(projectId)) {
+    return { ok: false, error: "Unauthorized." };
+  }
+  const allowed = await canAccessWorkspace(projectId, userId);
+  if (!allowed) return { ok: false, error: "Unauthorized." };
+
+  const loaded = await loadMergedProgressForToggle(projectId);
+  if (!loaded) return { ok: false, error: "Could not load project." };
+
+  const view = buildProgressGraph(
+    loaded.checklist,
+    loaded.milestoneState,
+    loaded.required,
+  );
+  const node = view.nodes.find((n) => n.id === nodeId);
+  if (!node) return { ok: false, error: "Task not found." };
+  if (completed && node.locked) {
+    return {
+      ok: false,
+      error: blockersMessage(node.blockers) || "Complete prerequisites first.",
+    };
+  }
+
+  const result = applyGraphNodeCompleted(
+    loaded.checklist,
+    loaded.milestoneState,
+    loaded.required,
+    nodeId,
+    completed,
+  );
+  if (!result) {
+    return {
+      ok: false,
+      error: blockersMessage(node.blockers) || "Could not update task.",
+    };
+  }
+
+  const persist = await persistWorkspaceProgressGraphToggle(
+    projectId,
+    result.checklist,
+    result.milestoneState,
+  );
+  if (!persist.ok) return persist;
+
+  revalidateArenaAndWorkspace(projectId);
+  revalidatePath("/dashboard");
+  return { ok: true };
 }
 
 export async function actionProgressToggleLeaf(

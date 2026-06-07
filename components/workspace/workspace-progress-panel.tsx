@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   DndContext,
   KeyboardSensor,
@@ -928,50 +929,18 @@ export function WorkspaceOrganizerPanel({
 
               {skillOpen ? (
                 <>
-                  <SkillProgressBody
-                    projectId={projectId}
-                    slot={slot}
-                    taskLists={taskLists}
-                    archivedEntries={archivedEntries}
-                    counts={counts}
-                    allDone={allDone}
-                    pending={pending}
-                    expandedTaskLists={expandedTaskLists}
-                    expandedTasks={expandedTasks}
-                    newTaskListTitle={newTaskListTitle[slot.category] ?? ""}
-                    newTaskTitle={newTaskTitle}
-                    newSubtaskTitle={newSubtaskTitle}
-                    onToggleTaskList={toggleTaskList}
-                    onToggleTask={toggleTask}
-                    onExpandTask={expandTask}
-                    onNewTaskListTitleChange={(value) =>
-                      setNewTaskListTitle((prev) => ({
-                        ...prev,
-                        [slot.category]: value,
-                      }))
-                    }
-                    onNewTaskTitleChange={(taskListId, value) =>
-                      setNewTaskTitle((prev) => ({
-                        ...prev,
-                        [taskListId]: value,
-                      }))
-                    }
-                    onNewSubtaskTitleChange={(taskId, value) =>
-                      setNewSubtaskTitle((prev) => ({
-                        ...prev,
-                        [taskId]: value,
-                      }))
-                    }
-                    onRun={run}
-                    onToggleLeaf={(leafId, completed) =>
-                      void toggleLeaf(category, leafId, completed)
-                    }
-                    onSetCategoryLeaves={(completed) =>
-                      void setCategoryLeaves(category, completed)
-                    }
-                    onCollapseTask={collapseTask}
-                    onCollapseTaskList={collapseTaskList}
-                  />
+                  <div className="px-4 py-2 border-t border-slate-100 bg-slate-50/50">
+                    <p className="text-xs text-slate-600">
+                      Tasks and milestones for this skill are on the{" "}
+                      <Link
+                        href={`/workspace/${projectId}?tab=journey`}
+                        className="font-semibold text-[#15803d] hover:underline"
+                      >
+                        Journey
+                      </Link>{" "}
+                      tab.
+                    </p>
+                  </div>
                   <OrganizerSkillFiles
                     projectId={projectId}
                     projectTitle={projectTitle}

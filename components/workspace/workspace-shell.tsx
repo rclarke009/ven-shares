@@ -6,6 +6,7 @@ import {
   Image,
   LayoutList,
   MessageCircle,
+  Route,
   Video,
 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -24,6 +25,7 @@ import type { ArenaCategorySlot } from "@/lib/projects-arena";
 import type { ArenaCategoryCoverage } from "@/lib/arena-team-display";
 import type { ProjectRequiredSkill } from "@/lib/project-required-skills";
 import type { ProjectImageCropMeta } from "@/lib/project-image-crop";
+import type { ProjectMilestoneState } from "@/lib/workspace-progress-graph";
 import type { WorkspaceProgressChecklist } from "@/lib/workspace-progress-checklist";
 import {
   boardParamFromCategory,
@@ -39,6 +41,7 @@ import { EditProjectForm } from "@/components/dashboard/edit-project-form";
 import { WorkspaceAppShell } from "@/components/workspace/workspace-app-shell";
 import { WorkspaceMessagesPanel } from "@/components/workspace/workspace-messages-panel";
 import { WorkspaceOrganizerPanel } from "@/components/workspace/workspace-progress-panel";
+import { ProjectJourneyPanel } from "@/components/workspace/project-journey-panel";
 import { WorkspaceProjectHero } from "@/components/workspace/workspace-project-hero";
 import { WorkspaceTeamRoster } from "@/components/workspace/workspace-team-roster";
 
@@ -56,6 +59,7 @@ export type WorkspaceFileDTO = {
 };
 
 const TABS = [
+  { id: "journey" as const, label: "Journey", icon: Route },
   { id: "activity" as const, label: "Activity", icon: Activity },
   { id: "messages" as const, label: "Messages", icon: MessageCircle },
   { id: "organizer" as const, label: "Organizer", icon: LayoutList },
@@ -135,6 +139,7 @@ type WorkspaceShellProps = {
   roster: WorkspaceRosterEntryDTO[];
   nameMap: Record<string, string>;
   progressChecklist: WorkspaceProgressChecklist;
+  progressMilestoneState: ProjectMilestoneState;
   progressCategoryStatuses: ArenaCategorySlot[];
   categoryCoverage: ArenaCategoryCoverage[];
   viewerCoveredCategories: ProfessionalJobCategory[];
@@ -265,6 +270,7 @@ export function WorkspaceShell({
   roster,
   nameMap,
   progressChecklist,
+  progressMilestoneState,
   progressCategoryStatuses,
   categoryCoverage,
   viewerCoveredCategories,
@@ -432,6 +438,15 @@ export function WorkspaceShell({
         representativeImagePath={representativeImagePath}
       />
       <div className="flex-1 p-6 overflow-auto">
+        {tab === "journey" ? (
+          <ProjectJourneyPanel
+            projectId={projectId}
+            checklist={progressChecklist}
+            milestoneState={progressMilestoneState}
+            requiredCategories={requiredJobCategories}
+          />
+        ) : null}
+
         {tab === "activity" ? (
           <div className="max-w-3xl rounded-2xl border border-slate-200 bg-white shadow-sm p-6">
             <h2 className="text-base font-semibold text-slate-900 mb-4">
