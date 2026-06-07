@@ -6,6 +6,7 @@ import {
   collectLeafDefsFromChecklistDefinition,
   isPlaceholderChecklistTitle,
   type ChecklistDefinition,
+  type ChecklistLeafDef,
   type TemplateDependencyOverrides,
 } from "@/lib/project-templates";
 import { stdJourneyMilestoneId } from "@/lib/workspace-progress-graph";
@@ -21,9 +22,57 @@ const MILESTONE_OPTIONS = [
 
 const SUMMARY_CHIP_LIMIT = 3;
 
+type MilestoneGroupBlock = {
+  groupTitle: string;
+  displayGroupTitle: string;
+  leaves: ChecklistLeafDef[];
+};
+
 function normalizeDepIds(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter((d): d is string => typeof d === "string" && !!d);
+}
+
+function formatMilestoneGroupLabel(title: string): string {
+  if (!title || isPlaceholderChecklistTitle(title)) return "Untitled group";
+  return title;
+}
+
+function groupLeavesByMilestone(leaves: ChecklistLeafDef[]): MilestoneGroupBlock[] {
+  const blocks: MilestoneGroupBlock[] = [];
+  for (const leaf of leaves) {
+    const last = blocks[blocks.length - 1];
+    if (last && last.groupTitle === leaf.taskListTitle) {
+      last.leaves.push(leaf);
+    } else {
+      blocks.push({
+        groupTitle: leaf.taskListTitle,
+        displayGroupTitle: formatMilestoneGroupLabel(leaf.taskListTitle),
+        leaves: [leaf],
+      });
+    }
+  }
+  return blocks;
+}
+
+function groupLeavesByCategoryAndMilestone(
+  leaves: ChecklistLeafDef[],
+  categories: string[],
+): Map<string, MilestoneGroupBlock[]> {
+  const byCategory = new Map<string, ChecklistLeafDef[]>();
+  for (const leaf of leaves) {
+    const list = byCategory.get(leaf.category) ?? [];
+    list.push(leaf);
+    byCategory.set(leaf.category, list);
+  }
+
+  const grouped = new Map<string, MilestoneGroupBlock[]>();
+  for (const category of categories) {
+    const categoryLeaves = byCategory.get(category);
+    if (!categoryLeaves?.length) continue;
+    grouped.set(category, groupLeavesByMilestone(categoryLeaves));
+  }
+  return grouped;
 }
 
 type TemplateDependenciesEditorProps = {
@@ -32,6 +81,22 @@ type TemplateDependenciesEditorProps = {
   overrides: TemplateDependencyOverrides;
   onChange: (next: TemplateDependencyOverrides) => void;
 };
+
+function MilestoneGroupBadge({ title }: { title: string }) {
+  const label = formatMilestoneGroupLabel(title);
+  const isUntitled = label === "Untitled group";
+  return (
+    <span
+      className={
+        isUntitled
+          ? "rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-xs text-slate-500"
+          : "rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-xs text-indigo-800"
+      }
+    >
+      {label}
+    </span>
+  );
+}
 
 function SelectedSummaryChips({
   selected,
@@ -68,6 +133,166 @@ function SelectedSummaryChips({
   );
 }
 
+function OtherSkillTasksPicker({
+  leaves,
+  excludeId,
+  selected,
+  categories,
+  onToggle,
+}: {
+  leaves: ChecklistLeafDef[];
+  excludeId: string;
+  selected: string[];
+  categories: string[];
+  onToggle: (depId: string) => void;
+}) {
+  const options = leaves.filter((leaf) => leaf.id !== excludeId);
+  const leavesByCategoryAndGroup = useMemo(
+    () => groupLeavesByCategoryAndMilestone(options, categories),
+    [options, categories],
+  );
+
+  const categoriesWithOptions = categories.filter(
+    (cat) => (leavesByCategoryAndGroup.get(cat)?.length ?? 0) > 0,
+  );
+  const showCategoryLabels = categoriesWithOptions.length > 1;
+
+  if (options.length === 0) {
+    return (
+      <p className="text-xs text-slate-500">No other skill tasks available.</p>
+    );
+  }
+
+  return (
+    <div className="max-h-40 overflow-y-auto rounded-lg border border-slate-200 bg-white p-2">
+      <div className="space-y-3">
+        {categoriesWithOptions.map((category) => {
+          const groups = leavesByCategoryAndGroup.get(category) ?? [];
+          return (
+            <div key={category}>
+              {showCategoryLabels ? (
+                <p className="mb-1.5 text-xs font-semibold text-slate-800">
+                  {category}
+                </p>
+              ) : null}
+              <div className="space-y-2.5">
+                {groups.map((group) => {
+                  const groupLeaves = group.leaves.filter(
+                    (leaf) => leaf.id !== excludeId,
+                  );
+                  if (groupLeaves.length === 0) return null;
+                  return (
+                    <div key={`${category}-${group.groupTitle}`}>
+                      <p className="mb-1 text-xs font-medium text-slate-500">
+                        {group.displayGroupTitle}
+                      </p>
+                      <ul className="space-y-1.5">
+                        {groupLeaves.map((opt) => {
+                          const isOn = selected.includes(opt.id);
+                          return (
+                            <li key={opt.id}>
+                              <label className="flex cursor-pointer items-start gap-2 text-sm text-slate-700">
+                                <input
+                                  type="checkbox"
+                                  checked={isOn}
+                                  onChange={() => onToggle(opt.id)}
+                                  className="mt-0.5 size-4 rounded border-slate-300 text-[#22c55e]"
+                                />
+                                <span className="text-xs sm:text-sm">
+                                  {opt.title}
+                                </span>
+                              </label>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function TaskDependencyRow({
+  leaf,
+  selected,
+  titleById,
+  leaves,
+  categories,
+  onToggleDep,
+}: {
+  leaf: ChecklistLeafDef;
+  selected: string[];
+  titleById: Map<string, string>;
+  leaves: ChecklistLeafDef[];
+  categories: string[];
+  onToggleDep: (depId: string) => void;
+}) {
+  return (
+    <details
+      key={leaf.id}
+      className="rounded-lg border border-slate-200 bg-slate-50/50"
+    >
+      <summary className="cursor-pointer px-3 py-2.5">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="text-sm font-medium text-slate-900">{leaf.title}</span>
+          <MilestoneGroupBadge title={leaf.taskListTitle} />
+          <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-600">
+            {selected.length === 0
+              ? "No prerequisites"
+              : `${selected.length} prerequisite${selected.length === 1 ? "" : "s"}`}
+          </span>
+        </div>
+        <div className="mt-2">
+          <SelectedSummaryChips selected={selected} titleById={titleById} />
+        </div>
+      </summary>
+      <div className="space-y-4 border-t border-slate-200 px-3 py-3">
+        <fieldset>
+          <legend className="mb-2 text-xs font-medium text-slate-700">
+            Journey milestones
+          </legend>
+          <ul className="space-y-1.5">
+            {MILESTONE_OPTIONS.map((opt) => {
+              const isOn = selected.includes(opt.id);
+              return (
+                <li key={opt.id}>
+                  <label className="flex cursor-pointer items-start gap-2 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={isOn}
+                      onChange={() => onToggleDep(opt.id)}
+                      className="mt-0.5 size-4 rounded border-slate-300 text-[#22c55e]"
+                    />
+                    <span>{opt.title}</span>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+        </fieldset>
+        <fieldset>
+          <legend className="mb-2 text-xs font-medium text-slate-700">
+            Other skill tasks
+          </legend>
+          <OtherSkillTasksPicker
+            leaves={leaves}
+            excludeId={leaf.id}
+            selected={selected}
+            categories={categories}
+            onToggle={onToggleDep}
+          />
+        </fieldset>
+      </div>
+    </details>
+  );
+}
+
 export function TemplateDependenciesEditor({
   categories,
   checklistDefinition,
@@ -91,18 +316,13 @@ export function TemplateDependenciesEditor({
     return map;
   }, [leaves]);
 
-  const leavesByCategory = useMemo(() => {
-    const grouped = new Map<string, typeof leaves>();
-    for (const leaf of leaves) {
-      const list = grouped.get(leaf.category) ?? [];
-      list.push(leaf);
-      grouped.set(leaf.category, list);
-    }
-    return grouped;
-  }, [leaves]);
+  const leavesByCategoryAndGroup = useMemo(
+    () => groupLeavesByCategoryAndMilestone(leaves, categories),
+    [leaves, categories],
+  );
 
   const categoriesWithLeaves = categories.filter(
-    (cat) => (leavesByCategory.get(cat)?.length ?? 0) > 0,
+    (cat) => (leavesByCategoryAndGroup.get(cat)?.length ?? 0) > 0,
   );
 
   function setDeps(nodeId: string, deps: string[]) {
@@ -136,8 +356,6 @@ export function TemplateDependenciesEditor({
       </p>
     );
   }
-
-  const otherLeaves = leaves;
 
   return (
     <div className="space-y-4">
@@ -175,7 +393,11 @@ export function TemplateDependenciesEditor({
 
       <div className="space-y-3">
         {categoriesWithLeaves.map((category) => {
-          const categoryLeaves = leavesByCategory.get(category) ?? [];
+          const groups = leavesByCategoryAndGroup.get(category) ?? [];
+          const categoryTaskCount = groups.reduce(
+            (sum, group) => sum + group.leaves.length,
+            0,
+          );
           return (
             <details
               key={category}
@@ -194,105 +416,45 @@ export function TemplateDependenciesEditor({
               >
                 {category}
                 <span className="ml-2 text-xs font-normal text-slate-500">
-                  {categoryLeaves.length} task
-                  {categoryLeaves.length === 1 ? "" : "s"}
+                  {categoryTaskCount} task
+                  {categoryTaskCount === 1 ? "" : "s"}
                 </span>
               </summary>
-              <div className="space-y-2 border-t border-slate-100 px-4 py-4">
-                {categoryLeaves.map((leaf) => {
-                  const selected = normalizeDepIds(nodeDependencies[leaf.id]);
-                  const taskMeta =
-                    leaf.taskListTitle &&
-                    leaf.taskListTitle !== leaf.title &&
-                    !isPlaceholderChecklistTitle(leaf.taskListTitle)
-                      ? leaf.taskListTitle
-                      : null;
-
-                  return (
-                    <details
-                      key={leaf.id}
-                      className="rounded-lg border border-slate-200 bg-slate-50/50"
-                    >
-                      <summary className="cursor-pointer px-3 py-2.5">
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                          <span className="text-sm font-medium text-slate-900">
-                            {leaf.title}
-                          </span>
-                          <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-600">
-                            {selected.length === 0
-                              ? "No prerequisites"
-                              : `${selected.length} prerequisite${selected.length === 1 ? "" : "s"}`}
-                          </span>
-                        </div>
-                        {taskMeta ? (
-                          <p className="mt-0.5 text-xs text-slate-500">{taskMeta}</p>
-                        ) : null}
-                        <div className="mt-2">
-                          <SelectedSummaryChips
+              <div className="space-y-4 border-t border-slate-100 px-4 py-4">
+                {groups.map((group) => (
+                  <div
+                    key={`${category}-${group.groupTitle}`}
+                    className="space-y-2"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h4 className="text-sm font-medium text-slate-800">
+                        {group.displayGroupTitle}
+                      </h4>
+                      <span className="text-xs text-slate-500">
+                        {group.leaves.length} task
+                        {group.leaves.length === 1 ? "" : "s"}
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      {group.leaves.map((leaf) => {
+                        const selected = normalizeDepIds(
+                          nodeDependencies[leaf.id],
+                        );
+                        return (
+                          <TaskDependencyRow
+                            key={leaf.id}
+                            leaf={leaf}
                             selected={selected}
                             titleById={titleById}
+                            leaves={leaves}
+                            categories={categories}
+                            onToggleDep={(depId) => toggleDep(leaf.id, depId)}
                           />
-                        </div>
-                      </summary>
-                      <div className="space-y-4 border-t border-slate-200 px-3 py-3">
-                        <fieldset>
-                          <legend className="mb-2 text-xs font-medium text-slate-700">
-                            Journey milestones
-                          </legend>
-                          <ul className="space-y-1.5">
-                            {MILESTONE_OPTIONS.map((opt) => {
-                              const isOn = selected.includes(opt.id);
-                              return (
-                                <li key={opt.id}>
-                                  <label className="flex cursor-pointer items-start gap-2 text-sm text-slate-700">
-                                    <input
-                                      type="checkbox"
-                                      checked={isOn}
-                                      onChange={() => toggleDep(leaf.id, opt.id)}
-                                      className="mt-0.5 size-4 rounded border-slate-300 text-[#22c55e]"
-                                    />
-                                    <span>{opt.title}</span>
-                                  </label>
-                                </li>
-                              );
-                            })}
-                          </ul>
-                        </fieldset>
-                        <fieldset>
-                          <legend className="mb-2 text-xs font-medium text-slate-700">
-                            Other skill tasks
-                          </legend>
-                          <div className="max-h-40 overflow-y-auto rounded-lg border border-slate-200 bg-white p-2">
-                            <ul className="space-y-1.5">
-                              {otherLeaves
-                                .filter((opt) => opt.id !== leaf.id)
-                                .map((opt) => {
-                                  const isOn = selected.includes(opt.id);
-                                  return (
-                                    <li key={opt.id}>
-                                      <label className="flex cursor-pointer items-start gap-2 text-sm text-slate-700">
-                                        <input
-                                          type="checkbox"
-                                          checked={isOn}
-                                          onChange={() =>
-                                            toggleDep(leaf.id, opt.id)
-                                          }
-                                          className="mt-0.5 size-4 rounded border-slate-300 text-[#22c55e]"
-                                        />
-                                        <span className="text-xs sm:text-sm">
-                                          {opt.label}
-                                        </span>
-                                      </label>
-                                    </li>
-                                  );
-                                })}
-                            </ul>
-                          </div>
-                        </fieldset>
-                      </div>
-                    </details>
-                  );
-                })}
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
             </details>
           );
