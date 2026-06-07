@@ -1,16 +1,88 @@
 import type { ProfessionalJobCategory } from "@/lib/professional-onboarding";
 import {
-  GRAPH_SKILL_CROSS_LINK_IDS,
-  stdJourneyMilestoneId,
-  type NodeDependenciesOverrides,
-} from "@/lib/workspace-progress-graph";
-import {
   stdSubtaskId,
   stdTaskId,
   stdTaskListId,
   WORKSPACE_PROGRESS_STANDARD_TEMPLATE,
   type WorkspaceProgressChecklist,
 } from "@/lib/workspace-progress-checklist";
+import {
+  GRAPH_SKILL_CROSS_LINK_IDS,
+  stdJourneyMilestoneId,
+  type NodeDependenciesOverrides,
+} from "@/lib/workspace-progress-graph";
+
+function templateCategorySlug(category: string): string {
+  return category.replace(/[^a-zA-Z0-9]+/g, "_");
+}
+
+function buildListIndexMapAfterMove(
+  length: number,
+  fromIndex: number,
+  toIndex: number,
+): number[] {
+  const order = Array.from({ length }, (_, i) => i);
+  const [removed] = order.splice(fromIndex, 1);
+  order.splice(toIndex, 0, removed);
+  const map = new Array<number>(length);
+  for (let newIdx = 0; newIdx < length; newIdx++) {
+    map[order[newIdx]] = newIdx;
+  }
+  return map;
+}
+
+function remapStdNodeIdForCategoryListIndex(
+  nodeId: string,
+  category: string,
+  indexMap: number[],
+): string {
+  const slug = templateCategorySlug(category);
+  const prefix = `std:${slug}:M`;
+  if (!nodeId.startsWith(prefix)) return nodeId;
+  const rest = nodeId.slice(prefix.length);
+  const match = /^(\d+)(.*)$/.exec(rest);
+  if (!match) return nodeId;
+  const oldLi = Number.parseInt(match[1], 10);
+  const suffix = match[2];
+  if (oldLi < 0 || oldLi >= indexMap.length) return nodeId;
+  const newLi = indexMap[oldLi];
+  return `${prefix}${newLi}${suffix}`;
+}
+
+/** Re-map checklist node ids after reordering milestone groups within a category. */
+export function remapNodeDependenciesForTaskListReorder(
+  category: string,
+  fromIndex: number,
+  toIndex: number,
+  listCount: number,
+  nodeDependencies: NodeDependenciesOverrides = {},
+): NodeDependenciesOverrides {
+  if (fromIndex === toIndex || listCount <= 1) return nodeDependencies;
+  const indexMap = buildListIndexMapAfterMove(listCount, fromIndex, toIndex);
+  const remapped: NodeDependenciesOverrides = {};
+  for (const [nodeId, deps] of Object.entries(nodeDependencies)) {
+    const newNodeId = remapStdNodeIdForCategoryListIndex(
+      nodeId,
+      category,
+      indexMap,
+    );
+    remapped[newNodeId] = deps.map((depId) =>
+      remapStdNodeIdForCategoryListIndex(depId, category, indexMap),
+    );
+  }
+  return remapped;
+}
+
+export function moveTaskListsInOrder<T>(
+  lists: T[],
+  fromIndex: number,
+  toIndex: number,
+): T[] {
+  const next = [...lists];
+  const [item] = next.splice(fromIndex, 1);
+  next.splice(toIndex, 0, item);
+  return next;
+}
 
 export type TemplateSubtaskDef = { title: string };
 export type TemplateTaskDef = { title: string; subtasks: TemplateSubtaskDef[] };

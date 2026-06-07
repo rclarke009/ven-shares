@@ -15,6 +15,13 @@ export const DEFAULT_PROJECT_IMAGE_CROP: ProjectImageCropMeta = {
   zoom: 1,
 };
 
+export const ARENA_CROP_ASPECT = 4 / 3;
+export const HERO_CROP_ASPECT = 5 / 1;
+export const ARENA_IMAGE_SIZE_HINT =
+  "Recommended: 1200 × 900 px or larger (4:3 aspect ratio).";
+export const HERO_IMAGE_SIZE_HINT =
+  "Recommended: 2000 × 400 px or larger (5:1 aspect ratio).";
+
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }

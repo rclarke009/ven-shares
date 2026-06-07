@@ -27,6 +27,10 @@ import {
   DEFAULT_PROJECT_IMAGE_CROP,
   serializeProjectImageCrop,
   type ProjectImageCropMeta,
+  ARENA_CROP_ASPECT,
+  ARENA_IMAGE_SIZE_HINT,
+  HERO_CROP_ASPECT,
+  HERO_IMAGE_SIZE_HINT,
 } from "@/lib/project-image-crop";
 import { PROFESSIONAL_JOB_CATEGORY_OPTIONS } from "@/lib/professional-onboarding";
 
@@ -54,13 +58,6 @@ type EditProjectFormProps = {
   >;
   variant?: "dashboard" | "workspace";
 };
-
-const ARENA_CROP_ASPECT = 4 / 3;
-const HERO_CROP_ASPECT = 5 / 1;
-const ARENA_IMAGE_SIZE_HINT =
-  "Recommended: 1200 × 900 px or larger (4:3 aspect ratio).";
-const HERO_IMAGE_SIZE_HINT =
-  "Recommended: 2000 × 400 px or larger (5:1 aspect ratio).";
 
 const fileFieldButtonClass =
   "inline-flex cursor-pointer items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 active:bg-slate-100";
@@ -550,7 +547,7 @@ export function EditProjectForm({
       fieldName="representative_image"
       inputId={`representative_image_${project.id}`}
       label={isWorkspace ? "Arena card image" : "Representative image"}
-      sizeHint={isWorkspace ? ARENA_IMAGE_SIZE_HINT : undefined}
+      sizeHint={ARENA_IMAGE_SIZE_HINT}
       helperBelowPreview={
         isWorkspace
           ? "This is how your cover appears on Idea Arena cards."

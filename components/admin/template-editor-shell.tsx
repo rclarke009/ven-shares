@@ -18,6 +18,7 @@ import { PROFESSIONAL_JOB_CATEGORY_OPTIONS } from "@/lib/professional-onboarding
 import {
   slugifyTemplateName,
   getStandardTaskListsForCategory,
+  remapNodeDependenciesForTaskListReorder,
   type ChecklistDefinition,
   type ProjectTemplateRow,
   type TemplateDependencyOverrides,
@@ -307,6 +308,22 @@ export function TemplateEditorShell({ template }: TemplateEditorShellProps) {
           categories={categories}
           definition={checklistDefinition}
           onChange={(next) => startTransition(() => setChecklistDefinition(next))}
+          onTaskListsReordered={(category, fromIndex, toIndex) => {
+            const listCount =
+              checklistDefinition[category]?.taskLists?.length ?? 0;
+            startTransition(() =>
+              setDependencyOverrides((prev) => ({
+                ...prev,
+                nodeDependencies: remapNodeDependenciesForTaskListReorder(
+                  category,
+                  fromIndex,
+                  toIndex,
+                  listCount,
+                  prev.nodeDependencies ?? {},
+                ),
+              })),
+            );
+          }}
         />
       ) : null}
 

@@ -1,7 +1,10 @@
 "use client";
 
+import { ChevronDown, ChevronUp } from "lucide-react";
+
 import {
   getStandardTaskListsForCategory,
+  moveTaskListsInOrder,
   type ChecklistDefinition,
   type TemplateTaskListDef,
 } from "@/lib/project-templates";
@@ -10,6 +13,11 @@ type TemplateChecklistEditorProps = {
   categories: string[];
   definition: ChecklistDefinition;
   onChange: (next: ChecklistDefinition) => void;
+  onTaskListsReordered?: (
+    category: string,
+    fromIndex: number,
+    toIndex: number,
+  ) => void;
 };
 
 function emptyTaskList(): TemplateTaskListDef {
@@ -31,6 +39,7 @@ export function TemplateChecklistEditor({
   categories,
   definition,
   onChange,
+  onTaskListsReordered,
 }: TemplateChecklistEditorProps) {
   if (categories.length === 0) {
     return (
@@ -45,6 +54,21 @@ export function TemplateChecklistEditor({
       ...definition,
       [category]: { taskLists },
     });
+  }
+
+  function moveTaskList(category: string, fromIndex: number, toIndex: number) {
+    const taskLists = definition[category]?.taskLists ?? [];
+    if (
+      fromIndex < 0 ||
+      toIndex < 0 ||
+      fromIndex >= taskLists.length ||
+      toIndex >= taskLists.length ||
+      fromIndex === toIndex
+    ) {
+      return;
+    }
+    onTaskListsReordered?.(category, fromIndex, toIndex);
+    updateCategory(category, moveTaskListsInOrder(taskLists, fromIndex, toIndex));
   }
 
   return (
@@ -90,6 +114,26 @@ export function TemplateChecklistEditor({
                   className="rounded-lg border border-slate-200 p-3"
                 >
                   <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <div className="flex shrink-0 flex-col gap-0.5">
+                      <button
+                        type="button"
+                        disabled={li === 0}
+                        onClick={() => moveTaskList(category, li, li - 1)}
+                        className="rounded border border-slate-200 p-1 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        aria-label="Move milestone group up"
+                      >
+                        <ChevronUp className="size-4" aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={li === taskLists.length - 1}
+                        onClick={() => moveTaskList(category, li, li + 1)}
+                        className="rounded border border-slate-200 p-1 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        aria-label="Move milestone group down"
+                      >
+                        <ChevronDown className="size-4" aria-hidden />
+                      </button>
+                    </div>
                     <input
                       type="text"
                       value={list.title}

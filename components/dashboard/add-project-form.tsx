@@ -8,6 +8,7 @@ import {
   type CreateProjectState,
 } from "@/app/dashboard/projects/actions";
 import { PROFESSIONAL_JOB_CATEGORY_OPTIONS } from "@/lib/professional-onboarding";
+import { ARENA_IMAGE_SIZE_HINT } from "@/lib/project-image-crop";
 import type { PublishedTemplatePickerItem } from "@/lib/project-templates";
 
 import { ProjectDescriptionField } from "./project-description-field";
@@ -204,6 +205,7 @@ export function AddProjectForm({
             Representative image{" "}
             <span className="font-normal text-slate-500">(optional)</span>
           </span>
+          <p className="text-xs text-slate-500 mb-2">{ARENA_IMAGE_SIZE_HINT}</p>
           {imagePreviewBlobUrl ? (
             <div className="relative h-24 w-24 rounded-lg overflow-hidden border border-slate-200 mb-2">
               <Image
