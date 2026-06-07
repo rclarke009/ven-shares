@@ -17,6 +17,7 @@ import {
 import { PROFESSIONAL_JOB_CATEGORY_OPTIONS } from "@/lib/professional-onboarding";
 import {
   slugifyTemplateName,
+  getStandardTaskListsForCategory,
   type ChecklistDefinition,
   type ProjectTemplateRow,
   type TemplateDependencyOverrides,
@@ -92,9 +93,18 @@ export function TemplateEditorShell({ template }: TemplateEditorShellProps) {
   );
 
   function toggleCategory(cat: string) {
+    const adding = !categories.includes(cat);
     setCategories((prev) =>
       prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat],
     );
+    if (adding) {
+      setChecklistDefinition((def) => {
+        if (def[cat]?.taskLists?.length) return def;
+        const standard = getStandardTaskListsForCategory(cat);
+        if (!standard) return def;
+        return { ...def, [cat]: { taskLists: standard } };
+      });
+    }
   }
 
   async function handleDelete() {

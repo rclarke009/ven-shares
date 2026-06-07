@@ -148,6 +148,11 @@ export const WORKSPACE_PROGRESS_STANDARD_TEMPLATE: Record<
       "Create core assets (site, deck, one-pager)",
       "Set measurement plan and KPIs (key performance indicators)",
     ]),
+    taskListFromMajor("Advertising", [
+      "Plan paid media budget, platforms, and audience targeting",
+      "Produce and launch ad creative, copy, and landing experiences",
+      "Track ROAS/CPA (return on ad spend / cost per acquisition) and optimize spend",
+    ]),
     taskListFromMajor("Launch & iteration", [
       "Run campaigns and experiments",
       "Optimize funnel and creative",

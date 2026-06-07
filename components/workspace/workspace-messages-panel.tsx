@@ -356,7 +356,7 @@ export function WorkspaceMessagesPanel({
                         {m.author_clerk_user_id === currentUserId ? " (you)" : ""}
                       </span>
                       {m.is_urgent ? (
-                        <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-800">
+                        <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-red-800">
                           Urgent
                         </span>
                       ) : null}

@@ -2,6 +2,7 @@
 
 import {
   collectLeafDefsFromChecklistDefinition,
+  isPlaceholderChecklistTitle,
   type ChecklistDefinition,
   type TemplateDependencyOverrides,
 } from "@/lib/project-templates";
@@ -37,7 +38,7 @@ export function TemplateDependenciesEditor({
   const nodeDependencies = overrides.nodeDependencies ?? {};
   const prerequisiteOptions = [
     ...MILESTONE_OPTIONS,
-    ...leaves.map((l) => ({ id: l.id, title: `${l.category}: ${l.title}` })),
+    ...leaves.map((l) => ({ id: l.id, title: l.label })),
   ];
 
   function setDeps(nodeId: string, deps: string[]) {
@@ -87,7 +88,14 @@ export function TemplateDependenciesEditor({
               className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
             >
               <p className="text-sm font-medium text-slate-900">{leaf.title}</p>
-              <p className="text-xs text-slate-500 mb-2">{leaf.category}</p>
+              <p className="text-xs text-slate-500 mb-2">
+                {leaf.category}
+                {leaf.taskListTitle &&
+                leaf.taskListTitle !== leaf.title &&
+                !isPlaceholderChecklistTitle(leaf.taskListTitle)
+                  ? ` · ${leaf.taskListTitle}`
+                  : null}
+              </p>
               <div className="flex flex-wrap gap-2">
                 {prerequisiteOptions
                   .filter((opt) => opt.id !== leaf.id)

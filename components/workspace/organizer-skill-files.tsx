@@ -94,11 +94,11 @@ function ArchivedFileRow({
                 {file.filename}
               </p>
             )}
-            <span className="rounded-full bg-slate-200/80 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-500">
+            <span className="rounded-full bg-slate-200/80 px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide text-slate-500">
               Archived
             </span>
           </div>
-          <p className="text-[10px] text-slate-400 mt-0.5">
+          <p className="text-[11px] text-slate-400 mt-0.5">
             Archived by{" "}
             {nameMap[file.deleted_by_clerk_user_id ?? ""] ?? "Someone"} ·{" "}
             {formatTime(file.deleted_at ?? file.created_at)}

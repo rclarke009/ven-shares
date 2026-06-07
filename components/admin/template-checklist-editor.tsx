@@ -1,8 +1,9 @@
 "use client";
 
-import type {
-  ChecklistDefinition,
-  TemplateTaskListDef,
+import {
+  getStandardTaskListsForCategory,
+  type ChecklistDefinition,
+  type TemplateTaskListDef,
 } from "@/lib/project-templates";
 
 type TemplateChecklistEditorProps = {
@@ -16,6 +17,14 @@ function emptyTaskList(): TemplateTaskListDef {
     title: "New milestone group",
     tasks: [{ title: "New task", subtasks: [{ title: "New task" }] }],
   };
+}
+
+function syncSingleSubtaskTitle(
+  task: TemplateTaskListDef["tasks"][number],
+  title: string,
+) {
+  if (task.subtasks.length !== 1) return task;
+  return { ...task, title, subtasks: [{ title }] };
 }
 
 export function TemplateChecklistEditor({
@@ -55,6 +64,26 @@ export function TemplateChecklistEditor({
               </span>
             </summary>
             <div className="space-y-4 border-t border-slate-100 px-4 py-4">
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const standard = getStandardTaskListsForCategory(category);
+                    if (!standard?.length) return;
+                    const msg =
+                      taskLists.length > 0
+                        ? `Replace the ${category} checklist with VenShares standard tasks? This cannot be undone until you save.`
+                        : `Load VenShares standard tasks for ${category}?`;
+                    if (!window.confirm(msg)) return;
+                    updateCategory(category, standard);
+                  }}
+                  className="text-xs font-medium text-slate-600 hover:text-slate-900 hover:underline"
+                >
+                  {taskLists.length > 0
+                    ? "Reset to standard checklist"
+                    : "Load standard checklist"}
+                </button>
+              </div>
               {taskLists.map((list, li) => (
                 <div
                   key={`${category}-${li}`}
@@ -93,7 +122,10 @@ export function TemplateChecklistEditor({
                             onChange={(e) => {
                               const next = [...taskLists];
                               const tasks = [...list.tasks];
-                              tasks[ti] = { ...task, title: e.target.value };
+                              tasks[ti] = syncSingleSubtaskTitle(
+                                task,
+                                e.target.value,
+                              );
                               next[li] = { ...list, tasks };
                               updateCategory(category, next);
                             }}

@@ -228,12 +228,101 @@ export function buildInitialChecklistFromDefinition(
   return checklist;
 }
 
+const PLACEHOLDER_CHECKLIST_TITLES = new Set([
+  "new task",
+  "new subtask",
+  "new milestone group",
+]);
+
+export function isPlaceholderChecklistTitle(title: string): boolean {
+  return PLACEHOLDER_CHECKLIST_TITLES.has(title.trim().toLowerCase());
+}
+
+/** Prefer the task title when a single subtask still carries a placeholder name. */
+export function effectiveChecklistLeafTitle(
+  taskTitle: string,
+  subtaskTitle: string,
+  subtaskCount: number,
+): string {
+  if (subtaskCount === 1) {
+    if (!isPlaceholderChecklistTitle(taskTitle)) return taskTitle;
+    if (!isPlaceholderChecklistTitle(subtaskTitle)) return subtaskTitle;
+    return taskTitle;
+  }
+  if (!isPlaceholderChecklistTitle(subtaskTitle)) {
+    if (
+      taskTitle !== subtaskTitle &&
+      !isPlaceholderChecklistTitle(taskTitle)
+    ) {
+      return `${taskTitle} → ${subtaskTitle}`;
+    }
+    return subtaskTitle;
+  }
+  return taskTitle !== subtaskTitle
+    ? `${taskTitle} → ${subtaskTitle}`
+    : taskTitle;
+}
+
+export function formatChecklistLeafLabel(
+  category: string,
+  taskListTitle: string,
+  taskTitle: string,
+  subtaskTitle: string,
+  subtaskCount: number,
+): string {
+  const leafTitle = effectiveChecklistLeafTitle(
+    taskTitle,
+    subtaskTitle,
+    subtaskCount,
+  );
+  const parts = [category];
+  if (
+    taskListTitle &&
+    !isPlaceholderChecklistTitle(taskListTitle) &&
+    taskListTitle !== leafTitle
+  ) {
+    parts.push(taskListTitle);
+  }
+  parts.push(leafTitle);
+  return parts.join(" › ");
+}
+
+export type ChecklistLeafDef = {
+  id: string;
+  category: string;
+  taskListTitle: string;
+  taskTitle: string;
+  subtaskTitle: string;
+  /** Primary display title for this leaf. */
+  title: string;
+  /** Full label for dependency picker pills. */
+  label: string;
+};
+
+/** Standard task lists for one skill category (for admin seed / reset). */
+export function getStandardTaskListsForCategory(
+  category: string,
+): TemplateTaskListDef[] | null {
+  const lists =
+    WORKSPACE_PROGRESS_STANDARD_TEMPLATE[
+      category as ProfessionalJobCategory
+    ];
+  if (!lists) return null;
+  return lists.map((tl) => ({
+    title: tl.title,
+    tasks: tl.tasks.map((t) => ({
+      title: t.title,
+      subtasks: t.subtasks.map((s) => ({ title: s.title })),
+    })),
+  }));
+}
+
 /** Collect all leaf node ids + titles from a checklist definition for dependency editor. */
 export function collectLeafDefsFromChecklistDefinition(
   required: ProfessionalJobCategory[],
   definition: ChecklistDefinition,
-): { id: string; title: string; category: string }[] {
-  const leaves: { id: string; title: string; category: string }[] = [];
+): ChecklistLeafDef[] {
+  const leaves: ChecklistLeafDef[] = [];
   for (const category of required) {
     const lists =
       getTaskListDefForCategory(definition, category) ??
@@ -242,12 +331,29 @@ export function collectLeafDefsFromChecklistDefinition(
       const tList = lists[li];
       for (let ti = 0; ti < tList.tasks.length; ti++) {
         const task = tList.tasks[ti];
-        const subs = task.subtasks.length > 0 ? task.subtasks : [{ title: task.title }];
+        const subs =
+          task.subtasks.length > 0 ? task.subtasks : [{ title: task.title }];
         for (let si = 0; si < subs.length; si++) {
+          const subtaskTitle = subs[si].title;
+          const title = effectiveChecklistLeafTitle(
+            task.title,
+            subtaskTitle,
+            subs.length,
+          );
           leaves.push({
             id: stdSubtaskId(category, li, ti, si),
-            title: subs[si].title,
             category,
+            taskListTitle: tList.title,
+            taskTitle: task.title,
+            subtaskTitle,
+            title,
+            label: formatChecklistLeafLabel(
+              category,
+              tList.title,
+              task.title,
+              subtaskTitle,
+              subs.length,
+            ),
           });
         }
       }

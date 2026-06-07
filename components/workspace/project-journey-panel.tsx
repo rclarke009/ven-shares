@@ -88,7 +88,7 @@ function PrerequisitesEditor({
           Prerequisites
         </p>
         {hasOverride ? (
-          <span className="text-[10px] font-medium text-amber-700 bg-amber-50 rounded px-1.5 py-0.5">
+          <span className="text-[11px] font-medium text-amber-700 bg-amber-50 rounded px-1.5 py-0.5">
             Custom
           </span>
         ) : null}
@@ -255,15 +255,15 @@ function MilestoneRow({
               </span>
             </button>
             {node.locked ? (
-              <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide rounded px-2 py-0.5 bg-slate-100 text-slate-500">
+              <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide rounded px-2 py-0.5 bg-slate-100 text-slate-500">
                 Locked
               </span>
             ) : node.completed ? (
-              <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide rounded px-2 py-0.5 bg-emerald-100 text-emerald-800">
+              <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide rounded px-2 py-0.5 bg-emerald-100 text-emerald-800">
                 Done
               </span>
             ) : (
-              <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide rounded px-2 py-0.5 bg-sky-50 text-sky-800">
+              <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide rounded px-2 py-0.5 bg-sky-50 text-sky-800">
                 Ready
               </span>
             )}

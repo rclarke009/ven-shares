@@ -509,7 +509,7 @@ function SkillProgressBody({
                         />
                         <span className="min-w-0">{taskList.title}</span>
                         {!taskList.standard ? (
-                          <span className="text-[10px] font-semibold text-slate-500 uppercase">
+                          <span className="text-[11px] font-semibold text-slate-500 uppercase">
                             Custom
                           </span>
                         ) : null}
@@ -913,7 +913,7 @@ export function WorkspaceOrganizerPanel({
                         {slot.category}
                       </span>
                       <span
-                        className={`text-[10px] font-semibold uppercase tracking-wide rounded px-2 py-0.5 ${badge.className}`}
+                        className={`text-[11px] font-semibold uppercase tracking-wide rounded px-2 py-0.5 ${badge.className}`}
                       >
                         {badge.label}
                       </span>

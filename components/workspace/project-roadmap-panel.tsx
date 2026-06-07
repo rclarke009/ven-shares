@@ -59,20 +59,20 @@ function organizerHref(projectId: string, category: string): string {
 function StatusBadge({ node }: { node: ResolvedProgressNode }) {
   if (node.locked) {
     return (
-      <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide rounded px-2 py-0.5 bg-slate-100 text-slate-500">
+      <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide rounded px-2 py-0.5 bg-slate-100 text-slate-500">
         Locked
       </span>
     );
   }
   if (node.completed) {
     return (
-      <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide rounded px-2 py-0.5 bg-emerald-100 text-emerald-800">
+      <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide rounded px-2 py-0.5 bg-emerald-100 text-emerald-800">
         Done
       </span>
     );
   }
   return (
-    <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide rounded px-2 py-0.5 bg-sky-50 text-sky-800">
+    <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide rounded px-2 py-0.5 bg-sky-50 text-sky-800">
       Ready
     </span>
   );
@@ -209,7 +209,7 @@ function MilestoneFlowchart({
                 <StatusBadge node={node} />
               </div>
               {isTeamAssembled && totalSkills > 0 ? (
-                <p className="pl-7 text-[10px] text-slate-500 leading-snug">
+                <p className="pl-7 text-[11px] text-slate-500 leading-snug">
                   {coveredSkills}/{totalSkills} skills covered
                   {memberNames.length > 0
                     ? ` · ${memberNames.join(", ")}${roster.filter((r) => r.role !== "owner").length > memberNames.length ? "…" : ""}`
@@ -260,7 +260,7 @@ function SkillTaskCard({
             <StatusBadge node={node} />
           </div>
           {node.locked && blockerText ? (
-            <p className="mt-1 text-[10px] text-slate-400">{blockerText}</p>
+            <p className="mt-1 text-[11px] text-slate-400">{blockerText}</p>
           ) : null}
         </div>
       </div>

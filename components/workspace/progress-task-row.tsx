@@ -275,7 +275,7 @@ export function ProgressTaskRow({
             />
             <span className="min-w-0">{task.title}</span>
             {!task.standard ? (
-              <span className="text-[10px] font-semibold text-slate-500 uppercase">
+              <span className="text-[11px] font-semibold text-slate-500 uppercase">
                 Custom
               </span>
             ) : null}

@@ -57,6 +57,10 @@ type EditProjectFormProps = {
 
 const ARENA_CROP_ASPECT = 4 / 3;
 const HERO_CROP_ASPECT = 5 / 1;
+const ARENA_IMAGE_SIZE_HINT =
+  "Recommended: 1200 × 900 px or larger (4:3 aspect ratio).";
+const HERO_IMAGE_SIZE_HINT =
+  "Recommended: 2000 × 400 px or larger (5:1 aspect ratio).";
 
 const fileFieldButtonClass =
   "inline-flex cursor-pointer items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 active:bg-slate-100";
@@ -92,6 +96,7 @@ type ProjectImageUploadFieldProps = {
   fieldName: string;
   inputId: string;
   label: string;
+  sizeHint?: string;
   helperBelowPreview?: string;
   helperBelowInput: string;
   isWorkspace: boolean;
@@ -118,6 +123,7 @@ function ProjectImageUploadField({
   fieldName,
   inputId,
   label,
+  sizeHint,
   helperBelowPreview,
   helperBelowInput,
   isWorkspace,
@@ -149,6 +155,9 @@ function ProjectImageUploadField({
         {label}{" "}
         <span className="font-normal text-slate-500">(optional)</span>
       </span>
+      {sizeHint ? (
+        <p className={`${helperTextClass} mt-0 mb-2`}>{sizeHint}</p>
+      ) : null}
       {showCropper ? (
         <ProjectImageCropField
           key={cropResetKey}
@@ -508,6 +517,7 @@ export function EditProjectForm({
       fieldName="hero_image"
       inputId={`hero_image_${project.id}`}
       label="Hero image"
+      sizeHint={HERO_IMAGE_SIZE_HINT}
       helperBelowPreview="This is how your project banner appears at the top of the workspace."
       helperBelowInput="JPEG, PNG, or WebP, up to 5MB. Uploading replaces the current hero image."
       isWorkspace={isWorkspace}
@@ -540,9 +550,10 @@ export function EditProjectForm({
       fieldName="representative_image"
       inputId={`representative_image_${project.id}`}
       label={isWorkspace ? "Arena card image" : "Representative image"}
+      sizeHint={isWorkspace ? ARENA_IMAGE_SIZE_HINT : undefined}
       helperBelowPreview={
         isWorkspace
-          ? "This is how your cover appears on Idea Arena cards (4:3 crop)."
+          ? "This is how your cover appears on Idea Arena cards."
           : undefined
       }
       helperBelowInput={
