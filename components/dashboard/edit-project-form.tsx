@@ -50,6 +50,11 @@ type EditProjectFormSection =
   | "foundation"
   | "skills";
 
+export type EditProjectFormActivity = {
+  dirty: boolean;
+  pending: boolean;
+};
+
 type EditProjectFormProps = {
   project: Pick<
     ProjectRow,
@@ -71,7 +76,79 @@ type EditProjectFormProps = {
   onSaved?: () => void;
   submitLabel?: string;
   hideOuterChrome?: boolean;
+  formId?: string;
+  hideSubmitButton?: boolean;
+  onFormActivityChange?: (state: EditProjectFormActivity) => void;
 };
+
+function arraysEqualSorted(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const sortedA = [...a].sort();
+  const sortedB = [...b].sort();
+  return sortedA.every((value, index) => value === sortedB[index]);
+}
+
+function readSkillRowsFromForm(
+  form: HTMLFormElement,
+): { skill_name: string; skill_description: string }[] {
+  const fd = new FormData(form);
+  const names = fd.getAll("skill_name").map(String);
+  const descriptions = fd.getAll("skill_description").map(String);
+  return names.map((skill_name, index) => ({
+    skill_name,
+    skill_description: descriptions[index] ?? "",
+  }));
+}
+
+function computeSectionDirty(
+  form: HTMLFormElement | null,
+  section: EditProjectFormSection,
+  project: EditProjectFormProps["project"],
+  selectedCategories: string[],
+  imageDirty: boolean,
+): boolean {
+  if (section === "images") {
+    return imageDirty;
+  }
+  if (!form || section === "all") {
+    return false;
+  }
+
+  const fd = new FormData(form);
+
+  if (section === "basics") {
+    return (
+      String(fd.get("title") ?? "") !== project.title ||
+      String(fd.get("description") ?? "") !== (project.description ?? "")
+    );
+  }
+
+  if (section === "foundation") {
+    return PROJECT_FOUNDATION_FIELD_DEFS.some(
+      (def) =>
+        String(fd.get(def.formName) ?? "") !==
+        (project.project_foundation[def.key] ?? ""),
+    );
+  }
+
+  if (section === "skills") {
+    if (!arraysEqualSorted(selectedCategories, project.required_job_categories)) {
+      return true;
+    }
+    const rows = readSkillRowsFromForm(form);
+    const initialRows = project.project_required_skills;
+    if (rows.length !== initialRows.length) {
+      return true;
+    }
+    return rows.some(
+      (row, index) =>
+        row.skill_name !== initialRows[index]!.skill_name ||
+        row.skill_description !== initialRows[index]!.skill_description,
+    );
+  }
+
+  return false;
+}
 
 const fileFieldButtonClass =
   "inline-flex cursor-pointer items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 active:bg-slate-100";
@@ -251,6 +328,9 @@ export function EditProjectForm({
   onSaved,
   submitLabel,
   hideOuterChrome = false,
+  formId,
+  hideSubmitButton = false,
+  onFormActivityChange,
 }: EditProjectFormProps) {
   const router = useRouter();
   const isWorkspace = variant === "workspace";
@@ -296,6 +376,8 @@ export function EditProjectForm({
     },
   );
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [dirtyTick, setDirtyTick] = useState(0);
+  const formRef = useRef<HTMLFormElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const heroInputRef = useRef<HTMLInputElement>(null);
   const initialState = useMemo<UpdateProjectMediaState>(
@@ -398,6 +480,14 @@ export function EditProjectForm({
         ? prev.filter((x) => x !== value)
         : [...prev, value],
     );
+    if (hideSubmitButton) {
+      setDirtyTick((tick) => tick + 1);
+    }
+  }
+
+  function scheduleDirtyRecheck() {
+    if (!hideSubmitButton) return;
+    setDirtyTick((tick) => tick + 1);
   }
 
   function handleImageChange(file: File | undefined) {
@@ -648,10 +738,46 @@ export function EditProjectForm({
   const defaultSubmitLabel =
     section === "all" ? "Save project" : "Save & continue";
 
+  const imageDirty =
+    selectedImageFile !== null ||
+    selectedHeroFile !== null ||
+    arenaCropState.dirty ||
+    heroCropState.dirty;
+
+  const isDirty = useMemo(() => {
+    void dirtyTick;
+    return computeSectionDirty(
+      formRef.current,
+      section,
+      project,
+      selected,
+      imageDirty,
+    );
+  }, [
+    dirtyTick,
+    section,
+    project,
+    selected,
+    imageDirty,
+    arenaCropState.dirty,
+    heroCropState.dirty,
+    selectedImageFile,
+    selectedHeroFile,
+  ]);
+
+  useEffect(() => {
+    onFormActivityChange?.({ dirty: isDirty, pending });
+  }, [isDirty, pending, onFormActivityChange]);
+
   return (
     <form
+      ref={formRef}
+      id={formId}
       action={isWorkspace ? undefined : formAction}
       onSubmit={isWorkspace ? handleSubmit : undefined}
+      onInput={hideSubmitButton ? scheduleDirtyRecheck : undefined}
+      onChange={hideSubmitButton ? scheduleDirtyRecheck : undefined}
+      onClick={hideSubmitButton ? scheduleDirtyRecheck : undefined}
       className={
         isWorkspace ? undefined : "mt-4 pt-4 border-t border-slate-100"
       }
@@ -793,13 +919,15 @@ export function EditProjectForm({
         </>
       ) : null}
 
-      <button
-        type="submit"
-        disabled={pending}
-        className={submitButtonClass}
-      >
-        {pending ? "Saving…" : (submitLabel ?? defaultSubmitLabel)}
-      </button>
+      {hideSubmitButton ? null : (
+        <button
+          type="submit"
+          disabled={pending}
+          className={submitButtonClass}
+        >
+          {pending ? "Saving…" : (submitLabel ?? defaultSubmitLabel)}
+        </button>
+      )}
     </form>
   );
 }

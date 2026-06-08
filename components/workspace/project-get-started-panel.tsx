@@ -5,7 +5,7 @@ import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 
-import { EditProjectForm } from "@/components/dashboard/edit-project-form";
+import { EditProjectForm, type EditProjectFormActivity } from "@/components/dashboard/edit-project-form";
 import { ProjectDetailView } from "@/components/idea-arena/project-detail-view";
 import type { ArenaCategoryCoverage, ArenaTeamMemberDisplay } from "@/lib/arena-team-display";
 import {
@@ -61,6 +61,14 @@ function editFormKey(project: WorkspaceEditableProject): string {
   return `${project.id}-${project.hero_image_path ?? ""}-${project.hero_image_original_path ?? ""}-${project.representative_image_path ?? ""}-${project.representative_image_original_path ?? ""}-${JSON.stringify(project.representative_image_crop)}-${JSON.stringify(project.hero_image_crop)}-${project.project_required_skills.map((s) => `${s.skill_name}:${s.skill_description}`).join("|")}-${project.title}-${JSON.stringify(project.project_foundation)}-${project.description ?? ""}-${project.required_job_categories.join(",")}`;
 }
 
+const INITIAL_FORM_ACTIVITY: EditProjectFormActivity = {
+  dirty: false,
+  pending: false,
+};
+
+const PRIMARY_NEXT_BUTTON_CLASS =
+  "inline-flex items-center gap-1 rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-900 disabled:opacity-60 disabled:pointer-events-none";
+
 export function ProjectGetStartedPanel({
   projectId,
   editableProject,
@@ -75,12 +83,26 @@ export function ProjectGetStartedPanel({
   const [step, setStepState] = useState<GetStartedStepId>(() =>
     parseStepId(searchParams.get("step")),
   );
+  const [formActivity, setFormActivity] = useState<EditProjectFormActivity>(
+    INITIAL_FORM_ACTIVITY,
+  );
 
   const formKey = editFormKey(editableProject);
 
   useEffect(() => {
     setStepState(parseStepId(searchParams.get("step")));
   }, [searchParams]);
+
+  useEffect(() => {
+    setFormActivity(INITIAL_FORM_ACTIVITY);
+  }, [step]);
+
+  const handleFormActivityChange = useCallback(
+    (state: EditProjectFormActivity) => {
+      setFormActivity(state);
+    },
+    [],
+  );
 
   const stepIndex = GET_STARTED_STEPS.findIndex((s) => s.id === step);
   const isFirst = stepIndex <= 0;
@@ -122,6 +144,16 @@ export function ProjectGetStartedPanel({
 
   const intro = STEP_INTROS[step];
   const currentStepMeta = GET_STARTED_STEPS[stepIndex]!;
+  const activeFormId = currentStepMeta.editable
+    ? `get-started-${projectId}-${step}`
+    : undefined;
+
+  const getStartedFormProps = {
+    hideOuterChrome: true as const,
+    hideSubmitButton: true as const,
+    onSaved: goNext,
+    onFormActivityChange: handleFormActivityChange,
+  };
 
   return (
     <div className="max-w-5xl">
@@ -197,9 +229,8 @@ export function ProjectGetStartedPanel({
               project={editableProject}
               variant="workspace"
               section="images"
-              hideOuterChrome
-              submitLabel="Save & continue"
-              onSaved={goNext}
+              formId={activeFormId}
+              {...getStartedFormProps}
             />
           ) : null}
 
@@ -209,9 +240,8 @@ export function ProjectGetStartedPanel({
               project={editableProject}
               variant="workspace"
               section="basics"
-              hideOuterChrome
-              submitLabel="Save & continue"
-              onSaved={goNext}
+              formId={activeFormId}
+              {...getStartedFormProps}
             />
           ) : null}
 
@@ -221,9 +251,8 @@ export function ProjectGetStartedPanel({
               project={editableProject}
               variant="workspace"
               section="foundation"
-              hideOuterChrome
-              submitLabel="Save & continue"
-              onSaved={goNext}
+              formId={activeFormId}
+              {...getStartedFormProps}
             />
           ) : null}
 
@@ -233,9 +262,8 @@ export function ProjectGetStartedPanel({
               project={editableProject}
               variant="workspace"
               section="skills"
-              hideOuterChrome
-              submitLabel="Save & continue"
-              onSaved={goNext}
+              formId={activeFormId}
+              {...getStartedFormProps}
             />
           ) : null}
 
@@ -284,11 +312,31 @@ export function ProjectGetStartedPanel({
                 </button>
               ) : null}
 
-              {currentStepMeta.editable ? null : step === "welcome" ? (
+              {currentStepMeta.editable && step !== "preview" ? (
+                formActivity.dirty ? (
+                  <button
+                    type="submit"
+                    form={activeFormId}
+                    disabled={formActivity.pending}
+                    className={PRIMARY_NEXT_BUTTON_CLASS}
+                  >
+                    {formActivity.pending ? "Saving…" : "Save & continue"}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={goNext}
+                    className={PRIMARY_NEXT_BUTTON_CLASS}
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4" aria-hidden />
+                  </button>
+                )
+              ) : step === "welcome" ? (
                 <button
                   type="button"
                   onClick={goNext}
-                  className="inline-flex items-center gap-1 rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-900"
+                  className={PRIMARY_NEXT_BUTTON_CLASS}
                 >
                   Next
                   <ChevronRight className="h-4 w-4" aria-hidden />
@@ -296,12 +344,6 @@ export function ProjectGetStartedPanel({
               ) : step === "preview" ? (
                 <span className="text-sm text-slate-500">You are all set.</span>
               ) : null}
-
-              {!currentStepMeta.editable || step === "preview" ? null : (
-                <p className="text-xs text-slate-500">
-                  Use Save & continue above to save this step.
-                </p>
-              )}
             </div>
           </div>
         </div>
