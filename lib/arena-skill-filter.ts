@@ -109,3 +109,9 @@ export function buildIdeaArenaQueryString(opts: {
 }): string {
   return buildIdeaArenaSearchParams(opts).toString();
 }
+
+/** Idea Arena list URL with “Matches my skills” pre-selected. */
+export function ideaArenaHrefMatchingMySkills(): string {
+  const q = buildIdeaArenaQueryString({ skillFilter: "mine" });
+  return q ? `/idea-arena?${q}` : "/idea-arena";
+}

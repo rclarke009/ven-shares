@@ -36,7 +36,12 @@ import {
   resolveBoardCategory,
   TEAM_BOARD_PARAM,
 } from "@/lib/workspace-message-boards";
-import { writeWorkspaceLastView } from "@/lib/workspace-last-view";
+import {
+  defaultWorkspaceTab,
+  resolveWorkspaceTab,
+  writeWorkspaceLastTab,
+  writeWorkspaceLastView,
+} from "@/lib/workspace-last-view";
 import type { WorkspacePickerProject } from "@/lib/workspace-project-picker.server";
 
 import { EditProjectForm } from "@/components/dashboard/edit-project-form";
@@ -66,9 +71,9 @@ export type WorkspaceFileDTO = {
 const TABS = [
   { id: "journey" as const, label: "Journey", icon: Route },
   { id: "roadmap" as const, label: "Roadmap", icon: Map },
-  { id: "messages" as const, label: "Messages", icon: MessageCircle },
   { id: "organizer" as const, label: "Organizer", icon: LayoutList },
   { id: "meeting" as const, label: "Meeting", icon: Video },
+  { id: "messages" as const, label: "Messages", icon: MessageCircle },
 ];
 
 const GET_STARTED_TAB = {
@@ -171,10 +176,10 @@ function resolveTabId(
   isProjectOwner: boolean,
 ): TabId {
   if (v === "get-started") {
-    return isProjectOwner ? "get-started" : "messages";
+    return isProjectOwner ? "get-started" : "journey";
   }
   if (v === "settings") {
-    return isProjectOwner ? "settings" : "messages";
+    return isProjectOwner ? "settings" : "journey";
   }
   if (v === "progress" || v === "files") {
     return "organizer";
@@ -183,7 +188,7 @@ function resolveTabId(
     return "messages";
   }
   if (isBaseTabId(v)) return v;
-  return "messages";
+  return defaultWorkspaceTab(isProjectOwner);
 }
 
 export function WorkspaceShell({
@@ -254,15 +259,47 @@ export function WorkspaceShell({
   }, [currentUserId, projectId]);
 
   useEffect(() => {
+    if (searchParams.get("tab")) return;
+    if (highlightMessageId) return;
+
+    const raw = resolveWorkspaceTab(currentUserId, projectId, isProjectOwner);
+    const resolved = resolveTabId(raw, isProjectOwner);
+    writeWorkspaceLastTab(currentUserId, projectId, resolved);
+    setTabState(resolved);
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", resolved);
+    if (resolved === "messages" && !params.get("board")) {
+      params.set("board", TEAM_BOARD_PARAM);
+    }
+    startTransition(() => {
+      router.replace(`${pathname}?${params.toString()}`);
+    });
+  }, [
+    currentUserId,
+    projectId,
+    isProjectOwner,
+    highlightMessageId,
+    pathname,
+    router,
+    searchParams,
+    startTransition,
+  ]);
+
+  useEffect(() => {
     const t = searchParams.get("tab");
-    if (t) setTabState(resolveTabId(t, isProjectOwner));
-  }, [searchParams, isProjectOwner]);
+    if (!t) return;
+    const resolved = resolveTabId(t, isProjectOwner);
+    setTabState(resolved);
+    writeWorkspaceLastTab(currentUserId, projectId, resolved);
+  }, [searchParams, isProjectOwner, currentUserId, projectId]);
 
   useEffect(() => {
     if (highlightMessageId) {
       setTabState("messages");
+      writeWorkspaceLastTab(currentUserId, projectId, "messages");
     }
-  }, [highlightMessageId]);
+  }, [highlightMessageId, currentUserId, projectId]);
 
   useEffect(() => {
     void actionWorkspacePresenceHeartbeat(projectId);
@@ -274,6 +311,7 @@ export function WorkspaceShell({
 
   function setTab(next: TabId) {
     setTabState(next);
+    writeWorkspaceLastTab(currentUserId, projectId, next);
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", next);
     if (next === "messages" && !params.get("board")) {
@@ -286,6 +324,7 @@ export function WorkspaceShell({
 
   function setMessageBoard(category: string | null) {
     setTabState("messages");
+    writeWorkspaceLastTab(currentUserId, projectId, "messages");
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", "messages");
     params.set("board", boardParamFromCategory(category));

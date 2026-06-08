@@ -189,7 +189,7 @@ async function WorkspaceProjectContent({
       heroImagePath={arenaProject.hero_image_path}
       representativeImagePath={arenaProject.representative_image_path}
       currentUserId={userId}
-      initialTab={tab ?? "messages"}
+      initialTab={tab ?? (accessFlags.isOwner ? "get-started" : "journey")}
       highlightMessageId={highlightMessageId}
       initialBoardParam={initialBoardParam}
       messages={messagesDto}

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { AddOppositeRolePrompt } from "@/components/dashboard/add-opposite-role-prompt";
+import { ideaArenaHrefMatchingMySkills } from "@/lib/arena-skill-filter";
 import { DashboardAddProjectHeader } from "@/components/dashboard/dashboard-add-project-header";
 import { DashboardProfessionalHeader } from "@/components/dashboard/dashboard-professional-header";
 import { DashboardProjectProgressStack } from "@/components/dashboard/dashboard-project-progress-stack";
@@ -65,8 +66,14 @@ export function WorkspaceDashboardPanel({
                 </Link>
               </div>
             ) : joinedProjectsCount === 0 ? (
-              <p className="text-slate-600 text-base mb-10">
-                You haven&apos;t joined a team yet. Use Idea Arena in the header
+              <p className="text-xl text-slate-700 leading-relaxed mb-10 max-w-2xl">
+                You haven&apos;t joined a team yet.{" "}
+                <Link
+                  href={ideaArenaHrefMatchingMySkills()}
+                  className="text-[#22c55e] font-semibold hover:underline"
+                >
+                  Browse Idea Arena
+                </Link>{" "}
                 to find projects that match your skills.
               </p>
             ) : (
