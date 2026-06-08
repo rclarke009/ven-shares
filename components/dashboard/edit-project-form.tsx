@@ -33,13 +33,22 @@ import {
   HERO_IMAGE_SIZE_HINT,
 } from "@/lib/project-image-crop";
 import { PROFESSIONAL_JOB_CATEGORY_OPTIONS } from "@/lib/professional-onboarding";
+import { PROJECT_FOUNDATION_FIELD_DEFS } from "@/lib/project-foundation";
 
 import {
   ProjectImageCropField,
   type ProjectImageCropFieldState,
 } from "./project-image-crop-field";
 import { ProjectDescriptionField } from "./project-description-field";
+import { ProjectFoundationFields } from "./project-foundation-fields";
 import { ProjectRequiredSkillRows } from "./project-required-skill-rows";
+
+type EditProjectFormSection =
+  | "all"
+  | "images"
+  | "basics"
+  | "foundation"
+  | "skills";
 
 type EditProjectFormProps = {
   project: Pick<
@@ -47,6 +56,7 @@ type EditProjectFormProps = {
     | "id"
     | "title"
     | "description"
+    | "project_foundation"
     | "required_job_categories"
     | "representative_image_path"
     | "representative_image_original_path"
@@ -57,6 +67,10 @@ type EditProjectFormProps = {
     | "project_required_skills"
   >;
   variant?: "dashboard" | "workspace";
+  section?: EditProjectFormSection;
+  onSaved?: () => void;
+  submitLabel?: string;
+  hideOuterChrome?: boolean;
 };
 
 const fileFieldButtonClass =
@@ -113,6 +127,7 @@ type ProjectImageUploadFieldProps = {
   cropAspect?: number;
   initialCrop?: ProjectImageCropMeta | null;
   cropResetKey?: string;
+  cropInitialAdjusting?: boolean;
   onCropStateChange?: (state: ProjectImageCropFieldState) => void;
 };
 
@@ -140,6 +155,7 @@ function ProjectImageUploadField({
   cropAspect,
   initialCrop,
   cropResetKey,
+  cropInitialAdjusting = false,
   onCropStateChange,
 }: ProjectImageUploadFieldProps) {
   const hasCustomImage = !!(savedPath?.trim() || selectedFile);
@@ -161,6 +177,7 @@ function ProjectImageUploadField({
           imageSrc={cropImageSrc}
           aspect={cropAspect ?? ARENA_CROP_ASPECT}
           initialCrop={initialCrop}
+          initialAdjusting={cropInitialAdjusting}
           containerClassName={previewClassName.replace(/\s*mb-2\s*/, " mb-0 ")}
           onCropStateChange={onCropStateChange}
         />
@@ -230,6 +247,10 @@ function ProjectImageUploadField({
 export function EditProjectForm({
   project,
   variant = "dashboard",
+  section = "all",
+  onSaved,
+  submitLabel,
+  hideOuterChrome = false,
 }: EditProjectFormProps) {
   const router = useRouter();
   const isWorkspace = variant === "workspace";
@@ -366,7 +387,10 @@ export function EditProjectForm({
       setSubmitError(null);
     });
     router.refresh();
-  }, [state.ok, router, project.representative_image_crop, project.hero_image_crop]);
+    if (onSaved) {
+      onSaved();
+    }
+  }, [state.ok, router, project.representative_image_crop, project.hero_image_crop, onSaved]);
 
   function toggleCategory(value: string) {
     setSelected((prev) =>
@@ -538,6 +562,7 @@ export function EditProjectForm({
       cropAspect={HERO_CROP_ASPECT}
       initialCrop={project.hero_image_crop}
       cropResetKey={`hero-${project.id}-${selectedHeroFile?.name ?? project.hero_image_path ?? "fallback"}-${heroCropImageSrc ?? "none"}`}
+      cropInitialAdjusting={!!selectedHeroFile}
       onCropStateChange={setHeroCropState}
     />
   ) : null;
@@ -584,11 +609,12 @@ export function EditProjectForm({
       cropAspect={ARENA_CROP_ASPECT}
       initialCrop={project.representative_image_crop}
       cropResetKey={`arena-${project.id}-${selectedImageFile?.name ?? project.representative_image_path ?? "none"}-${arenaCropImageSrc ?? "none"}`}
+      cropInitialAdjusting={!!selectedImageFile}
       onCropStateChange={setArenaCropState}
     />
   );
 
-  const titleAndDescriptionFields = (
+  const basicsFields = (
     <>
       <label className={labelClass}>
         Title
@@ -608,7 +634,19 @@ export function EditProjectForm({
     </>
   );
 
+  const showImages = section === "all" || section === "images";
+  const showBasics = section === "all" || section === "basics";
+  const showFoundation = section === "all" || section === "foundation";
+  const showSkills = section === "all" || section === "skills";
+  const isPartialSection = section !== "all";
+  const preserveBasics = isPartialSection && !showBasics;
+  const preserveFoundation = isPartialSection && !showFoundation;
+  const preserveSkills = isPartialSection && !showSkills;
+  const preserveCategories = isPartialSection && !showSkills;
+
   const displayError = submitError ?? state.error;
+  const defaultSubmitLabel =
+    section === "all" ? "Save project" : "Save & continue";
 
   return (
     <form
@@ -619,7 +657,48 @@ export function EditProjectForm({
       }
     >
       <input type="hidden" name="projectId" value={project.id} />
-      {!isWorkspace ? (
+      {preserveBasics ? (
+        <>
+          <input type="hidden" name="title" value={project.title} />
+          <input
+            type="hidden"
+            name="description"
+            value={project.description ?? ""}
+          />
+        </>
+      ) : null}
+      {preserveCategories
+        ? project.required_job_categories.map((cat) => (
+            <input key={cat} type="hidden" name="categories" value={cat} />
+          ))
+        : null}
+      {preserveFoundation
+        ? PROJECT_FOUNDATION_FIELD_DEFS.map((def) => (
+            <input
+              key={def.key}
+              type="hidden"
+              name={def.formName}
+              value={project.project_foundation[def.key] ?? ""}
+            />
+          ))
+        : null}
+      {preserveSkills
+        ? project.project_required_skills.flatMap((skill, i) => [
+            <input
+              key={`name-${i}`}
+              type="hidden"
+              name="skill_name"
+              value={skill.skill_name}
+            />,
+            <input
+              key={`desc-${i}`}
+              type="hidden"
+              name="skill_description"
+              value={skill.skill_description}
+            />,
+          ])
+        : null}
+      {!isWorkspace && !hideOuterChrome ? (
         <p className="text-sm font-medium text-slate-800 mb-3">Edit project</p>
       ) : null}
       {displayError ? (
@@ -630,71 +709,92 @@ export function EditProjectForm({
           {displayError}
         </p>
       ) : null}
-      {state.ok ? (
+      {state.ok && !onSaved ? (
         <p className="text-sm text-[#15803d] mb-3">Project updated.</p>
       ) : null}
 
       <div className="space-y-3 mb-4">
         {isWorkspace ? (
           <>
-            {arenaImageField}
-            {heroImageField}
-            {titleAndDescriptionFields}
+            {showImages ? (
+              <>
+                {arenaImageField}
+                {heroImageField}
+              </>
+            ) : null}
+            {showBasics ? basicsFields : null}
+            {showFoundation ? (
+              <ProjectFoundationFields
+                defaultValues={project.project_foundation}
+                variant={variant}
+              />
+            ) : null}
           </>
         ) : (
           <>
-            {titleAndDescriptionFields}
-            {arenaImageField}
+            {showBasics ? basicsFields : null}
+            {showFoundation ? (
+              <ProjectFoundationFields
+                defaultValues={project.project_foundation}
+                variant={variant}
+              />
+            ) : null}
+            {showImages ? arenaImageField : null}
           </>
         )}
       </div>
 
-      <p className={sectionTitleClass}>
-        Minimum team skills{" "}
-        <span className="font-normal text-slate-500">(required)</span>
-      </p>
-      <p className={helperTextClass}>
-        Select every category your team needs at minimum. Professionals can join
-        if they match at least one — they do not need every box checked.
-      </p>
-      <ul className="grid gap-2 sm:grid-cols-2 mb-3">
-        {PROFESSIONAL_JOB_CATEGORY_OPTIONS.map((cat) => {
-          const isChecked = selected.includes(cat);
-          return (
-            <li key={cat}>
-              <label
-                className={`${categoryLabelClass} ${
-                  isChecked
-                    ? "border-[#22c55e] bg-green-50/50"
-                    : "border-slate-200 bg-white hover:border-slate-300"
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  name="categories"
-                  value={cat}
-                  checked={isChecked}
-                  onChange={() => toggleCategory(cat)}
-                  className="mt-0.5 size-3.5 rounded border-slate-300 text-[#22c55e] focus:ring-[#22c55e]"
-                />
-                <span className="text-slate-800 leading-snug">{cat}</span>
-              </label>
-            </li>
-          );
-        })}
-      </ul>
+      {showSkills ? (
+        <>
+          <p className={sectionTitleClass}>
+            Minimum team skills{" "}
+            <span className="font-normal text-slate-500">(required)</span>
+          </p>
+          <p className={helperTextClass}>
+            Select every category your team needs at minimum. Professionals can
+            join if they match at least one — they do not need every box
+            checked.
+          </p>
+          <ul className="grid gap-2 sm:grid-cols-2 mb-3">
+            {PROFESSIONAL_JOB_CATEGORY_OPTIONS.map((cat) => {
+              const isChecked = selected.includes(cat);
+              return (
+                <li key={cat}>
+                  <label
+                    className={`${categoryLabelClass} ${
+                      isChecked
+                        ? "border-[#22c55e] bg-green-50/50"
+                        : "border-slate-200 bg-white hover:border-slate-300"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      name="categories"
+                      value={cat}
+                      checked={isChecked}
+                      onChange={() => toggleCategory(cat)}
+                      className="mt-0.5 size-3.5 rounded border-slate-300 text-[#22c55e] focus:ring-[#22c55e]"
+                    />
+                    <span className="text-slate-800 leading-snug">{cat}</span>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
 
-      <ProjectRequiredSkillRows
-        key={`${project.id}-${project.project_required_skills.map((s) => `${s.skill_name}:${s.skill_description}`).join("|")}`}
-        initialRows={project.project_required_skills}
-      />
+          <ProjectRequiredSkillRows
+            key={`${project.id}-${project.project_required_skills.map((s) => `${s.skill_name}:${s.skill_description}`).join("|")}`}
+            initialRows={project.project_required_skills}
+          />
+        </>
+      ) : null}
 
       <button
         type="submit"
         disabled={pending}
         className={submitButtonClass}
       >
-        {pending ? "Saving…" : "Save project"}
+        {pending ? "Saving…" : (submitLabel ?? defaultSubmitLabel)}
       </button>
     </form>
   );

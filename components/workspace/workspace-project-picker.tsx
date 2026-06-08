@@ -100,13 +100,20 @@ export function WorkspaceProjectPicker({
   const [menuOpen, setMenuOpen] = useState(false);
 
   const isAllProjects = activeProjectId === null;
+  const hasProjects = owned.length > 0 || joined.length > 0;
+  const forceMenuOpen = activeProjectId === null && hasProjects;
 
   const closeMenu = useCallback(() => {
+    if (forceMenuOpen) return;
     setMenuOpen(false);
-  }, []);
+  }, [forceMenuOpen]);
 
   useEffect(() => {
-    if (!menuOpen) return;
+    if (forceMenuOpen) setMenuOpen(true);
+  }, [forceMenuOpen]);
+
+  useEffect(() => {
+    if (!menuOpen || forceMenuOpen) return;
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") closeMenu();
@@ -129,18 +136,28 @@ export function WorkspaceProjectPicker({
       document.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("pointerdown", onPointerDown);
     };
-  }, [menuOpen, closeMenu]);
+  }, [menuOpen, forceMenuOpen, closeMenu]);
 
   function selectAll() {
     writeWorkspaceLastView(currentUserId, "all");
-    closeMenu();
+    if (activeProjectId !== null) {
+      closeMenu();
+    }
     router.push("/workspace");
   }
 
   function selectProject(id: string) {
     writeWorkspaceLastView(currentUserId, id);
-    closeMenu();
+    setMenuOpen(false);
     router.push(`/workspace/${id}`);
+  }
+
+  function toggleMenu() {
+    if (forceMenuOpen) {
+      setMenuOpen(true);
+      return;
+    }
+    setMenuOpen((prev) => !prev);
   }
 
   return (
@@ -148,10 +165,13 @@ export function WorkspaceProjectPicker({
       ref={rootRef}
       className="border-b border-slate-600/80 p-3 pb-4"
     >
+      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 px-1">
+        Workspace
+      </p>
       <button
         ref={triggerRef}
         type="button"
-        onClick={() => setMenuOpen((prev) => !prev)}
+        onClick={toggleMenu}
         className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm transition-colors ${
           menuOpen
             ? "bg-slate-500/80 text-white"

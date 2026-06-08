@@ -54,7 +54,7 @@ export function WorkspaceDashboardPanel({
             <DashboardProfessionalHeader />
             {!proOnboardingComplete ? (
               <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-5 mb-10">
-                <p className="text-sm text-slate-700 mb-3">
+                <p className="text-base text-slate-700 mb-3">
                   Finish your professional profile to join teams in Idea Arena.
                 </p>
                 <Link
@@ -65,7 +65,7 @@ export function WorkspaceDashboardPanel({
                 </Link>
               </div>
             ) : joinedProjectsCount === 0 ? (
-              <p className="text-slate-600 text-sm mb-10">
+              <p className="text-slate-600 text-base mb-10">
                 You haven&apos;t joined a team yet. Use Idea Arena in the header
                 to find projects that match your skills.
               </p>
@@ -83,7 +83,7 @@ export function WorkspaceDashboardPanel({
           <>
             <DashboardAddProjectHeader templates={projectTemplates} />
             {projectsCount === 0 ? (
-              <p className="text-slate-600 text-sm mb-10">
+              <p className="text-slate-600 text-base mb-10">
                 No projects yet. Click Add new project to get started.
               </p>
             ) : (

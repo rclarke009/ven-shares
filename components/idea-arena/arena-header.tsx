@@ -17,9 +17,13 @@ const nav = [
 
 type ArenaHeaderProps = {
   profileMode: VenUserButtonProfileMode;
+  contextWorkspaceHref?: string;
 };
 
-export function ArenaHeader({ profileMode }: ArenaHeaderProps) {
+export function ArenaHeader({
+  profileMode,
+  contextWorkspaceHref,
+}: ArenaHeaderProps) {
   return (
     <header className="border-b bg-white/95 backdrop-blur-md sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
@@ -37,7 +41,7 @@ export function ArenaHeader({ profileMode }: ArenaHeaderProps) {
         </nav>
         <div className="flex items-center gap-4 shrink-0">
           <AdminNavLink />
-          <WorkspaceNavLink />
+          <WorkspaceNavLink contextWorkspaceHref={contextWorkspaceHref} />
           <VenUserButton profileMode={profileMode} />
         </div>
       </div>

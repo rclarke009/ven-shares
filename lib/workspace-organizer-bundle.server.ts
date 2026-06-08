@@ -3,7 +3,10 @@ import "server-only";
 import { currentUser } from "@clerk/nextjs/server";
 
 import type { WorkspaceFileDTO } from "@/components/workspace/workspace-shell";
-import type { ArenaCategoryCoverage } from "@/lib/arena-team-display";
+import type {
+  ArenaCategoryCoverage,
+  ArenaTeamMemberDisplay,
+} from "@/lib/arena-team-display";
 import {
   getArenaTeamDisplay,
   resolveViewerCoveredCategories,
@@ -40,6 +43,7 @@ export type WorkspaceOrganizerBundle = {
   nodeDependencies: NodeDependenciesOverrides;
   categoryStatuses: ArenaCategorySlot[];
   categoryCoverage: ArenaCategoryCoverage[];
+  arenaTeamMembers: ArenaTeamMemberDisplay[];
   files: WorkspaceFileDTO[];
   nameMap: Record<string, string>;
   viewerCoveredCategories: ProfessionalJobCategory[];
@@ -137,6 +141,7 @@ export async function loadWorkspaceOrganizerBundle(
     nodeDependencies: graphBundle.nodeDependencies,
     categoryStatuses: arenaProject.category_statuses,
     categoryCoverage,
+    arenaTeamMembers: members,
     files: filesDto,
     nameMap: nameMapRecord,
     viewerCoveredCategories,

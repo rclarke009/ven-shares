@@ -10,18 +10,26 @@ import { workspaceHrefFromStorage } from "@/lib/workspace-last-view";
 const linkClass =
   "text-sm font-medium text-slate-700 hover:text-[#22c55e] transition-colors";
 
-export function WorkspaceNavLink() {
+type WorkspaceNavLinkProps = {
+  contextWorkspaceHref?: string;
+};
+
+export function WorkspaceNavLink({
+  contextWorkspaceHref,
+}: WorkspaceNavLinkProps) {
   const pathname = usePathname();
   const { userId, isLoaded } = useAuth();
-  const [workspaceHref, setWorkspaceHref] = useState("/workspace");
+  const [storedWorkspaceHref, setStoredWorkspaceHref] = useState("/workspace");
 
   useEffect(() => {
     if (!isLoaded || !userId) {
-      setWorkspaceHref("/workspace");
+      setStoredWorkspaceHref("/workspace");
       return;
     }
-    setWorkspaceHref(workspaceHrefFromStorage(userId));
+    setStoredWorkspaceHref(workspaceHrefFromStorage(userId));
   }, [isLoaded, userId]);
+
+  const workspaceHref = contextWorkspaceHref ?? storedWorkspaceHref;
 
   if (pathname.startsWith("/workspace")) {
     return (

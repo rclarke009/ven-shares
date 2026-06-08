@@ -21,6 +21,7 @@ import {
   getVenUserButtonProfileMode,
 } from "@/lib/ven-role.server";
 import { getWorkspaceAccessFlags } from "@/lib/workspace-access";
+import { workspaceHrefForArenaMember } from "@/lib/workspace-arena-nav";
 
 type PageProps = {
   params: Promise<{ projectId: string }>;
@@ -98,9 +99,19 @@ export default async function IdeaArenaProjectPage({
 
   const profileMode = await getVenUserButtonProfileMode();
 
+  const contextWorkspaceHref = canOpenWorkspace
+    ? workspaceHrefForArenaMember(
+        projectId,
+        isProjectOwner ? "owner" : "team",
+      )
+    : undefined;
+
   return (
     <div className="min-h-screen bg-[#f8fafc] flex flex-col">
-      <ArenaHeader profileMode={profileMode} />
+      <ArenaHeader
+        profileMode={profileMode}
+        contextWorkspaceHref={contextWorkspaceHref}
+      />
       <main className="flex-1">
         <ProjectDetailView
           project={project}

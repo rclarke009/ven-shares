@@ -8,9 +8,15 @@ import type {
 } from "@/lib/arena-team";
 import { arenaTeamMemberRailLabel } from "@/lib/arena-team-display";
 import type { ArenaCategorySlotStatus, ArenaProject } from "@/lib/projects-arena";
+import { workspaceHrefForArenaMember } from "@/lib/workspace-arena-nav";
 
 import { ArenaUserAvatar } from "./arena-user-avatar";
 import { SkillTeamRoster } from "./skill-team-roster";
+import {
+  hasAnyFoundationContent,
+  PROJECT_FOUNDATION_FIELD_DEFS,
+} from "@/lib/project-foundation";
+
 import { arenaProjectImageUrl } from "./utils";
 import { JoinTeamForm } from "./join-team-form";
 
@@ -59,6 +65,7 @@ type ProjectDetailViewProps = {
   categoryCoverage: ArenaCategoryCoverage[];
   /** Query string for Idea Arena list (no leading `?`). */
   returnToArenaQuery: string;
+  variant?: "default" | "preview";
 };
 
 export function ProjectDetailView({
@@ -70,7 +77,9 @@ export function ProjectDetailView({
   teamMembers,
   categoryCoverage,
   returnToArenaQuery,
+  variant = "default",
 }: ProjectDetailViewProps) {
+  const isPreview = variant === "preview";
   const coverageByCategory = new Map(
     categoryCoverage.map((c) => [c.category, c]),
   );
@@ -78,9 +87,21 @@ export function ProjectDetailView({
   const summary =
     project.description?.trim() ||
     "No summary yet. The inventor can add more detail from the dashboard.";
+  const showFoundation = hasAnyFoundationContent(project.project_foundation);
+  const workspaceHref = canOpenWorkspace
+    ? workspaceHrefForArenaMember(
+        project.id,
+        isProjectOwner ? "owner" : "team",
+      )
+    : null;
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-10">
+    <div className={isPreview ? "max-w-5xl mx-auto" : "max-w-5xl mx-auto px-6 py-10"}>
+      {isPreview ? (
+        <p className="mb-4 rounded-lg border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm text-sky-900">
+          Preview — how professionals see your Idea Arena card.
+        </p>
+      ) : null}
       <div className="rounded-3xl border border-slate-200/80 bg-[#f0f0f0] shadow-lg overflow-hidden">
         <div className="flex flex-col lg:flex-row">
           <div className="flex-1 p-6 lg:p-8 min-w-0">
@@ -110,6 +131,27 @@ export function ProjectDetailView({
                 <span className="font-bold">Summary: </span>
                 {summary}
               </p>
+              {showFoundation ? (
+                <div className="rounded-xl border border-slate-200 bg-white/90 px-4 py-3 space-y-3">
+                  <p className="text-sm font-semibold text-slate-900">
+                    Project foundation
+                  </p>
+                  {PROJECT_FOUNDATION_FIELD_DEFS.map((def) => {
+                    const value = project.project_foundation[def.key]?.trim();
+                    if (!value) return null;
+                    return (
+                      <div key={def.key}>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          {def.label}
+                        </p>
+                        <p className="text-sm text-slate-800 leading-relaxed mt-0.5 whitespace-pre-wrap">
+                          {value}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : null}
             </div>
             <div className="mt-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
               <div>
@@ -218,7 +260,7 @@ export function ProjectDetailView({
                   </div>
                 ) : null}
               </div>
-              {canOpenWorkspace ? (
+              {isPreview ? null : canOpenWorkspace ? (
                 <div className="shrink-0 text-right max-w-48 sm:max-w-none space-y-2">
                   <p className="text-sm font-semibold text-[#15803d]">
                     {isProjectOwner
@@ -226,7 +268,7 @@ export function ProjectDetailView({
                       : "You’re on this team."}
                   </p>
                   <Link
-                    href={`/workspace/${project.id}`}
+                    href={workspaceHref!}
                     className="inline-flex text-sm font-semibold text-white bg-[#15803d] hover:bg-[#166534] rounded-lg px-4 py-2 transition-colors"
                   >
                     Open workspace
@@ -234,14 +276,14 @@ export function ProjectDetailView({
                 </div>
               ) : isProfessional ? (
                 joinTeamSkillMessage ? (
-                  <p className="text-sm text-slate-600 shrink-0 text-right max-w-xs sm:max-w-sm leading-snug">
+                  <p className="text-base text-slate-600 shrink-0 text-right max-w-xs sm:max-w-sm leading-snug">
                     {joinTeamSkillMessage}
                   </p>
                 ) : (
                   <JoinTeamForm projectId={project.id} />
                 )
               ) : (
-                <p className="text-sm text-slate-600 shrink-0 text-right max-w-56">
+                <p className="text-base text-slate-600 shrink-0 text-right max-w-56">
                   Team join is for skilled professionals.
                 </p>
               )}
@@ -264,14 +306,14 @@ export function ProjectDetailView({
                     </span>{" "}
                     when work is tracked in the workspace checklist.
                   </p>
-                  {canOpenWorkspace ? (
+                  {isPreview || !canOpenWorkspace ? null : (
                     <Link
-                      href={`/workspace/${project.id}`}
+                      href={workspaceHref!}
                       className="inline-block text-[10px] font-semibold text-sky-300 hover:text-sky-200 hover:underline"
                     >
                       Open workspace
                     </Link>
-                  ) : null}
+                  )}
                 </div>
               ) : (
                 <ul className="flex flex-row lg:flex-col gap-4 lg:gap-5 overflow-x-auto lg:overflow-visible pb-1 lg:pb-0 justify-start lg:items-center">
@@ -305,18 +347,20 @@ export function ProjectDetailView({
           </div>
         </div>
       </div>
-      <p className="mt-6 text-center text-xs text-slate-500">
-        <Link
-          href={
-            returnToArenaQuery
-              ? `/idea-arena?${returnToArenaQuery}`
-              : `/idea-arena?selected=${project.id}`
-          }
-          className="text-[#22c55e] font-medium hover:underline"
-        >
-          Back to Idea Arena
-        </Link>
-      </p>
+      {isPreview ? null : (
+        <p className="mt-6 text-center text-xs text-slate-500">
+          <Link
+            href={
+              returnToArenaQuery
+                ? `/idea-arena?${returnToArenaQuery}`
+                : `/idea-arena?selected=${project.id}`
+            }
+            className="text-[#22c55e] font-medium hover:underline"
+          >
+            Back to Idea Arena
+          </Link>
+        </p>
+      )}
     </div>
   );
 }

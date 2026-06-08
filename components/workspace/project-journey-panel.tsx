@@ -504,7 +504,7 @@ export function ProjectJourneyPanel({
         <h2 className="text-base font-semibold text-slate-900">
           VenShares project journey
         </h2>
-        <p className="text-sm text-slate-600 mt-1">
+        <p className="text-base text-slate-600 mt-1">
           Track milestones and skill tasks in order. Expand any item to set
           prerequisites. Locked items unlock when their prerequisites are
           complete.

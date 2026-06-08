@@ -38,7 +38,7 @@ export default async function ProfessionalOnboardingPage() {
         <h1 className="text-2xl font-semibold text-slate-900 mb-2">
           Personalize your profile
         </h1>
-        <p className="text-slate-600 mb-8 text-sm leading-relaxed">
+        <p className="text-slate-600 mb-8 text-base leading-relaxed">
           Skilled professionals on VenShares work with inventors and IP
           (intellectual property). Later
           you&apos;ll add verification documents; for now, tell us your focus

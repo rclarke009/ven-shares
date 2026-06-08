@@ -53,7 +53,7 @@ export function AddProjectPanel({ projects }: AddProjectPanelProps) {
       ) : null}
 
       {projects.length === 0 ? (
-        <p className="text-slate-600 text-sm">
+        <p className="text-slate-600 text-base">
           No projects yet. Click Add new project to get started.
         </p>
       ) : (

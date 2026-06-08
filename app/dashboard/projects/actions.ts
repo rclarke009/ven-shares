@@ -32,6 +32,12 @@ import {
   mergeMilestoneState,
 } from "@/lib/workspace-progress-graph";
 import { isCurrentUserInventor } from "@/lib/ven-role.server";
+import {
+  parseProjectFoundationFromDb,
+  parseProjectFoundationFromFormData,
+  projectFoundationToJson,
+  type ProjectFoundation,
+} from "@/lib/project-foundation";
 
 import type { RepresentativeImageOk } from "@/lib/representative-image-upload";
 
@@ -39,6 +45,7 @@ export type ProjectRow = {
   id: string;
   title: string;
   description: string | null;
+  project_foundation: ProjectFoundation;
   clerk_user_id: string;
   required_job_categories: string[];
   representative_image_path: string | null;
@@ -91,6 +98,7 @@ function mapProjectRowFromDb(row: Record<string, unknown>): ProjectRow {
     id: row.id as string,
     title: row.title as string,
     description: (row.description as string | null) ?? null,
+    project_foundation: parseProjectFoundationFromDb(row.project_foundation),
     clerk_user_id: row.clerk_user_id as string,
     required_job_categories: Array.isArray(cats)
       ? cats.filter((x): x is string => typeof x === "string")
@@ -195,6 +203,7 @@ export async function listProjectsForCurrentUser(): Promise<ProjectRow[]> {
       id,
       title,
       description,
+      project_foundation,
       clerk_user_id,
       required_job_categories,
       representative_image_path,
@@ -210,6 +219,7 @@ export async function listProjectsForCurrentUser(): Promise<ProjectRow[]> {
       id,
       title,
       description,
+      project_foundation,
       clerk_user_id,
       required_job_categories,
       representative_image_path,
@@ -222,6 +232,7 @@ export async function listProjectsForCurrentUser(): Promise<ProjectRow[]> {
       id,
       title,
       description,
+      project_foundation,
       clerk_user_id,
       required_job_categories,
       representative_image_path,
@@ -326,9 +337,12 @@ export async function createProject(
     templateId = template.id;
   }
 
+  const project_foundation = parseProjectFoundationFromFormData(formData);
+
   const insertPayload: Record<string, unknown> = {
     title,
     description,
+    project_foundation: projectFoundationToJson(project_foundation),
     clerk_user_id: userId,
     required_job_categories,
     template_id: templateId,
@@ -691,9 +705,12 @@ export async function updateProjectWithMediaAndSkills(
     workspace_progress_checklist = merged as unknown as Record<string, unknown>;
   }
 
+  const project_foundation = parseProjectFoundationFromFormData(formData);
+
   const updatePayload: Record<string, unknown> = {
     title,
     description,
+    project_foundation: projectFoundationToJson(project_foundation),
     required_job_categories,
     completed_job_categories,
   };

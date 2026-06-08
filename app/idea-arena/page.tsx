@@ -15,6 +15,7 @@ import {
 } from "@/lib/arena-skill-filter";
 import { listProjectsForArenaForViewer } from "@/lib/projects-arena";
 import { getProfessionalJobCategoriesFromMetadata } from "@/lib/skills-match";
+import { workspaceHrefForArenaMember } from "@/lib/workspace-arena-nav";
 import {
   isCurrentUserProfessional,
   getVenUserButtonProfileMode,
@@ -63,9 +64,25 @@ export default async function IdeaArenaPage({
 
   const profileMode = await getVenUserButtonProfileMode();
 
+  const selectedProject =
+    selectedParam && filteredProjects.some((p) => p.id === selectedParam)
+      ? filteredProjects.find((p) => p.id === selectedParam)
+      : undefined;
+  const contextWorkspaceHref =
+    selectedProject?.myRelation === "owner" ||
+    selectedProject?.myRelation === "team"
+      ? workspaceHrefForArenaMember(
+          selectedProject.id,
+          selectedProject.myRelation,
+        )
+      : undefined;
+
   return (
     <div className="min-h-screen bg-[#f8fafc] flex flex-col">
-      <ArenaHeader profileMode={profileMode} />
+      <ArenaHeader
+        profileMode={profileMode}
+        contextWorkspaceHref={contextWorkspaceHref}
+      />
       <section className="hero-bg py-14 md:py-20 px-6 text-center">
         <p className="text-lg md:text-2xl text-white max-w-3xl mx-auto font-medium drop-shadow-md">
           If you find a job you love, you&apos;ll never work again...
@@ -79,7 +96,7 @@ export default async function IdeaArenaPage({
         </Suspense>
 
         {allProjects.length === 0 ? (
-          <p className="text-slate-600 text-sm max-w-lg">
+          <p className="text-slate-600 text-base max-w-lg">
             No projects yet. Inventors can add projects from the{" "}
             <Link href="/workspace" className="text-[#22c55e] font-medium hover:underline">
               workspace
@@ -87,7 +104,7 @@ export default async function IdeaArenaPage({
             .
           </p>
         ) : emptyMineNoProfile ? (
-          <p className="text-slate-600 text-sm max-w-lg">
+          <p className="text-slate-600 text-base max-w-lg">
             Add your job categories to your profile to see jobs that match your
             skills. Add your job categories from{" "}
             <OpenSkillsAvailabilityLink /> in your account menu, or{" "}
@@ -100,7 +117,7 @@ export default async function IdeaArenaPage({
             .
           </p>
         ) : filteredProjects.length === 0 ? (
-          <div className="text-slate-600 text-sm max-w-lg space-y-2">
+          <div className="text-slate-600 text-base max-w-lg space-y-2">
             <p>No projects match this filter.</p>
             {parsed.mode === "need" && parsed.needCategories.length === 0 ? (
               <p className="text-slate-500">

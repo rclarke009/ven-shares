@@ -12,6 +12,7 @@ import { ARENA_IMAGE_SIZE_HINT } from "@/lib/project-image-crop";
 import type { PublishedTemplatePickerItem } from "@/lib/project-templates";
 
 import { ProjectDescriptionField } from "./project-description-field";
+import { ProjectFoundationFields } from "./project-foundation-fields";
 import { ProjectRequiredSkillRows } from "./project-required-skill-rows";
 
 const initialState: CreateProjectState = { ok: false, error: "" };
@@ -164,6 +165,7 @@ export function AddProjectForm({
           />
         </div>
         <ProjectDescriptionField />
+        <ProjectFoundationFields />
         <fieldset className="space-y-2">
           <legend className="block text-sm font-medium text-slate-700">
             Minimum team skills{" "}

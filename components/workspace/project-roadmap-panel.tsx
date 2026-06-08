@@ -352,7 +352,7 @@ export function ProjectRoadmapPanel({
     <div className="max-w-6xl space-y-8">
       <div>
         <h2 className="text-base font-semibold text-slate-900">Project roadmap</h2>
-        <p className="text-sm text-slate-600 mt-1">
+        <p className="text-base text-slate-600 mt-1">
           Visual overview of milestones and skill tasks. Click any item to open
           it in Journey or Organizer.
         </p>

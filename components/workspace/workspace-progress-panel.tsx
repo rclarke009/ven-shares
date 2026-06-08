@@ -860,7 +860,7 @@ export function WorkspaceOrganizerPanel({
 
   if (categoryStatuses.length === 0) {
     return (
-      <div className="max-w-3xl rounded-2xl border border-dashed border-slate-300 bg-white/80 p-10 text-center text-sm text-slate-600">
+      <div className="max-w-3xl rounded-2xl border border-dashed border-slate-300 bg-white/80 p-10 text-center text-base text-slate-600">
         This project doesn’t list team skills yet. The inventor can add them
         from the dashboard.
       </div>

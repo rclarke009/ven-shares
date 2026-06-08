@@ -17,7 +17,7 @@ export function ProfessionalSkillsProfilePanel() {
 
   if (!isLoaded) {
     return (
-      <p className="text-sm text-slate-600 py-4">Loading your profile…</p>
+      <p className="text-base text-slate-600 py-4">Loading your profile…</p>
     );
   }
 
@@ -25,7 +25,7 @@ export function ProfessionalSkillsProfilePanel() {
 
   if (!hasProfessionalRole(meta)) {
     return (
-      <p className="text-sm text-slate-600 py-4">
+      <p className="text-base text-slate-600 py-4">
         Skills and availability are only for skilled professional accounts.
       </p>
     );
@@ -34,7 +34,7 @@ export function ProfessionalSkillsProfilePanel() {
   if (!isProfessionalOnboardingComplete(meta)) {
     return (
       <div className="py-4 space-y-3">
-        <p className="text-sm text-slate-600 leading-relaxed">
+        <p className="text-base text-slate-600 leading-relaxed">
           Finish your professional profile setup before editing skills here.
         </p>
         <Link

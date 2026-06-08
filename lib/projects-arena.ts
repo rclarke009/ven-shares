@@ -7,6 +7,10 @@ import { normalizeRequiredJobCategoriesFromDb } from "@/lib/skills-match";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 
 import type { ProjectRequiredSkill } from "@/lib/project-required-skills";
+import {
+  parseProjectFoundationFromDb,
+  type ProjectFoundation,
+} from "@/lib/project-foundation";
 import { parseProjectImageCrop } from "@/lib/project-image-crop";
 import type { ProjectImageCropMeta } from "@/lib/project-image-crop";
 import {
@@ -36,6 +40,7 @@ export type ArenaProject = {
   id: string;
   title: string;
   description: string | null;
+  project_foundation: ProjectFoundation;
   required_job_categories: ProfessionalJobCategory[];
   completed_job_categories: ProfessionalJobCategory[];
   representative_image_path: string | null;
@@ -184,6 +189,7 @@ function mapArenaRow(
     id: row.id as string,
     title: row.title as string,
     description: (row.description as string | null) ?? null,
+    project_foundation: parseProjectFoundationFromDb(row.project_foundation),
     required_job_categories,
     completed_job_categories,
     representative_image_path:
@@ -212,6 +218,7 @@ const ARENA_PROJECT_SELECT = `
       id,
       title,
       description,
+      project_foundation,
       required_job_categories,
       completed_job_categories,
       workspace_progress_checklist,
@@ -230,6 +237,7 @@ const ARENA_PROJECT_SELECT_WITHOUT_WORKSPACE_CHECKLIST = `
       id,
       title,
       description,
+      project_foundation,
       required_job_categories,
       completed_job_categories,
       representative_image_path,
@@ -242,6 +250,7 @@ const ARENA_PROJECT_SELECT_LEGACY = `
       id,
       title,
       description,
+      project_foundation,
       required_job_categories,
       representative_image_path,
       created_at,
@@ -253,6 +262,7 @@ const ARENA_PROJECT_SELECT_WITHOUT_HERO_IMAGE = `
       id,
       title,
       description,
+      project_foundation,
       required_job_categories,
       completed_job_categories,
       workspace_progress_checklist,
@@ -268,6 +278,7 @@ const ARENA_PROJECT_SELECT_WITHOUT_CROP = `
       id,
       title,
       description,
+      project_foundation,
       required_job_categories,
       completed_job_categories,
       workspace_progress_checklist,

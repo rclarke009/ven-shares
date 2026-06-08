@@ -298,7 +298,7 @@ export function WorkspaceMessagesPanel({
 
         <ul className="flex-1 overflow-y-auto p-4 space-y-4 max-h-[50vh]">
           {boardMessages.length === 0 ? (
-            <li className="text-sm text-slate-600">No messages yet.</li>
+            <li className="text-base text-slate-600">No messages yet.</li>
           ) : (
             boardMessages.map((m) => {
               const canArchive =

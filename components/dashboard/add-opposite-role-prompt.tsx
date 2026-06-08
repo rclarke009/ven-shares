@@ -27,7 +27,7 @@ export function AddOppositeRolePrompt({ missingRole }: AddOppositeRolePromptProp
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-5 mb-10 shadow-sm">
-      <p className="text-sm text-slate-700 mb-3">{body}</p>
+      <p className="text-base text-slate-700 mb-3">{body}</p>
       <Link
         href={href}
         className="inline-flex text-sm font-semibold text-slate-900 border-2 border-slate-900 hover:bg-slate-900 hover:text-white rounded-lg px-4 py-2 transition-colors"

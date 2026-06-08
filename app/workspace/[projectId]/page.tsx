@@ -34,7 +34,7 @@ import {
 
 type PageProps = {
   params: Promise<{ projectId: string }>;
-  searchParams: Promise<{ tab?: string; m?: string; board?: string; file?: string; node?: string; skill?: string }>;
+  searchParams: Promise<{ tab?: string; step?: string; m?: string; board?: string; file?: string; node?: string; skill?: string }>;
 };
 
 function WorkspaceFallback() {
@@ -212,6 +212,7 @@ async function WorkspaceProjectContent({
               id: arenaProject.id,
               title: arenaProject.title,
               description: arenaProject.description,
+              project_foundation: arenaProject.project_foundation,
               required_job_categories: arenaProject.required_job_categories,
               representative_image_path: arenaProject.representative_image_path,
               representative_image_original_path:
@@ -224,6 +225,8 @@ async function WorkspaceProjectContent({
             }
           : null
       }
+      arenaProject={accessFlags.isOwner ? arenaProject : null}
+      arenaTeamMembers={organizerBundle.arenaTeamMembers}
     />
   );
 }

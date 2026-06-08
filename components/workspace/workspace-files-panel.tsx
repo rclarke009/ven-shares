@@ -311,7 +311,7 @@ function FileList({
   onConfirmArchive,
 }: FileListProps) {
   if (files.length === 0) {
-    return <p className="text-sm text-slate-600 mb-2">{emptyMessage}</p>;
+    return <p className="text-base text-slate-600 mb-2">{emptyMessage}</p>;
   }
 
   return (

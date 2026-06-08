@@ -60,7 +60,7 @@ export default async function ProfessionalProfilePage() {
         <h1 className="text-2xl font-semibold text-slate-900 mb-2">
           Edit profile skills
         </h1>
-        <p className="text-slate-600 mb-8 text-sm leading-relaxed">
+        <p className="text-slate-600 mb-8 text-base leading-relaxed">
           Update your job categories, weekly availability, and profile photo.
           You can also edit categories and hours in{" "}
           <OpenSkillsAvailabilityLink /> from your account menu.

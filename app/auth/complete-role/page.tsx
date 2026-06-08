@@ -29,7 +29,7 @@ export default async function CompleteRolePage() {
       <h1 className="text-3xl font-semibold text-slate-900 mb-2 text-center">
         Finish setting up your account
       </h1>
-      <p className="text-slate-600 mb-10 max-w-md text-center text-sm leading-relaxed">
+      <p className="text-slate-600 mb-10 max-w-md text-center text-base leading-relaxed">
         Choose how you&apos;ll use VenShares. You can add the other role
         anytime from your dashboard.
       </p>
