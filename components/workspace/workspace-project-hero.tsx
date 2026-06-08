@@ -1,5 +1,4 @@
 import Image from "next/image";
-import Link from "next/link";
 
 import { workspaceHeroImageUrl } from "@/components/idea-arena/utils";
 
@@ -36,16 +35,10 @@ export function WorkspaceProjectHero({
         className="absolute inset-0 bg-linear-to-t from-black/70 via-black/25 to-black/10"
         aria-hidden
       />
-      <div className="absolute inset-x-0 bottom-0 px-6 py-4 flex items-end justify-between gap-4">
+      <div className="absolute inset-x-0 bottom-0 px-6 py-4">
         <h1 className="text-lg md:text-xl font-bold text-white truncate drop-shadow-sm">
           {projectTitle}
         </h1>
-        <Link
-          href={`/idea-arena/${projectId}`}
-          className="text-sm font-medium text-white/95 hover:text-white hover:underline shrink-0 drop-shadow-sm"
-        >
-          Arena Preview
-        </Link>
       </div>
     </div>
   );

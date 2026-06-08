@@ -27,8 +27,8 @@ type ProjectGetStartedPanelProps = {
 
 const STEP_INTROS: Record<GetStartedStepId, { title: string; body: string }> = {
   welcome: {
-    title: "Welcome to Get Started",
-    body: "Your Idea Arena card is how skilled professionals discover and evaluate your venture. This walkthrough helps you set up everything they see — images, summary, foundation details, and team needs.",
+    title: "Welcome",
+    body: "Your Idea Arena Card is how skilled professionals discover and evaluate your venture. This walkthrough helps you set up everything they see — images, summary, foundation details, and team needs. Tell them as much detail as you can so they will want to come on board and work on your project.",
   },
   images: {
     title: "Look & feel",

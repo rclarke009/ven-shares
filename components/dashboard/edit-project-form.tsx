@@ -719,7 +719,11 @@ export function EditProjectForm({
             {showImages ? (
               <>
                 {arenaImageField}
-                {heroImageField}
+                {heroImageField ? (
+                  <div className="border-t border-slate-200 pt-6 mt-3">
+                    {heroImageField}
+                  </div>
+                ) : null}
               </>
             ) : null}
             {showBasics ? basicsFields : null}

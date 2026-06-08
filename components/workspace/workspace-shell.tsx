@@ -9,6 +9,7 @@ import {
   Route,
   Video,
 } from "lucide-react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   useEffect,
@@ -509,13 +510,23 @@ export function WorkspaceShell({
 
         {tab === "settings" && editableProject ? (
           <div className="max-w-4xl rounded-2xl border border-slate-200 bg-white shadow-sm p-6">
-            <h2 className="text-base font-semibold text-slate-900 mb-1">
-              Arena Card Details
-            </h2>
-            <p className="text-base text-slate-600 mb-4">
-              Set your Idea Arena card image and workspace banner, plus title,
-              summary, and the team skills professionals need to join.
-            </p>
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold text-slate-900 mb-1">
+                  Arena Card Details
+                </h2>
+                <p className="text-base text-slate-600">
+                  Set your Idea Arena card image and workspace banner, plus title,
+                  summary, and the team skills professionals need to join.
+                </p>
+              </div>
+              <Link
+                href={`/idea-arena/${projectId}`}
+                className="shrink-0 text-sm font-medium text-[#15803d] hover:text-[#166534] hover:underline"
+              >
+                Arena Preview
+              </Link>
+            </div>
             <EditProjectForm
               key={`${editableProject.id}-${editableProject.hero_image_path ?? ""}-${editableProject.hero_image_original_path ?? ""}-${editableProject.representative_image_path ?? ""}-${editableProject.representative_image_original_path ?? ""}-${JSON.stringify(editableProject.representative_image_crop)}-${JSON.stringify(editableProject.hero_image_crop)}-${editableProject.project_required_skills.map((s) => `${s.skill_name}:${s.skill_description}`).join("|")}-${editableProject.title}`}
               project={editableProject}
