@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { EditProjectForm, type EditProjectFormActivity } from "@/components/dashboard/edit-project-form";
 import { ProjectDetailView } from "@/components/idea-arena/project-detail-view";
@@ -79,19 +79,12 @@ export function ProjectGetStartedPanel({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [, startTransition] = useTransition();
-  const [step, setStepState] = useState<GetStartedStepId>(() =>
-    parseStepId(searchParams.get("step")),
-  );
+  const step = parseStepId(searchParams.get("step"));
   const [formActivity, setFormActivity] = useState<EditProjectFormActivity>(
     INITIAL_FORM_ACTIVITY,
   );
 
   const formKey = editFormKey(editableProject);
-
-  useEffect(() => {
-    setStepState(parseStepId(searchParams.get("step")));
-  }, [searchParams]);
 
   useEffect(() => {
     setFormActivity(INITIAL_FORM_ACTIVITY);
@@ -121,15 +114,12 @@ export function ProjectGetStartedPanel({
 
   const setStep = useCallback(
     (next: GetStartedStepId) => {
-      setStepState(next);
       const params = new URLSearchParams(searchParams.toString());
       params.set("tab", "get-started");
       params.set("step", next);
-      startTransition(() => {
-        router.replace(`${pathname}?${params.toString()}`);
-      });
+      router.replace(`${pathname}?${params.toString()}`);
     },
-    [pathname, router, searchParams, startTransition],
+    [pathname, router, searchParams],
   );
 
   function goNext() {
