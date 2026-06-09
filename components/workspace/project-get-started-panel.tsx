@@ -83,11 +83,13 @@ export function ProjectGetStartedPanel({
   const [formActivity, setFormActivity] = useState<EditProjectFormActivity>(
     INITIAL_FORM_ACTIVITY,
   );
+  const [advanceAfterSave, setAdvanceAfterSave] = useState(false);
 
   const formKey = editFormKey(editableProject);
 
   useEffect(() => {
     setFormActivity(INITIAL_FORM_ACTIVITY);
+    setAdvanceAfterSave(false);
   }, [step]);
 
   const handleFormActivityChange = useCallback(
@@ -122,15 +124,21 @@ export function ProjectGetStartedPanel({
     [pathname, router, searchParams],
   );
 
-  function goNext() {
+  const goNext = useCallback(() => {
     if (isLast) return;
     setStep(GET_STARTED_STEPS[stepIndex + 1]!.id);
-  }
+  }, [isLast, setStep, stepIndex]);
 
   function goBack() {
     if (isFirst) return;
     setStep(GET_STARTED_STEPS[stepIndex - 1]!.id);
   }
+
+  useEffect(() => {
+    if (!advanceAfterSave || formActivity.pending || formActivity.dirty) return;
+    setAdvanceAfterSave(false);
+    goNext();
+  }, [advanceAfterSave, formActivity.dirty, formActivity.pending, goNext]);
 
   const intro = STEP_INTROS[step];
   const currentStepMeta = GET_STARTED_STEPS[stepIndex]!;
@@ -141,7 +149,6 @@ export function ProjectGetStartedPanel({
   const getStartedFormProps = {
     hideOuterChrome: true as const,
     hideSubmitButton: true as const,
-    onSaved: goNext,
     onFormActivityChange: handleFormActivityChange,
   };
 
@@ -308,6 +315,7 @@ export function ProjectGetStartedPanel({
                     type="submit"
                     form={activeFormId}
                     disabled={formActivity.pending}
+                    onClick={() => setAdvanceAfterSave(true)}
                     className={PRIMARY_NEXT_BUTTON_CLASS}
                   >
                     {formActivity.pending ? "Saving…" : "Save & continue"}
